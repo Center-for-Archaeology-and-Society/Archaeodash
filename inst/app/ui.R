@@ -20,6 +20,7 @@ shinyUI(
   navbarPage(theme = shinythemes::shinytheme("sandstone"),
              title = strong("ArchaeoDash"),
              windowTitle = "ArchaeoDash - A Dashboard for Archaeological Compositional Analysis",
+             shinyjs::useShinyjs(),
              fluid = TRUE, id = "nav",
 
              homeTab(),

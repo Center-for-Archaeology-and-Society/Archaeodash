@@ -176,7 +176,7 @@ visualizeAssignServer = function(input,output,session,rvals){
     },
     error = function(e) {
       showNotification("Error returning plot dataset")
-      return(tibble::tibble)
+      return(NULL)
     })
   })
 
@@ -206,6 +206,14 @@ visualizeAssignServer = function(input,output,session,rvals){
     removeModal()
     rvals$attrData = rvals$attrData %>%
       dplyr::mutate(!!as.name(input$createGroup) := factor(input$createGroupVal))
+  })
+
+  observeEvent(input$NewGroup,{
+    if(input$NewGroup != "" && isTRUE(nrow(rvals$brushSelected) > 0)){
+      shinyjs::enable("Change")
+    } else {
+      shinyjs::disable("Change")
+    }
   })
 
   observeEvent(input$Change, {
@@ -250,7 +258,7 @@ visualizeAssignServer = function(input,output,session,rvals){
         p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
       }
     }
-    plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'select')
+    plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'lasso')
   })
 
   output$brush <- renderUI({
