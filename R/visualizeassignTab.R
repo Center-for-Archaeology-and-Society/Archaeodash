@@ -277,14 +277,16 @@ visualizeAssignServer = function(input,output,session,rvals){
       ggplot2::ggplot(ggplot2::aes(y = !!as.name(input$xvar2), x = value, color = !!as.name(input$multigroup))) +
       ggplot2::geom_point() +
       ggplot2::xlab("") +
-      ggplot2::theme_bw()
+      ggplot2::theme_bw(base_size = 14)
     if(length(input$yvar2) > 1){
       p = p +
-        ggplot2::facet_wrap(~name, scales = "free_x", strip.position = "bottom") +
+        ggplot2::facet_wrap(~name, scales = "free", strip.position = "left") +
         ggplot2::theme(strip.background = ggplot2::element_rect(fill = '#404040'),
-                       strip.text = ggplot2::element_text(color = "white"))
+                       strip.text = ggplot2::element_text(color = "white")) +
+        ggplot2::coord_flip()
     } else {
-      p = p + ggplot2::xlab(input$yvar2)
+      p = p + ggplot2::xlab(input$yvar2) +
+        ggplot2::coord_flip()
     }
     rvals$multiplot = p
   })
