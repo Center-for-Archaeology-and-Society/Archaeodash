@@ -64,7 +64,7 @@ dataInputServer = function(input,output,session,rvals){
       ),
       selectInput(
         "attrGroups",
-        "Select the attributes that represent groups/categories/clusters:",
+        "Select descriptive/grouping columns:",
         items.all,
         multiple = TRUE,
         selected = items
@@ -98,6 +98,10 @@ dataInputServer = function(input,output,session,rvals){
     rvals$attrData = rvals$importedData %>%
       dplyr::select(tidyselect::any_of(input$attr)) %>%
       dplyr::mutate_at(dplyr::vars(tidyselect::any_of(input$attrGroups)),factor)
+    if(length(input$attrGroups) == 0){
+      rvals$attrData = rvals$attrData %>%
+        dplyr::mutate(cluster = "group 1")
+    }
     rvals$chemicalData = rvals$importedData %>%
       dplyr::select(tidyselect::any_of(input$chem)) %>%
       # set below zero to
