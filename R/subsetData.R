@@ -1,3 +1,9 @@
+#' Subset Data UI
+#'
+#' @return
+#' @export
+#'
+#' @examples
 subsetData = function(){
   showModal(modalDialog(
     title = "Subset dataset",
@@ -14,6 +20,17 @@ subsetData = function(){
   ))
 }
 
+#' Subset data server
+#'
+#' @param input
+#' @param output
+#' @param session
+#' @param rvals
+#'
+#' @return
+#' @export
+#'
+#' @examples
 subsetDataServer = function(input,output,session,rvals){
 
   output$subsetDFUI = renderUI({
@@ -95,11 +112,29 @@ subsetDataServer = function(input,output,session,rvals){
   })
 }
 
+#' Subset Module UI
+#'
+#' @param id
+#' @param label
+#'
+#' @return
+#' @export
+#'
+#' @examples
 subsetModUI = function(id,label = "subset"){
   ns <- NS(id)
   uiOutput(ns('subsetButton'))
 }
 
+#' Subset Module Server
+#'
+#' @param id
+#' @param rvals
+#'
+#' @return
+#' @export
+#'
+#' @examples
 subsetModServer <- function(id,rvals) {
   moduleServer(
     id,
@@ -121,11 +156,29 @@ subsetModServer <- function(id,rvals) {
     })
 }
 
+#' Choose dataset UI
+#'
+#' @param id
+#' @param label
+#'
+#' @return
+#' @export
+#'
+#' @examples
 chooseDFUI = function(id, label = "choose DF"){
   ns <- NS(id)
   uiOutput(ns('availableDFsUI'))
 }
 
+#' Choose dataset server
+#'
+#' @param id
+#' @param rvals
+#'
+#' @return
+#' @export
+#'
+#' @examples
 chooseDFServer = function(id,rvals) {
   moduleServer(
     id,

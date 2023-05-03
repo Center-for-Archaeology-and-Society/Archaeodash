@@ -4,14 +4,12 @@
 \alias{group.mem.probs}
 \title{Function for calculating group membership probabilities by chemical compositional distance using Mahalanobis distances and Hotellings T^2 statistic}
 \usage{
-group.mem.probs(x2.l, attr1.grp, grps)
+group.mem.probs(elements, assigned, method = "Hotellings")
 }
 \arguments{
-\item{x2.l}{}
+\item{elements}{transformed element data}
 
-\item{attr1.grp}{}
-
-\item{grps}{}
+\item{assigned}{group designation by sample}
 }
 \description{
 Function for calculating group membership probabilities by chemical compositional distance using Mahalanobis distances and Hotellings T^2 statistic
