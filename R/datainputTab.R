@@ -9,6 +9,9 @@ datainputTab = function(){tabPanel(title = "Data Input", icon = icon("upload"), 
          sidebarLayout(
            sidebarPanel(
              fileInput("file1", "Choose File (csv, xlsx or other supported format)"),
+             chooseDFUI('di'),
+             subsetModUI("di"),
+             br(),
              uiOutput("attr"),
              uiOutput("chem"),
              uiOutput("ui.action") # button that defines data columns & plots to mainPanel window as datatable
@@ -36,12 +39,17 @@ datainputTab = function(){tabPanel(title = "Data Input", icon = icon("upload"), 
 #'
 #' @examples
 dataInputServer = function(input,output,session,rvals){
+
   observeEvent(input$file1, {
     print("importing file")
     if (!is.null(input$file1)) {
       rvals$importedData = rvals$selectedData = rio::import(input$file1$datapath,setclass = 'tibble')
     }
   })
+
+  chooseDFServer("di",rvals)
+
+  subsetModServer("di",rvals)
 
   # Render multi-select lookup for choosing attribute columns
   output$attr <- renderUI({
@@ -95,14 +103,16 @@ dataInputServer = function(input,output,session,rvals){
 
   # create subset data frames
   observeEvent(input$action, {
-    rvals$attrData = rvals$importedData %>%
+    dfName = tools::file_path_sans_ext(input$file1$name)
+    rvals$defaultDF = dfName
+    rvals$df[[dfName]]$attrData = rvals$importedData %>%
       dplyr::select(tidyselect::any_of(input$attr)) %>%
       dplyr::mutate_at(dplyr::vars(tidyselect::any_of(input$attrGroups)),factor)
     if(length(input$attrGroups) == 0){
-      rvals$attrData = rvals$attrData %>%
-        dplyr::mutate(cluster = "group 1")
+      rvals$df[[dfName]]$attrData = rvals$df[[dfName]]$attrData %>%
+        dplyr::mutate(cluster = factor("none"))
     }
-    rvals$chemicalData = rvals$importedData %>%
+    rvals$df[[dfName]]$chemicalData = rvals$importedData %>%
       dplyr::select(tidyselect::any_of(input$chem)) %>%
       # set below zero to
       dplyr::mutate_all(list(function(x)
@@ -113,14 +123,14 @@ dataInputServer = function(input,output,session,rvals){
 
   # Render datatable of chemical data based on selected variables
   output$chem.contents <- DT::renderDataTable({
-    req(rvals$chemicalData)
-    DT::datatable(rvals$chemicalData, rownames = F)
+    req(rvals$df[[input$`di-selectedDF`]]$chemicalData)
+    DT::datatable(rvals$df[[input$`di-selectedDF`]]$chemicalData, rownames = F)
   })
 
   # Render datatable of attribute data based on selected variables
   output$attr.contents <- DT::renderDataTable({
-    req(rvals$attrData)
-    DT::datatable(rvals$attrData, rownames = F)
+    req(rvals$df[[input$`di-selectedDF`]]$attrData)
+    DT::datatable(rvals$df[[input$`di-selectedDF`]]$attrData, rownames = F)
   })
 
   # Render button to update datatable based on variable selections

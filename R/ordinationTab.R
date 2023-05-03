@@ -8,6 +8,10 @@
 ordinationTab = function(){tabPanel(title = "Ordination", icon = icon("equalizer", lib = "glyphicon"),
                   sidebarLayout(
                     sidebarPanel(
+                      chooseDFUI("ot"),
+                      br(),
+                      subsetModUI("ot"),
+                      br(),
                       uiOutput("chem.pca"),
                       uiOutput("pca.button")
                     ), # end sidebarPanel
@@ -35,10 +39,15 @@ ordinationTab = function(){tabPanel(title = "Ordination", icon = icon("equalizer
 #'
 #' @examples
 ordinationServer = function(input,output,session,rvals){
+
+  chooseDFServer("ot",rvals)
+
+  subsetModServer("ot",rvals)
+
   # Render multi-select lookup for choosing chemical concentration columns to include in
   # Principal Components Analysis
   output$chem.pca <- renderUI({
-    items.all <- names(rvals$chemicalData)
+    items.all <- names(rvals$df[[input$`ot-selectedDF`]]$chemicalData)
     names(items.all) = items.all
     selectInput(
       "chem.pca.sel",
@@ -54,16 +63,16 @@ ordinationServer = function(input,output,session,rvals){
   })
 
   observeEvent(input$runPCA, {
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`ot-selectedDF`]]$chemicalData)
     req(input$chem.pca.sel)
-    rvals$pca1 = prcomp(rvals$chemicalData[input$chem.pca.sel])
+    rvals$df[[input$`ot-selectedDF`]]$pcaResults = prcomp(rvals$df[[input$`ot-selectedDF`]]$chemicalData[input$chem.pca.sel])
   })
 
   # Render PCA plot
   output$pca.plot <- renderPlot({
-    req(rvals$pca1)
+    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
     factoextra::fviz_pca_ind(
-      rvals$pca1,
+      rvals$df[[input$`ot-selectedDF`]]$pcaResults,
       col.ind = "cos2",
       # Color by the quality of representation
       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
@@ -74,15 +83,15 @@ ordinationServer = function(input,output,session,rvals){
 
   # Render PCA Eigenvalue plot
   output$eigen.plot <- renderPlot({
-    req(rvals$pca1)
-    factoextra::fviz_eig(rvals$pca1)
+    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
+    factoextra::fviz_eig(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
   })
 
   # Render PCA Eigenvalue plot
   output$pca.el.plot <- renderPlot({
-    req(rvals$pca1)
+    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
     factoextra::fviz_pca_var(
-      rvals$pca1,
+      rvals$df[[input$`ot-selectedDF`]]$pcaResults,
       col.var = "contrib",
       # Color by contributions to the PC
       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),

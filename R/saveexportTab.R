@@ -8,6 +8,10 @@
 saveexportTab = function(){tabPanel(title = "Save & Export", icon = icon("download"),
                   sidebarLayout(
                     sidebarPanel(
+                      chooseDFUI("se"),
+                      br(),
+                      subsetModUI("se"),
+                      br(),
                       "Export selected attributes (including new/updated clusters/designations) and transformed/imputed elements",
                       textInput('ExportName', label = 'Type name for export (include file type (e.g., csv, xlsx)'),
                       br(),
@@ -33,12 +37,17 @@ saveexportTab = function(){tabPanel(title = "Save & Export", icon = icon("downlo
 #'
 #' @examples
 saveExportServer = function(input,output,session,rvals){
+
+  chooseDFServer("se",rvals)
+
+  subsetModServer("se",rvals)
+
   output$Save <- downloadHandler(
     filename = function() {
-      input$ExportName
+      ifelse(isTRUE(stringr::str_detect(input$ExportName,stringr::fixed("."))),input$ExportName,paste0(input$ExportName,".xlsx"))
     },
     content = function(file) {
-      rio::export(dplyr::bind_cols(rvals$attrData, rvals$chemicalData),
+      rio::export(dplyr::bind_cols(rvals$df[[input$`se-selectedDF`]]$attrData, rvals$df[[input$`se-selectedDF`]]$chemicalData),
                   file)
     }
   )

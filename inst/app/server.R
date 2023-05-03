@@ -5,11 +5,11 @@ library(shiny)
 shinyServer(function(input, output, session) {
 
   ####  create reactive values  ####
-  rvals = reactiveValues()
+  # rvals = reactiveValues()
 
   ## for testing
-  # rvals <<- reactiveValues(); showNotification("warning: global variable is only for testing")
-  # input <<- input
+  rvals <<- reactiveValues(); showNotification("warning: global variable is only for testing")
+  input <<- input
 
   #### Import data ####
   dataInputServer(input,output,session,rvals)
@@ -28,5 +28,8 @@ shinyServer(function(input, output, session) {
 
   ####   Save & Export  ####
   saveExportServer(input,output,session,rvals)
+
+  #### subsetDataServer ####
+  subsetDataServer(input,output,session,rvals)
 
 }) # end server

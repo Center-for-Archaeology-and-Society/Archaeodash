@@ -24,9 +24,13 @@ visualizeassignTab = function() {
                          fluidRow(
                            column(
                              2,
+                             chooseDFUI("vs"),
+                             br(),
+                             subsetModUI("vs"),
+                             br(),
                              selectInput(
                                'data.src',
-                               'Choose Dataset',
+                               'Choose data type',
                                choices = c('elements', 'principal components'),
                                selected = 'elements'
                              ),
@@ -67,6 +71,10 @@ visualizeassignTab = function() {
                          uiOutput('brush')
                 ),
                 tabPanel(title = "multiplots",
+                         chooseDFUI("mp"),
+                         br(),
+                         subsetModUI("mp"),
+                         br(),
                          fluidRow(column(3,uiOutput('xvar2UI')),
                                   column(1),
                                   column(3,
@@ -99,10 +107,18 @@ visualizeassignTab = function() {
 #' @examples
 visualizeAssignServer = function(input,output,session,rvals){
 
+  chooseDFServer("vs",rvals)
+
+  chooseDFServer("mp",rvals)
+
+  subsetModServer("vs",rvals)
+
+  subsetModServer("mp",rvals)
+
   output$sel <- renderUI({
     req(input$Code)
-    req(rvals$attrData)
-    vals = rvals$attrData[[input$Code]] %>% unique %>% sort
+    req(rvals$df[[input$`vs-selectedDF`]]$attrData)
+    vals = rvals$df[[input$`vs-selectedDF`]]$attrData[[input$Code]] %>% unique %>% sort
     checkboxGroupInput("groups",
                        "Groups to show:",
                        choices = vals,
@@ -110,43 +126,43 @@ visualizeAssignServer = function(input,output,session,rvals){
   })
 
   output$xvarUI = renderUI({
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`vs-selectedDF`]]$chemicalData)
     if (input$data.src == 'principal components') {
-      df = try(rvals$pca1$x %>% dplyr::as_tibble(), silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$pcaResults$x %>% dplyr::as_tibble(), silent = T)
     } else {
-      df = try(rvals$chemicalData, silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$chemicalData, silent = T)
     }
     selectInput('xvar', 'X', names(df), selected = names(df)[1])
   })
 
   output$yvarUI = renderUI({
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`vs-selectedDF`]]$chemicalData)
     if (input$data.src == 'principal components') {
-      df = try(rvals$pca1$x %>% dplyr::as_tibble(), silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$pcaResults$x %>% dplyr::as_tibble(), silent = T)
     } else {
-      df = try(rvals$chemicalData, silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$chemicalData, silent = T)
     }
     selectInput('yvar', 'y', names(df), selected = names(df)[2])
   })
 
   output$CodeUI = renderUI({
-    selectInput('Code', 'GROUP', choices = colnames(rvals$attrData)[sapply(rvals$attrData, is.factor)])
+    selectInput('Code', 'GROUP', choices = colnames(rvals$df[[input$`vs-selectedDF`]]$attrData)[sapply(rvals$df[[input$`vs-selectedDF`]]$attrData, is.factor)])
   })
 
   output$xvar2UI = renderUI({
-    req(rvals$chemicalData)
-    selectInput('xvar2', 'X', names(rvals$chemicalData))
+    req(rvals$df[[input$`vs-selectedDF`]]$chemicalData)
+    selectInput('xvar2', 'X', names(rvals$df[[input$`vs-selectedDF`]]$chemicalData))
   })
 
   output$yvar2UI = renderUI({
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`vs-selectedDF`]]$chemicalData)
     req(input$xvar2)
-    choices = names(rvals$chemicalData)[which(names(rvals$chemicalData) != input$xvar2)]
+    choices = names(rvals$df[[input$`vs-selectedDF`]]$chemicalData)[which(names(rvals$df[[input$`vs-selectedDF`]]$chemicalData) != input$xvar2)]
     selectInput('yvar2', 'Y', choices = choices, multiple = T, selected = choices)
   })
 
   output$Code2UI = renderUI({
-    selectInput('multigroup', 'GROUP', choices = colnames(rvals$attrData)[sapply(rvals$attrData, is.factor)])
+    selectInput('multigroup', 'GROUP', choices = colnames(rvals$df[[input$`vs-selectedDF`]]$attrData)[sapply(rvals$df[[input$`vs-selectedDF`]]$attrData, is.factor)])
   })
 
   observeEvent({
@@ -161,9 +177,9 @@ visualizeAssignServer = function(input,output,session,rvals){
     req(input$yvar)
     req(input$groups)
     if (input$data.src == 'principal components') {
-      df = try(rvals$pca1$x %>% dplyr::as_tibble(), silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$pcaResults$x %>% dplyr::as_tibble(), silent = T)
     } else {
-      df = try(rvals$chemicalData, silent = T)
+      df = try(rvals$df[[input$`vs-selectedDF`]]$chemicalData, silent = T)
     }
     rvals$plotlydf = tryCatch({
       df %>%
@@ -171,7 +187,7 @@ visualizeAssignServer = function(input,output,session,rvals){
         dplyr::select(rowid,
                       x = tidyselect::all_of(input$xvar),
                       y = tidyselect::all_of(input$yvar)) %>%
-        dplyr::bind_cols(rvals$attrData %>% dplyr::select(group = tidyselect::all_of(input$Code))) %>%
+        dplyr::bind_cols(rvals$df[[input$`vs-selectedDF`]]$attrData %>% dplyr::select(group = tidyselect::all_of(input$Code))) %>%
         dplyr::filter(group %in% input$groups)
     },
     error = function(e) {
@@ -185,7 +201,7 @@ visualizeAssignServer = function(input,output,session,rvals){
     if (length(plotlySelect) > 0) {
       rvals$brushSelected = rvals$plotlydf %>%
         dplyr::filter(rowid %in% plotlySelect$key)
-      rvals$attrBrush = rvals$attrData %>%
+      rvals$attrBrush = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
         tibble::rowid_to_column() %>%
         dplyr::filter(rowid %in% plotlySelect$key)
     }
@@ -204,12 +220,12 @@ visualizeAssignServer = function(input,output,session,rvals){
 
   observeEvent(input$createSubmit,{
     removeModal()
-    rvals$attrData = rvals$attrData %>%
+    rvals$df[[input$`vs-selectedDF`]]$attrData = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
       dplyr::mutate(!!as.name(input$createGroup) := factor(input$createGroupVal))
   })
 
   observeEvent(input$NewGroup,{
-    if(input$NewGroup != "" && isTRUE(nrow(rvals$brushSelected) > 0)){
+    if(stringr::str_detect(input$NewGroup,"[a-zA-z]|[0-9]") && isTRUE(nrow(rvals$brushSelected) > 0)){
       shinyjs::enable("Change")
     } else {
       shinyjs::disable("Change")
@@ -218,14 +234,14 @@ visualizeAssignServer = function(input,output,session,rvals){
 
   observeEvent(input$Change, {
     req(rvals$brushSelected)
-    new = rvals$attrData %>%
+    new = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
       dplyr::mutate(rowid = 1:dplyr::n()) %>%
       dplyr::filter(rowid %in% rvals$brushSelected$rowid) %>%
       dplyr::mutate(!!as.name(input$Code) := input$NewGroup)
-    old = rvals$attrData %>%
+    old = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
       dplyr::mutate(rowid = 1:dplyr::n()) %>%
       dplyr::filter(!rowid %in% rvals$brushSelected$rowid)
-    rvals$attrData = dplyr::bind_rows(new, old) %>%
+    rvals$df[[input$`vs-selectedDF`]]$attrData = dplyr::bind_rows(new, old) %>%
       dplyr::arrange(rowid) %>%
       dplyr::select(-rowid) %>%
       dplyr::mutate_at(dplyr::vars(tidyselect::all_of(input$Code)),factor)
@@ -276,10 +292,10 @@ visualizeAssignServer = function(input,output,session,rvals){
   })
 
   observeEvent(input$updateMultiplot,{
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`mp-selectedDF`]]$chemicalData)
     req(input$xvar2)
-    p = rvals$chemicalData %>%
-      dplyr::bind_cols(rvals$attrData %>% dplyr::select(tidyselect::any_of(input$multigroup))) %>%
+    p = rvals$df[[input$`mp-selectedDF`]]$chemicalData %>%
+      dplyr::bind_cols(rvals$df[[input$`mp-selectedDF`]]$attrData %>% dplyr::select(tidyselect::any_of(input$multigroup))) %>%
       dplyr::select(tidyselect::any_of(c(input$xvar2,input$yvar2,input$multigroup))) %>%
       tidyr::pivot_longer(-tidyselect::all_of(c(input$xvar2,input$multigroup))) %>%
       ggplot2::ggplot(ggplot2::aes(y = !!as.name(input$xvar2), x = value, color = !!as.name(input$multigroup))) +

@@ -13,6 +13,9 @@ clusterTab = function(){
                        tabPanel(title = "Cluster",
                                 sidebarLayout(
                                   sidebarPanel(
+                                    chooseDFUI("ct"),
+                                    br(),
+                                    subsetModUI("ct"),
                                     radioButtons("cluster.parent", "Select Clustering Method",
                                                  choices = c("View optimal number of clusters" = "nClust",
                                                              "Hierarchical Agglomerative Clustering" = "hca",
@@ -35,6 +38,10 @@ clusterTab = function(){
                        ), # end cluster panel
                        tabPanel(title = "Group Membership",
                                 sidebarLayout(sidebarPanel(
+                                  chooseDFUI("gm"),
+                                  br(),
+                                  subsetModUI("gm"),
+                                  br(),
                                   uiOutput("membershipGroupUI"),
                                   uiOutput("membershipGroupChoiceUI"),
                                   selectInput("membershipMethod","Select method",choices = c("Hotellings","Mahalanobis")),
@@ -60,6 +67,15 @@ clusterTab = function(){
 #'
 #' @examples
 clusterServer = function(input,output,session,rvals){
+
+  chooseDFServer("ct",rvals)
+
+  chooseDFServer("gm",rvals)
+
+  subsetModServer("ct",rvals)
+
+  subsetModServer("gm",rvals)
+
   # Render button to run clustering algorithm
   output$cluster.button <- renderUI({
     req(input$file1)
@@ -82,28 +98,28 @@ clusterServer = function(input,output,session,rvals){
   # Render WSS and Silhouette graphs for optimal number of clusters for each method
 
   observeEvent(input$cluster.button, {
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
     try({
       if(input$cluster.column.text == "") clusterName = "cluster" else clusterName = input$cluster.column.text
       if (input$cluster.parent == "nClust") {
         kmeans_wss <-
-          factoextra::fviz_nbclust(rvals$chemicalData, kmeans, method = "wss") +
+          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, kmeans, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Elbow Method")
         kmeans_sil <-
-          factoextra::fviz_nbclust(rvals$chemicalData, kmeans, method = "silhouette") +
+          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, kmeans, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Silhouette Method")
         kmedoids_wss <-
-          factoextra::fviz_nbclust(rvals$chemicalData, cluster::pam, method = "wss") +
+          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, cluster::pam, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids Elbow Method")
         kmedoids_sil <-
-          factoextra::fviz_nbclust(rvals$chemicalData, cluster::pam, method = "silhouette") +
+          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, cluster::pam, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids ")
 
         rvals$clusterPlot = function(){cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)}
       } else if (input$cluster.parent == "hca") {
         hc = as.dendrogram(
           hclust(
-            dist(rvals$chemicalData, method = input$clust.dist.method),
+            dist(rvals$df[[input$`ct-selectedDF`]]$chemicalData, method = input$clust.dist.method),
             method = input$hclust.method
           )
         )
@@ -133,7 +149,7 @@ clusterServer = function(input,output,session,rvals){
           c("Sample", clusterName)
       } else if (input$cluster.parent == "hdca") {
         hc = as.dendrogram(
-          cluster::diana(rvals$chemicalData, metric = input$hdca.dist.method)
+          cluster::diana(rvals$df[[input$`ct-selectedDF`]]$chemicalData, metric = input$hdca.dist.method)
         )
         rvals$clusterPlot = function(){plot(
           dendextend::color_branches(hc,
@@ -156,13 +172,13 @@ clusterServer = function(input,output,session,rvals){
           c("Sample", clusterName)
       } else if (input$cluster.parent == "kmeans") {
         kmeans_solution = kmeans(
-          rvals$chemicalData,
+          rvals$df[[input$`ct-selectedDF`]]$chemicalData,
           centers = input$kmeans.centers,
           iter.max = input$kmeans.iter.max,
           nstart = input$kmeans.nstart
         )
         rvals$clusterPlot = function(){factoextra::fviz_cluster(
-          kmeans_solution, data = rvals$chemicalData
+          kmeans_solution, data = rvals$df[[input$`ct-selectedDF`]]$chemicalData
         ) +
             ggplot2::theme_bw()}
         rvals$clusterDT = kmeans_solution$cluster
@@ -173,11 +189,11 @@ clusterServer = function(input,output,session,rvals){
       } else if (input$cluster.parent == "kmedoids") {
         pam_solution =
           cluster::pam(
-            rvals$chemicalData,
+            rvals$df[[input$`ct-selectedDF`]]$chemicalData,
             k = input$kmedoids.k,
             metric = input$kmedoids.dist.method
           )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = rvals$chemicalData) + ggplot2::theme_bw()}
+        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = rvals$df[[input$`ct-selectedDF`]]$chemicalData) + ggplot2::theme_bw()}
         rvals$clusterDT <- pam_solution$cluster
         rvals$clusterDT <-
           tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample")
@@ -200,7 +216,7 @@ clusterServer = function(input,output,session,rvals){
 
   # Render UI options for cluster analysis
   output$cluster.options <- renderUI({
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
     # Output of options if HCA chosen
     if (input$cluster.parent == "hca") {
       cluster_input_selections <- list(
@@ -344,26 +360,26 @@ clusterServer = function(input,output,session,rvals){
   # Assign cluster assignments based on cluster solution
 
   observeEvent(input$cluster.assign.button,{
-    req(rvals$chemicalData)
+    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
     req(rvals$clusterDT)
-    rvals$attrData =
-      rvals$attrData %>%
+    rvals$df[[input$`ct-selectedDF`]]$attrData =
+      rvals$df[[input$`ct-selectedDF`]]$attrData %>%
       dplyr::bind_cols(rvals$clusterDT %>%
                          dplyr::select(-Sample) %>%
                          dplyr::mutate_all(factor))
     showNotification("assigned cluster")
   })
 
-  # UI Outputs for membership groups
+  ##### UI Outputs for membership groups ####
 
   output$membershipGroupUI = renderUI({
-    req(rvals$attrData)
-    selectInput("membershipGroup","Choose Group Column",choices = colnames(rvals$attrData)[sapply(rvals$attrData, is.factor)])
+    req(rvals$df[[input$`gm-selectedDF`]]$attrData)
+    selectInput("membershipGroup","Choose Group Column",choices = colnames(rvals$df[[input$`gm-selectedDF`]]$attrData)[sapply(rvals$df[[input$`gm-selectedDF`]]$attrData, is.factor)])
   })
 
   output$membershipGroupChoiceUI = renderUI({
     req(input$membershipGroup)
-    choices = rvals$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
+    choices = rvals$df[[input$`gm-selectedDF`]]$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
       dplyr::pull() %>%
       sort()
     selectInput("membershipGroupChoice","Choose Group to View",choices = choices)
@@ -372,7 +388,7 @@ clusterServer = function(input,output,session,rvals){
   observeEvent(input$membershipRun,{
     req(input$membershipGroup)
     showNotification("calculating membership")
-    rvals$membershipProbs = try(group.mem.probs(elements = rvals$chemicalData,assigned = rvals$attrData[[input$membershipGroup]],method = input$membershipMethod))
+    rvals$membershipProbs = try(group.mem.probs(elements = rvals$df[[input$`gm-selectedDF`]]$chemicalData,assigned = rvals$df[[input$`gm-selectedDF`]]$attrData[[input$membershipGroup]],method = input$membershipMethod))
     if(inherits(rvals$membershipProbs,"try-error")) showNotification(paste("Error"),rvals$membershipProbs[[1]])
     showNotification("completed")
   })
