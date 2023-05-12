@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-group.mem.probs <- function(elements,assigned,method = "Hotellings") {
+group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
   # Initialize libraries
   library(ICSNP)
   library(kableExtra)
@@ -16,7 +16,7 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings") {
   library(mice)
   # elements = transformed element data
   # assigned = group designation by sample
-  grps = assigned %>% unique %>% sort
+  grps = assigned %>% unique %>% sort %>% as.character
 
   if(method == "Hotellings"){
     probs <- list()
@@ -53,8 +53,56 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings") {
       }
     }
   }
+
+  probs = getBestGroup(probs = probs)
+
+  probs = purrr::map(1:length(probs),function(i){
+    indx = which(assigned == grps[i])
+    cbind(tibble::tibble(ID = ID[indx]),probs[[i]])
+  })
+
   names(probs) = grps
   return(probs)
+}
+
+#' Calculate eligible groups
+#'
+#' number of rows must be 2 more than the number of columns per group
+#'
+#' @param elements dataframe with chemical elements
+#' @param attrs dataframe with descriptive attributes
+#' @param group selected group attribute
+#'
+#' @return vector of eligible groups for further analysis
+#' @export
+#'
+#' @examples
+getEligible = function(elements,attrs,group){
+  nc = ncol(elements)
+  eligible = attrs %>%
+    dplyr::group_by(dplyr::across(tidyselect::all_of(group))) %>%
+    dplyr::count() %>%
+    dplyr::filter(n > (nc + 1)) %>%
+    dplyr::pull(!!as.name(group)) %>%
+    as.character
+  return(eligible)
+}
+
+#' Find best group based on largest values
+#'
+#' @param probs
+#'
+#' @return
+#' @export
+#'
+#' @examples
+getBestGroup = function(probs){
+  result = purrr::map(probs,function(p){
+    bestVal = apply(p,1,which.max)
+    best = sapply(bestVal,function(i) colnames(p)[i])
+    return(cbind(p,best))
+  })
+  return(result)
 }
 
 # read in sample data INAA_test, create attribute and element data.frames, impute missing data and transform
@@ -89,3 +137,5 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings") {
 # row.names(probs[[m]]) <- row.names(x)
 # }
 # proc.time()-ptm
+
+

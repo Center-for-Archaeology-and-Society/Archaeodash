@@ -4,7 +4,7 @@
 \alias{group.mem.probs}
 \title{Function for calculating group membership probabilities by chemical compositional distance using Mahalanobis distances and Hotellings T^2 statistic}
 \usage{
-group.mem.probs(elements, assigned, method = "Hotellings")
+group.mem.probs(elements, assigned, method = "Hotellings", ID)
 }
 \arguments{
 \item{elements}{transformed element data}
