@@ -57,7 +57,7 @@ visualizeassignTab = function() {
                              3,
                              offset = 0.5,
                              br(),
-                             actionButton('addGroup',"Add New Group"),
+                             actionButton('addGroup',"Add New Column"),
                              br(),
                              actionButton('Change', 'Change Group Assignment'),
                              textInput('NewGroup', label = 'Enter new group designation')
@@ -162,7 +162,11 @@ visualizeAssignServer = function(input,output,session,rvals){
   })
 
   output$Code2UI = renderUI({
-    selectInput('multigroup', 'GROUP', choices = colnames(rvals$df[[input$`vs-selectedDF`]]$attrData)[sapply(rvals$df[[input$`vs-selectedDF`]]$attrData, is.factor)])
+    choices = rvals$df[[input$`vs-selectedDF`]]$attrData[[input$Code]] %>% unique %>% sort
+    tagList(
+    selectInput('multigroup', 'GROUP', choices = colnames(rvals$df[[input$`vs-selectedDF`]]$attrData)[sapply(rvals$df[[input$`vs-selectedDF`]]$attrData, is.factor)]),
+    selectInput('multifilter', 'Groups to show:', choices = choices, multiple = T, selected = choices)
+    )
   })
 
   observeEvent({
@@ -297,6 +301,7 @@ visualizeAssignServer = function(input,output,session,rvals){
     p = rvals$df[[input$`mp-selectedDF`]]$chemicalData %>%
       dplyr::bind_cols(rvals$df[[input$`mp-selectedDF`]]$attrData %>% dplyr::select(tidyselect::any_of(input$multigroup))) %>%
       dplyr::select(tidyselect::any_of(c(input$xvar2,input$yvar2,input$multigroup))) %>%
+      dplyr::filter(!!as.name(input$multigroup) %in% input$multifilter) %>%
       tidyr::pivot_longer(-tidyselect::all_of(c(input$xvar2,input$multigroup))) %>%
       ggplot2::ggplot(ggplot2::aes(y = !!as.name(input$xvar2), x = value, color = !!as.name(input$multigroup))) +
       ggplot2::geom_point() +

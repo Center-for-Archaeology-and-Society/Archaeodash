@@ -75,7 +75,7 @@ dataInputServer = function(input,output,session,rvals){
         "Select descriptive/grouping columns:",
         items.all,
         multiple = TRUE,
-        selected = items
+        selected = NULL
       )
     )
   })
