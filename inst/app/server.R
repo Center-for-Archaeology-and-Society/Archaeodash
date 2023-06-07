@@ -23,6 +23,9 @@ shinyServer(function(input, output, session) {
   ####   Cluster  ####
   clusterServer(input,output,session,rvals)
 
+  ####   Group Membership  ####
+  groupServer(input,output,session,rvals)
+
   ####   Visualize & Assign  ####
   visualizeAssignServer(input,output,session,rvals)
 

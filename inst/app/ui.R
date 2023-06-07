@@ -28,6 +28,7 @@ shinyUI(
              imputetransformTab(),
              ordinationTab(),
              clusterTab(),
+             groupTab(),
              visualizeassignTab(),
              saveexportTab()
 

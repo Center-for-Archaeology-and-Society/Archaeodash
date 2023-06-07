@@ -1,61 +1,37 @@
 
 #' UI elements for cluster tab
 #'
-#'Future home for cluster analysis, hierarchical and divisive/kmeans/kmedoids etc.
-#'
 #' @return
 #' @export
 #'
 #' @examples
 clusterTab = function(){
   tabPanel(title = "Cluster", icon = icon("adjust", lib = "glyphicon"),
-           tabsetPanel(id = "clusterPanels",
-                       tabPanel(title = "Cluster",
-                                sidebarLayout(
-                                  sidebarPanel(
-                                    chooseDFUI("ct"),
-                                    br(),
-                                    subsetModUI("ct"),
-                                    radioButtons("cluster.parent", "Select Clustering Method",
-                                                 choices = c("View optimal number of clusters" = "nClust",
-                                                             "Hierarchical Agglomerative Clustering" = "hca",
-                                                             "Hierarchical Divisive Clustering" = "hdca",
-                                                             "k-means" = "kmeans",
-                                                             "k-medoids" = "kmedoids"),
-                                                 selected = "nClust"),
-                                    uiOutput("cluster.options"),
-                                    uiOutput("cluster.column.text"),
-                                    uiOutput("cluster.button"),
-                                    br(),
-                                    uiOutput("cluster.assign.button")
-                                  ), # end sidebarPanel
+           sidebarLayout(
+             sidebarPanel(
+               chooseDFUI("ct"),
+               br(),
+               subsetModUI("ct"),
+               radioButtons("cluster.parent", "Select Clustering Method",
+                            choices = c("View optimal number of clusters" = "nClust",
+                                        "Hierarchical Agglomerative Clustering" = "hca",
+                                        "Hierarchical Divisive Clustering" = "hdca",
+                                        "k-means" = "kmeans",
+                                        "k-medoids" = "kmedoids"),
+                            selected = "nClust"),
+               uiOutput("cluster.options"),
+               uiOutput("cluster.column.text"),
+               uiOutput("cluster.button"),
+               br(),
+               uiOutput("cluster.assign.button")
+             ), # end sidebarPanel
 
-                                  mainPanel(
-                                    plotOutput("clusterPlot"),
-                                    DT::dataTableOutput("clusterDT")
-                                  ) # end mainPanel PCA
-                                ) # end sidebarLayout PCA
-                       ), # end cluster panel
-                       tabPanel(title = "Group Membership",
-                                sidebarLayout(sidebarPanel(
-                                  chooseDFUI("gm"),
-                                  br(),
-                                  subsetModUI("gm"),
-                                  br(),
-                                  uiOutput("membershipGroupUI"),
-                                  uiOutput("eligibleGroupUI"),
-                                  uiOutput("projectionGroupUI"),
-                                  uiOutput("sampleIDUI"),
-                                  uiOutput("membershipGroupChoiceUI"),
-                                  selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
-                                  actionButton("membershipRun","Calculate"),
-                                ),
-                                mainPanel(
-                                  tableOutput('membershipTbl')
-                                ))
-                       ) # end group membership panel
-           )#end tabset panel
-  ) # end tabPanel "Cluster"
+             mainPanel(
+               plotOutput("clusterPlot"),
+               DT::dataTableOutput("clusterDT")
+             ) # end mainPanel PCA
+           ) # end sidebarLayout PCA
+  ) # end cluster panel
 }
 
 #' Cluster Server
@@ -73,11 +49,7 @@ clusterServer = function(input,output,session,rvals){
 
   chooseDFServer("ct",rvals)
 
-  chooseDFServer("gm",rvals)
-
   subsetModServer("ct",rvals)
-
-  subsetModServer("gm",rvals)
 
   # Render button to run clustering algorithm
   output$cluster.button <- renderUI({
@@ -371,59 +343,6 @@ clusterServer = function(input,output,session,rvals){
                          dplyr::select(-Sample) %>%
                          dplyr::mutate_all(factor))
     showNotification("assigned cluster")
-  })
-
-  ##### UI Outputs for membership groups ####
-
-  output$membershipGroupUI = renderUI({
-    req(rvals$df[[input$`gm-selectedDF`]]$attrData)
-    selectInput("membershipGroup","Choose Group Column",choices = colnames(rvals$df[[input$`gm-selectedDF`]]$attrData)[sapply(rvals$df[[input$`gm-selectedDF`]]$attrData, is.factor)])
-  })
-
-  output$eligibleGroupUI = renderUI({
-    req(input$membershipGroup %in% names(rvals$df[[input$`gm-selectedDF`]]$attrData))
-    eligible = getEligible(elements = rvals$df[[input$`gm-selectedDF`]]$chemicalData, attrs = rvals$df[[input$`gm-selectedDF`]]$attrData, group = input$membershipGroup)
-    selectInput("eligibleGroups","Choose Eligible Groups",choices = eligible, multiple = T, selected = eligible)
-  })
-
-  output$projectionGroupUI = renderUI({
-    req(input$eligibleGroups)
-    req(input$membershipGroup)
-    choices = rvals$df[[input$`gm-selectedDF`]]$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
-      dplyr::pull() %>%
-      sort()
-    selectInput("projectionGroups","Choose Groups to Project Against",choices = choices, multiple = T, selected = choices)
-  })
-
-  output$sampleIDUI = renderUI({
-    req(rvals$df[[input$`gm-selectedDF`]]$attrData)
-    selectInput("sampleID","Choose sample ID Column",choices = names(rvals$df[[input$`gm-selectedDF`]]$attrData))
-  })
-
-  output$membershipGroupChoiceUI = renderUI({
-    req(input$eligibleGroups)
-    req(input$membershipGroup)
-    choices = rvals$df[[input$`gm-selectedDF`]]$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
-      dplyr::pull() %>%
-      sort()
-    selectInput("membershipGroupChoice","Choose Group to View",choices = choices)
-  })
-
-  observeEvent(input$membershipRun,{
-    req(input$membershipGroup)
-    showNotification("calculating membership")
-    grps = c(input$eligibleGroups,input$projectionGroups)
-    indx = which(rvals$df[[input$`gm-selectedDF`]]$attrData[[input$membershipGroup]] %in% grps)
-    elements = rvals$df[[input$`gm-selectedDF`]]$chemicalData[indx,]
-    attrs = rvals$df[[input$`gm-selectedDF`]]$attrData[indx,]
-    rvals$membershipProbs = try(group.mem.probs(elements = elements,assigned = attrs[[input$membershipGroup]],method = input$membershipMethod, ID = attrs[[input$sampleID]]))
-    if(inherits(rvals$membershipProbs,"try-error")) showNotification(paste("Error"),rvals$membershipProbs[[1]])
-    showNotification("completed")
-  })
-
-  output$membershipTbl = renderTable({
-    rvals$membershipProbs[[input$membershipGroupChoice]] %>%
-      tibble::as_tibble()
   })
 
 }

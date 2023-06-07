@@ -212,6 +212,16 @@ visualizeAssignServer = function(input,output,session,rvals){
   })
 
   observeEvent(input$addGroup,{
+
+    # save state of inputs to update
+    rvals$state$selected = input$`vs-selectedDF`
+    rvals$state$type = input$data.src
+    rvals$state$xvar = input$xvar
+    rvals$state$yvar = input$yvar
+    rvals$state$group = input$code
+    rvals$state$elipse = input$Conf
+    rvals$state$ci = input$int.set
+
     showModal(modalDialog(
       textInput('createGroup',"New Group Name",value = "cluster"),
       textInput('createGroupVal',"New Group Default Value",value = "1"),
@@ -226,6 +236,15 @@ visualizeAssignServer = function(input,output,session,rvals){
     removeModal()
     rvals$df[[input$`vs-selectedDF`]]$attrData = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
       dplyr::mutate(!!as.name(input$createGroup) := factor(input$createGroupVal))
+
+    # update inputs from saved states
+    updateSelectInput(session = session,inputId = "vs-selected",selected = rvals$state$selected)
+    updateSelectInput(session = session, inputId = "data.src",selected = rvals$state$type)
+    updateSelectInput(session = session, inputId = "xvar",selected = rvals$state$xvar)
+    updateSelectInput(session = session, inputId = "yvar",selected = rvals$state$yvar)
+    updateSelectInput(session = session, inputId = "code",selected = rvals$state$group)
+    updateSelectInput(session = session, inputId = "Conf",selected = rvals$state$elipse)
+    updateSelectInput(session = session, inputId = "int.set",selected = rvals$state$ci)
   })
 
   observeEvent(input$NewGroup,{
@@ -237,6 +256,13 @@ visualizeAssignServer = function(input,output,session,rvals){
   })
 
   observeEvent(input$Change, {
+    rvals$state$selected = input$`vs-selectedDF`
+    rvals$state$type = input$data.src
+    rvals$state$xvar = input$xvar
+    rvals$state$yvar = input$yvar
+    rvals$state$group = input$code
+    rvals$state$elipse = input$Conf
+    rvals$state$ci = input$int.set
     req(rvals$brushSelected)
     new = rvals$df[[input$`vs-selectedDF`]]$attrData %>%
       dplyr::mutate(rowid = 1:dplyr::n()) %>%
@@ -249,6 +275,13 @@ visualizeAssignServer = function(input,output,session,rvals){
       dplyr::arrange(rowid) %>%
       dplyr::select(-rowid) %>%
       dplyr::mutate_at(dplyr::vars(tidyselect::all_of(input$Code)),factor)
+    updateSelectInput(session = session,inputId = "vs-selected",selected = rvals$state$selected)
+    updateSelectInput(session = session, inputId = "data.src",selected = rvals$state$type)
+    updateSelectInput(session = session, inputId = "xvar",selected = rvals$state$xvar)
+    updateSelectInput(session = session, inputId = "yvar",selected = rvals$state$yvar)
+    updateSelectInput(session = session, inputId = "code",selected = rvals$state$group)
+    updateSelectInput(session = session, inputId = "Conf",selected = rvals$state$elipse)
+    updateSelectInput(session = session, inputId = "int.set",selected = rvals$state$ci)
   })
 
   # plot

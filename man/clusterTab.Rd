@@ -7,5 +7,5 @@
 clusterTab()
 }
 \description{
-Future home for cluster analysis, hierarchical and divisive/kmeans/kmedoids etc.
+UI elements for cluster tab
 }
