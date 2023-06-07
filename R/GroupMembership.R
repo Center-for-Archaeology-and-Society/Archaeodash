@@ -21,7 +21,16 @@ groupTab = function(){
              actionButton("membershipRun","Calculate"),
            ),
            mainPanel(
-             tableOutput('membershipTbl')
+             fluidRow(
+               column(8,
+                      DT::DTOutput('membershipTbl')
+               ),
+               column(4,
+                      fluidRow(actionButton("gAddGroup","Add New Column")),
+                      fluidRow(br()),
+                      fluidRow(actionButton("gChangeGroup","Change Group Assignment")),
+                      fluidRow(textInput("gNewGroup","Enter new group designation")))
+             )
            ))
   ) # end group membership panel
 }
@@ -91,8 +100,8 @@ groupServer = function(input,output,session,rvals){
     showNotification("completed")
   })
 
-  output$membershipTbl = renderTable({
-    rvals$membershipProbs[[input$membershipGroupChoice]] %>%
-      tibble::as_tibble()
+  output$membershipTbl = DT::renderDataTable({
+    DT::datatable(rvals$membershipProbs[[input$membershipGroupChoice]] %>%
+      tibble::as_tibble(),rownames = F,selection = 'multiple', style = 'bootstrap')
   })
 }
