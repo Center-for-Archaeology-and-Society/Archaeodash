@@ -13,6 +13,7 @@ visualizeassignTab = function() {
     icon = icon("signal", lib = "glyphicon"),
     tabsetPanel(
       id = "visualize",
+      type = "pills",
       tabPanel(
         title = "visualize and select",
         fluidRow(
@@ -67,10 +68,6 @@ visualizeassignTab = function() {
       ),
       tabPanel(
         title = "multiplots",
-        chooseDFUI("mp"),
-        br(),
-        subsetModUI("mp"),
-        br(),
         fluidRow(
           column(3, uiOutput('xvar2UI')),
           column(3,offset = 1,
@@ -115,7 +112,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
     input$data.src
     rvals$pcadf
     rvals$attrGroups
-    },{
+  },{
     if (input$data.src == 'principal components') {
       rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
         shiny::showNotification("No PCA results",type = "warning")
@@ -221,10 +218,10 @@ visualizeAssignServer = function(input, output, session, rvals) {
     p1 <-
       ggplot2::ggplot(rvals$plotdf,
                       ggplot2::aes(
-                        x = input$xvar,
-                        y = input$xvar,
-                        color = rvals$attrGroups,
-                        shape = rvals$attrGroups,
+                        x = !!as.name(input$xvar),
+                        y = !!as.name(input$yvar),
+                        color = !!as.name(rvals$attrGroups),
+                        shape = !!as.name(rvals$attrGroups),
                         key = rowid
                       )) +
       ggplot2::geom_point() +
@@ -242,7 +239,9 @@ visualizeAssignServer = function(input, output, session, rvals) {
         p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
       }
     }
-    plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'lasso')
+    suppressWarnings({
+      plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'lasso')
+    })
   })
 
   output$brush <- renderUI({
@@ -264,17 +263,13 @@ visualizeAssignServer = function(input, output, session, rvals) {
   observeEvent(input$updateMultiplot, {
     req(rvals$selectedData)
     req(input$xvar2)
-    p = rvals$selectedData[,rvals$chem] %>%
-      dplyr::bind_cols(rvals$selectedData[,rvals$attrs] %>% dplyr::select(tidyselect::any_of(input$multigroup))) %>%
-      dplyr::select(tidyselect::any_of(c(
-        input$xvar2, input$yvar2, input$multigroup
-      ))) %>%
-      dplyr::filter(!!as.name(input$multigroup) %in% input$multifilter) %>%
-      tidyr::pivot_longer(-tidyselect::all_of(c(input$xvar2, input$multigroup))) %>%
+    p = rvals$selectedData %>%
+      dplyr::select(tidyselect::all_of(c(rvals$attrGroups,input$xvar2,input$yvar2))) %>%
+      tidyr::pivot_longer(-tidyselect::all_of(c(input$xvar2, rvals$attrGroups))) %>%
       ggplot2::ggplot(ggplot2::aes(
         y = !!as.name(input$xvar2),
         x = value,
-        color = !!as.name(input$multigroup)
+        color = !!as.name(rvals$attrGroups)
       )) +
       ggplot2::geom_point() +
       ggplot2::xlab("") +

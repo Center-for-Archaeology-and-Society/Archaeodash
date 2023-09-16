@@ -131,6 +131,7 @@ dataInputServer = function(input, output, session, rvals) {
     req(rvals$selectedData)
     req(input$attr)
     req(input$chem)
+    isolate({
     rvals$chem = input$chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
@@ -153,6 +154,7 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$selectedData = quietly(rvals$selectedData %>%
                                      dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub))
     }
+    })
   })
 
   output$newCol = renderUI({
