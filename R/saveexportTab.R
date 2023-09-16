@@ -1,28 +1,28 @@
 
+
 #' UI Elements for Saving and Exporting
 #'
 #' @return
 #' @export
 #'
 #' @examples
-saveexportTab = function(){tabPanel(title = "Save & Export", icon = icon("download"),
-                  sidebarLayout(
-                    sidebarPanel(
-                      chooseDFUI("se"),
-                      br(),
-                      subsetModUI("se"),
-                      br(),
-                      "Export selected attributes (including new/updated clusters/designations) and transformed/imputed elements",
-                      textInput('ExportName', label = 'Type name for export (include file type (e.g., csv, xlsx)'),
-                      br(),
-                      downloadButton("Save","Click here to save file")
-                    ), # end sidebarPanel
-
-                    mainPanel(
-
-                    ) # end mainPanel Save and Export
-                  ) # end sidebarLayout Save and Export
-) # end tabPanel "Save and Export"
+saveexportTab = function() {
+  shinyjs::hidden(
+  div(class = "exportSection",
+    br(),
+    "Export selected data",
+    radioButtons(
+      inputId = "dataType",
+      label = "Results type",
+      choices = c("chemical", "PCA"),
+      selected = "chemical",
+      inline = F
+    ),
+    textInput('ExportName', label = 'File name including the file extension (e.g., csv, xlsx)'),
+    br(),
+    downloadButton("Save", "Click here to save file")
+  )
+  )
 }
 
 #' Save and Export Server
@@ -36,19 +36,25 @@ saveexportTab = function(){tabPanel(title = "Save & Export", icon = icon("downlo
 #' @export
 #'
 #' @examples
-saveExportServer = function(input,output,session,rvals){
+saveExportServer = function(input, output, session, rvals) {
 
-  chooseDFServer("se",rvals)
-
-  subsetModServer("se",rvals)
+  observeEvent(rvals$selectedData,{
+    req(rvals$selectedData)
+    shinyjs::show(id = "exportSection")
+  })
 
   output$Save <- downloadHandler(
     filename = function() {
-      ifelse(isTRUE(stringr::str_detect(input$ExportName,stringr::fixed("."))),input$ExportName,paste0(input$ExportName,".xlsx"))
+      ifelse(
+        isTRUE(stringr::str_detect(
+          input$ExportName, stringr::fixed(".")
+        )),
+        input$ExportName,
+        paste0(input$ExportName, ".xlsx")
+      )
     },
     content = function(file) {
-      rio::export(dplyr::bind_cols(rvals$df[[input$`se-selectedDF`]]$attrData, rvals$df[[input$`se-selectedDF`]]$chemicalData),
-                  file)
+      rio::export(ifelse(input$dataType == "PCA",rvals$pcaData,rvals$selectedData),file)
     }
   )
 }

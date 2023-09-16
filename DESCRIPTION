@@ -1,6 +1,6 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 0.0.4
+Version: 0.1.0
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
@@ -31,4 +31,6 @@ Imports:
     stats,
     tidyselect,
     ICSNP,
-    shinyjs
+    shinyjs,
+    bslib,
+    janitor

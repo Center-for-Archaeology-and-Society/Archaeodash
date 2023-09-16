@@ -8,7 +8,43 @@
 #' @export
 #'
 #' @examples
-group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
+#'
+
+# group.mem.probs <- function(elements,assigned) {
+#
+#   grps = assigned %>% unique %>% sort %>% as.character
+#
+#   # Initialize libraries
+#   library(ICSNP)
+#   library(kableExtra)
+#   library(DataExplorer)
+#   library(mice)
+#   # elements = transformed element data
+#   # attr1 = group designation by sample
+#   # grps <- vector of groups to evaluate
+#
+#   probs <- list()
+#   for (m in 1:length(grps)) {
+#     x <- elements[which(assigned==grps[m]),]
+#     probs[[m]] <- matrix(0,nrow(x),length(grps))
+#     colnames(probs[[m]]) <- grps
+#     rownames(probs[[m]]) <- rownames(x)
+#
+#     grps2 <- grps[-m]
+#
+#     p.val <- NULL
+#     for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],x[-i,])$p.value}
+#     probs[[m]][,m] <- round(p.val,5)*100
+#
+#     for (j in 1:length(grps2)) {
+#       p.val2 <- NULL
+#       for (i in 1:nrow(x)) {p.val2[i] <- HotellingsT2(x[i,],elements[which(assigned==grps2[j]),])$p.value}
+#       probs[[m]][,which(grps==grps2[j])] <- round(p.val2,5)*100}}
+#   return(probs)}
+
+
+
+group.mem.probs <- function(elements,assigned,valid,method = "Hotellings", ID) {
   # Initialize libraries
   library(ICSNP)
   library(kableExtra)
@@ -16,22 +52,30 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
   library(mice)
   # elements = transformed element data
   # assigned = group designation by sample
-  grps = assigned %>% unique %>% sort %>% as.character
+  rownames(elements) = ID
 
   if(method == "Hotellings"){
-    probs <- list()
-    for (g in 1:length(grps)) {
-      x <- elements[which(assigned==grps[g]),]
-      probs[[g]] <- matrix(0,nrow(x),length(grps))
-      colnames(probs[[g]]) <- grps
-      rownames(probs[[g]]) <- rownames(x)
-
-      for (gg in 1:length(grps)) {
-        p.val <- NULL
-        for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],elements[which(assigned==grps[gg]),])$p.value}
-        probs[[g]][,which(grps==grps[gg])] <- round(p.val,5)*100
+    probsAll = matrix(nrow = nrow(elements), ncol = length(valid))
+    colnames(probsAll) = valid
+    rownames(probsAll) = ID
+    for (j in 1:length(valid)) {
+      p.val2 <- NULL
+      for(r in 1:nrow(elements)){
+        p.val2[r] <- HotellingsT2(elements[r,],elements[which(assigned==valid[j]),])$p.value
       }
+      probsAll[,which(grps==valid[j])] <- round(p.val2,5)*100
     }
+
+    for (m in 1:length(valid)) {
+      indx = which(assigned == valid[m])
+      x <- elements[which(assigned==valid[m]),]
+
+      p.val <- NULL
+      for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],x[-i,])$p.value}
+      probsAll[indx,m] <- round(p.val,5)*100
+    }
+    probsAll = probsAll %>% tibble::as_tibble() %>% dplyr::mutate(ID = ID, Group = assigned, .before = 1)
+
   } else {
     probs <- list()
     for (g in 1:length(grps)) {
@@ -54,15 +98,16 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
     }
   }
 
-  probs = getBestGroup(probs = probs)
+  # probs = getBestGroup(probs = probs)
+  #
+  # probs = purrr::map(1:length(probs),function(i){
+  #   indx = which(assigned == grps[i])
+  #   cbind(tibble::tibble(ID = ID[indx]),probs[[i]])
+  # return(probsAll)
+  # })
 
-  probs = purrr::map(1:length(probs),function(i){
-    indx = which(assigned == grps[i])
-    cbind(tibble::tibble(ID = ID[indx]),probs[[i]])
-  })
-
-  names(probs) = grps
-  return(probs)
+  # names(probs) = grps
+  return(probsAll)
 }
 
 #' Calculate eligible groups
@@ -79,12 +124,18 @@ group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
 #' @examples
 getEligible = function(elements,attrs,group){
   nc = ncol(elements)
-  eligible = attrs %>%
-    dplyr::group_by(dplyr::across(tidyselect::all_of(group))) %>%
-    dplyr::count() %>%
-    dplyr::filter(n > (nc + 1)) %>%
-    dplyr::pull(!!as.name(group)) %>%
-    as.character
+  if(inherits(attrs,"data.frame")){
+    eligible = attrs %>%
+      dplyr::group_by(dplyr::across(tidyselect::all_of(group))) %>%
+      dplyr::count() %>%
+      dplyr::filter(n > (nc + 1)) %>%
+      dplyr::pull(!!as.name(group)) %>%
+      as.character
+  } else {
+    eligible = table(attrs)  %>%
+      .[which(. > nc)]
+    eligible = names(eligible)
+  }
   return(eligible)
 }
 
