@@ -328,13 +328,17 @@ clusterServer = function(input,output,session,rvals){
   # Assign cluster assignments based on cluster solution
 
   observeEvent(input$cluster.assign.button,{
-    req(rvals$selectedData[,rvals$chem])
+    req(rvals$selectedData)
     req(rvals$clusterDT)
-    rvals$selectedData[,rvals$attrs] =
-      rvals$selectedData[,rvals$attrs] %>%
+    quietly({
+    nms = rvals$clusterDT %>% names()
+    nms = setdiff(nms,'Sample')
+    rvals$selectedData =
+      rvals$selectedData %>%
       dplyr::bind_cols(rvals$clusterDT %>%
                          dplyr::select(-Sample) %>%
-                         dplyr::mutate_all(factor))
+                         dplyr::mutate_at(dplyr::vars(nms),factor))
+    })
     showNotification("assigned cluster")
   })
 

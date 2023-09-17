@@ -1,10 +1,9 @@
 .mysidebar {
-  width: 350px !important;
   padding: 10px;
 }
 
 .mymainpanel {
-  margin-left: 100px !important;
+    padding: 10px;
 }
 
 body {

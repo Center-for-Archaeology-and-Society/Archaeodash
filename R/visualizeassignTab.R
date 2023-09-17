@@ -25,10 +25,6 @@ visualizeassignTab = function() {
         fluidRow(
           column(
             2,
-            chooseDFUI("vs"),
-            br(),
-            subsetModUI("vs"),
-            br(),
             selectInput(
               'data.src',
               'Choose data type',
@@ -74,9 +70,9 @@ visualizeassignTab = function() {
                  uiOutput('yvar2UI')),
         ),
         fluidRow(
-          column(3, actionButton("updateMultiplot", "update")),
+          column(2, actionButton("updateMultiplot", "update")),
           column(
-            3,offset = 1,
+            2,offset = 1,
             numericInput(
               "plotHeight",
               label = "plot height in pixels",
@@ -86,7 +82,8 @@ visualizeassignTab = function() {
               step = 50
             )
           ),
-          column(4, offset = 1,actionButton('savePlot', "Save Plot"))
+          column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
+          column(2, offset = 1,actionButton('savePlot', "Save Plot"))
         ),
         fluidRow(uiOutput('multiplotUI'))
       )
@@ -165,51 +162,26 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   observeEvent(input$Change, {
-    rvals$state$selected = input$`vs-selectedDF`
-    rvals$state$type = input$data.src
-    rvals$state$xvar = input$xvar
-    rvals$state$yvar = input$yvar
-    rvals$state$elipse = input$Conf
-    rvals$state$ci = input$int.set
     req(rvals$brushSelected)
-    new = rvals$selectedData %>%
-      dplyr::inner_join(rvals$brushSelected) %>%
-      dplyr::mutate(!!as.name(input$Code) := input$NewGroup)
-    old = rvals$selectedData %>%
-      dplyr::filter(!rowid %in% new$rowid)
-    rvals$selectedData[,rvals$attrs] = dplyr::bind_rows(new, old) %>%
-      dplyr::arrange(rowid) %>%
-      dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)), factor)
-    updateSelectInput(
-      session = session,
-      inputId = "vs-selected",
-      selected = rvals$state$selected
-    )
-    updateSelectInput(
-      session = session,
-      inputId = "data.src",
-      selected = rvals$state$type
-    )
-    updateSelectInput(
-      session = session,
-      inputId = "xvar",
-      selected = rvals$state$xvar
-    )
-    updateSelectInput(
-      session = session,
-      inputId = "yvar",
-      selected = rvals$state$yvar
-    )
-    updateSelectInput(
-      session = session,
-      inputId = "Conf",
-      selected = rvals$state$elipse
-    )
-    updateSelectInput(
-      session = session,
-      inputId = "int.set",
-      selected = rvals$state$ci
-    )
+    quietly({
+      new = rvals$selectedData %>%
+        dplyr::inner_join(rvals$brushSelected) %>%
+        dplyr::mutate(!!as.name(rvals$attrGroups) := input$NewGroup)
+      old = rvals$selectedData %>%
+        dplyr::filter(!rowid %in% new$rowid)
+      rvals$selectedData = dplyr::bind_rows(new, old) %>%
+        dplyr::arrange(rowid) %>%
+        dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)), factor)
+      if(isFALSE(is.null(rvals$membershipProps)))
+        rvals$membershipProbs[['GroupVal']] = rvals$selectedData[[rvals$attrGroups]]
+    })
+    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
+    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
+    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
+    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
+    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
   })
 
   # plot
@@ -245,10 +217,10 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   output$brush <- renderUI({
-    if (is.null(rvals$attrBrush)) {
+    if (is.null(rvals$brushSelected)) {
       p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
     } else {
-      renderTable(rvals$attrBrush)
+      renderTable(rvals$brushSelected[,rvals$attrs])
     }
   })
 
@@ -271,7 +243,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
         x = value,
         color = !!as.name(rvals$attrGroups)
       )) +
-      ggplot2::geom_point() +
+      ggplot2::geom_point(size = input$ptsize) +
       ggplot2::xlab("") +
       ggplot2::theme_bw(base_size = 14)
     if (length(input$yvar2) > 1) {

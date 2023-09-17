@@ -1,17 +1,6 @@
 # ui for Compositional Analysis Dashboard - Compositions
 
-# <<Input details on public use license here -- MIT or GNU or??>>
 
-# Need to think of a better name "TACA" is a placeholder
-
-# Potential options:
-# TACA (Tools for Archaeological Compositional Analysis)
-# ACAD (Archaeological Compositional Analysis Dashboard)
-# ArchaeoDash
-# ArchCompAnalysis
-# GeocompAnalysis
-# AECA (Archaeological elemental compositonal analysis)
-# Comp_Dash
 library(ArchaeoDash)
 library(shiny)
 library(bslib)

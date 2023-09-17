@@ -1,9 +1,10 @@
 #' UI elements for Data Input tab
 #'
-#' @return
+#' @return NULL
 #' @export
 #'
 #' @examples
+#' datainputTab()
 datainputTab = function() {
   tagList(
     fileInput("file1", "Choose File (csv, xlsx or other supported format)"),
@@ -32,6 +33,7 @@ datainputTab = function() {
 #'
 #' @examples
 dataInputServer = function(input, output, session, rvals) {
+
   observeEvent(input$file1, {
     print("importing file")
     if (!is.null(input$file1)) {
@@ -43,7 +45,7 @@ dataInputServer = function(input, output, session, rvals) {
   # Render multi-select lookup for choosing attribute columns
   output$attr <- renderUI({
     req(rvals$selectedData)
-    df <- rvals$selectedData
+    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
     # Remove numeric columns from default selection
     nums1 <- unlist(lapply(df, is.numeric))
     items = names(df[,!nums1])
@@ -51,19 +53,26 @@ dataInputServer = function(input, output, session, rvals) {
     items.all <- names(df)
     names(items.all) = items.all
     names(items) = items
-    tagList(
+    if(isTRUE(is.null(rvals[['attr']])))
+      selection = items else
+        selection = rvals[['attr']]
+    if(isTRUE(is.null(rvals[['attrGroups']])))
+      selection2 = items else
+        selection2 = rvals[['attrGroups']]
+      tagList(
       selectInput(
         "attr",
-        "Select all of the attribute variables you want to display:",
+        "Select attribute variables you want to display:",
         items.all,
         multiple = TRUE,
-        selected = items
+        selected = selection
       ),
       selectInput(
         "attrGroups",
         "Select descriptive/group column:",
         items.all,
-        multiple = F
+        multiple = F,
+        selected = selection2
       )
     )
   })
@@ -72,33 +81,40 @@ dataInputServer = function(input, output, session, rvals) {
   output$subSelect <- renderUI({
     req(rvals$selectedData)
     req(input$attrGroups)
-    items.all = quietly(rvals$selectedData[[input$attrGroups]] %>% unique %>% sort)
+    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
+    items.all = quietly(df[[input$attrGroups]] %>% unique %>% sort)
+    print("subSelect")
+    print(rvals[['attrGroupsSub']])
+    if(isTRUE(is.null(rvals[['attrGroupsSub']])))
+      selection = items.all else
+        selection = rvals[['attrGroupsSub']]
     tagList(
       selectInput(
         "attrGroupsSub",
         "Select groups to include",
         choices = items.all,
         multiple = TRUE,
-        selected = items.all
+        selected = selection
       )
     )
   })
 
   # Render multi-select lookup for choosing chemical concentration columns
   output$chem <- renderUI({
-    df <- rvals$selectedData
+    req(rvals$selectedData)
+    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
     if (is.null(df))
       return(NULL)
     # Only include numeric columns in default selection
     nums <- unlist(lapply(df, is.numeric))
-    items = names(df[, nums])
+    items = names(df[, nums]) %>% .[which(. != "rowid")]
     # Set names as all columns in datatable
     items.all <- names(df)
     names(items) = items
     names(items.all) = items.all
     selectInput(
       "chem",
-      "Select all of the element concentrations:",
+      "Select element concentrations:",
       items.all,
       multiple = TRUE,
       selected = items
@@ -123,6 +139,11 @@ dataInputServer = function(input, output, session, rvals) {
 
   observeEvent(input$confirmReset,{
     removeModal()
+    rvals$chem = NULL
+    rvals$attrGroups = NULL
+    rvals$attr = NULL
+    rvals$attrs = NULL
+    rvals$attrGroupsSub = NULL
     rvals$selectedData = rvals$importedData
   })
 
@@ -131,11 +152,21 @@ dataInputServer = function(input, output, session, rvals) {
     req(rvals$selectedData)
     req(input$attr)
     req(input$chem)
-    isolate({
     rvals$chem = input$chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
     rvals$attrs = unique(c('rowid',rvals$attr,rvals$attrGroups))
+    rvals$attrGroupsSub = input$attrGroupsSub
+    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
+    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
+    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
+    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
+    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
+      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>% dplyr::arrange(rowid)
+    }
     rvals$selectedData = quietly(
       rvals$selectedData %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
@@ -151,10 +182,19 @@ dataInputServer = function(input, output, session, rvals) {
     if(isTRUE(is.null(input$attrGroupsSub))){
       showNotification("Cannot proceed without any groups selected",type = "error")
     } else {
-      rvals$selectedData = quietly(rvals$selectedData %>%
-                                     dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub))
+      keep = quietly(rvals$selectedData %>%
+                       dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub))
+      discard = quietly(rvals$selectedData %>%
+                          dplyr::filter(!rowid %in% keep$rowid))
+      rvals$selectedData = keep
+      rvals$unselectedData = discard
     }
-    })
+    showNotification("updated",duration = 3)
+  })
+
+  observeEvent(rvals$selectedData,{
+    print("restoring state")
+    restoreState(rvals = rvals,input = input,session = session)
   })
 
   output$newCol = renderUI({
@@ -175,6 +215,7 @@ dataInputServer = function(input, output, session, rvals) {
 
   observeEvent(input$createSubmit,{
     removeModal()
+    print("adding column")
     if(isTRUE(is.null(input$createGroup))) newCol = "cluster" else newCol = input$createGroup
     if(isTRUE(is.null(input$createGroupVal))) val = "1" else val = input$createGroupVal
     rvals$selectedData = quietly(
@@ -182,6 +223,13 @@ dataInputServer = function(input, output, session, rvals) {
         dplyr::select(-tidyselect::any_of(newCol)) %>%
         dplyr::mutate(!!as.name(newCol) := factor(val))
     )
+    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
+    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
+    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
+    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
+    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
   })
 
 }

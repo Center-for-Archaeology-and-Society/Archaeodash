@@ -1,6 +1,8 @@
 
 
 
+
+
 #' UI elements for Impute - Transform Tab
 #'
 #' @return
@@ -9,7 +11,7 @@
 #' @examples
 imputetransformTab = function() {
   tabPanel(
-    title = "Impute & Transform",
+    title = "Impute & Transform & Explore",
     icon = icon("transfer", lib = "glyphicon"),
     id = "imputetransform",
 
@@ -34,6 +36,11 @@ imputetransformTab = function() {
           id = "dataset.impute",
           tabPanel("Elements", DT::dataTableOutput("elementsDT")),
           tabPanel("Attributes", DT::dataTableOutput("attributesDT")),
+          tabPanel(
+            "Crosstabs",
+            wellPanel(uiOutput("crosstabsUI")),
+            DT::dataTableOutput("crosstabsDT")
+          ),
           tabPanel(
             "Univariate Plots",
             uiOutput("ui.univariate"),
@@ -107,8 +114,62 @@ imputeTransformServer = function(input, output, session, rvals) {
   # Render datatable of imputed chemical data
   output$attributesDT <- DT::renderDataTable({
     req(rvals$selectedData)
-    quietly(DT::datatable(rvals$selectedData[,rvals$attrs], rownames = F))
+    quietly(DT::datatable(rvals$selectedData[, rvals$attrs], rownames = F))
   })
+
+  output$crosstabsUI = renderUI({
+    req(rvals$selectedData)
+    fluidRow(
+      column(3,
+             selectInput(
+               inputId = 'crosstab1', "column 1", names(rvals$selectedData)
+             )),
+      column(
+        3,
+        offset = 1,
+        selectInput(inputId = 'crosstab2', "column 2", names(rvals$selectedData))
+      ),
+      column(
+        3,
+        offset = 1,
+        selectInput(
+          inputId = 'crosstab3',
+          "summary function",
+          c(
+            count = "count",
+            mean = "mean",
+            median = "median",
+            sd = "sd"
+          )
+        )
+      )
+    )
+  })
+
+  output$crosstabsDT = DT::renderDT({
+    req(input$crosstab1)
+    quietly({
+      if (input$crosstab3 == "count") {
+        dt = rvals$selectedData %>%
+          dplyr::group_by(dplyr::across(tidyselect::all_of(
+            c(input$crosstab1, input$crosstab2)
+          ))) %>%
+          dplyr::summarize(count = n(), .groups = "drop")
+      } else {
+        suppressWarnings({
+          dt = rvals$selectedData %>%
+            dplyr::group_by(dplyr::across(tidyselect::all_of(input$crosstab1))) %>%
+            dplyr::summarize(dplyr::across(
+              .names = paste0("result-", input$crosstab2),
+              .cols = tidyselect::all_of(input$crosstab2),
+              .fns = list(!!rlang::sym(input$crosstab3))
+            ))
+        })
+      }
+      dt
+    })
+  })
+
 
 
   # Render button and controls to transform data
@@ -151,7 +212,8 @@ imputeTransformServer = function(input, output, session, rvals) {
       })
       # get rid of infinite values
       rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
-        dplyr::mutate_all(list(function(c) dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
+        dplyr::mutate_all(list(function(c)
+          dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
     })
     print("ending transform")
   })
@@ -159,14 +221,12 @@ imputeTransformServer = function(input, output, session, rvals) {
   # Render datatable of transformed chemical data
   output$transform.contents <- DT::renderDataTable({
     req(rvals$selectedData)
-    quietly(
-      DT::datatable(rvals$selectedData[, rvals$chem], rownames = F)
-    )
+    quietly(DT::datatable(rvals$selectedData[, rvals$chem], rownames = F))
   })
 
   # Render missing data plot
   output$miss.plot <- renderPlot({
-    req(rvals$selectedData)
+    req(rvals[['selectedData']])
     DataExplorer::plot_missing(rvals$selectedData[, rvals$chem], ggtheme = ggplot2::theme_bw())
   })
 

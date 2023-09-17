@@ -7,21 +7,19 @@
 #'
 #' @examples
 saveexportTab = function() {
-  shinyjs::hidden(
   div(class = "exportSection",
-    br(),
-    "Export selected data",
-    radioButtons(
-      inputId = "dataType",
-      label = "Results type",
-      choices = c("chemical", "PCA"),
-      selected = "chemical",
-      inline = F
-    ),
-    textInput('ExportName', label = 'File name including the file extension (e.g., csv, xlsx)'),
-    br(),
-    downloadButton("Save", "Click here to save file")
-  )
+      br(),
+      "Export selected data",
+      radioButtons(
+        inputId = "dataType",
+        label = "Results type",
+        choices = c("chemical", "PCA","Membership Probabilities"),
+        selected = "chemical",
+        inline = F
+      ),
+      textInput('ExportName', label = 'File name including the file extension (e.g., csv, xlsx)'),
+      br(),
+      downloadButton("Save", "Click here to save file")
   )
 }
 
@@ -38,10 +36,10 @@ saveexportTab = function() {
 #' @examples
 saveExportServer = function(input, output, session, rvals) {
 
-  observeEvent(rvals$selectedData,{
-    req(rvals$selectedData)
-    shinyjs::show(id = "exportSection")
-  })
+  # observeEvent(rvals$selectedData,{
+  #   req(rvals$selectedData)
+  #   shinyjs::show(id = "exportSection")
+  # })
 
   output$Save <- downloadHandler(
     filename = function() {
@@ -54,7 +52,15 @@ saveExportServer = function(input, output, session, rvals) {
       )
     },
     content = function(file) {
-      rio::export(ifelse(input$dataType == "PCA",rvals$pcaData,rvals$selectedData),file)
-    }
+      if(input$dataType == "PCA"){
+        data = rvals$pcaData
+      } else if(input$dataType == "Membership Probabilities"){
+        data = rvals$membershipProbs
+      } else {
+        data = rvals$selectedData
+      }
+
+      rio::export(data,file)
+  }
   )
 }

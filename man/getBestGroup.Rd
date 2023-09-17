@@ -4,11 +4,19 @@
 \alias{getBestGroup}
 \title{Find best group based on largest values}
 \usage{
-getBestGroup(probs)
+getBestGroup(probsAll, eligible)
 }
 \arguments{
-\item{probs}{}
+\item{probsAll}{result from group probability}
+
+\item{eligible}{groups}
+}
+\value{
+vector of group names
 }
 \description{
 Find best group based on largest values
+}
+\examples{
+getBestGroup(probsAll,eligible)
 }

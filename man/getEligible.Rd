@@ -4,12 +4,12 @@
 \alias{getEligible}
 \title{Calculate eligible groups}
 \usage{
-getEligible(elements, attrs, group)
+getEligible(data, chem, group)
 }
 \arguments{
-\item{elements}{dataframe with chemical elements}
+\item{data}{dataframe from imported data}
 
-\item{attrs}{dataframe with descriptive attributes}
+\item{chem}{names of columns with chemical elements}
 
 \item{group}{selected group attribute}
 }
@@ -18,4 +18,7 @@ vector of eligible groups for further analysis
 }
 \description{
 number of rows must be 2 more than the number of columns per group
+}
+\examples{
+getEligible(data,chem,group)
 }
