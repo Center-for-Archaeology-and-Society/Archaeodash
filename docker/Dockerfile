@@ -1,11 +1,12 @@
-FROM rocker/rocker-verse:4.3.1
+FROM rocker/shiny-verse:4.3.1
 
 LABEL description="This is the docker container for Archaeodash"
 
 RUN apt-get update
 
 RUN  apt-get install -y --no-install-recommends \
-	vim
+	vim \
+    git
 
 RUN install2.r --error --skipinstalled \
     cluster \
@@ -30,6 +31,9 @@ RUN install2.r --error --skipinstalled \
     ICSNP \
     shinyjs \
     bslib \
-    janitor
+    janitor \ 
+    devtools
 
+RUN git clone https://github.com/Center-for-Archaeology-and-Society/Archaeodash.git /srv/shiny-server/Archaeodash
 
+RUN R -e "devtools::install_local('srv/shiny-server/Archaeodash',force = T, dependencies =F)"
