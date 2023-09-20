@@ -31,8 +31,9 @@ RUN install2.r --error --skipinstalled \
     ICSNP \
     shinyjs \
     bslib \
-    janitor \ 
-    devtools
+    janitor \
+    devtools \
+    candisc
 
 RUN git clone -b dev https://github.com/Center-for-Archaeology-and-Society/Archaeodash.git /srv/shiny-server/Archaeodash
 
