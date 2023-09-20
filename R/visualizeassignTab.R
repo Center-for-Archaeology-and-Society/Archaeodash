@@ -28,7 +28,7 @@ visualizeassignTab = function() {
             selectInput(
               'data.src',
               'Choose data type',
-              choices = c('elements', 'principal components'),
+              choices = c('elements', 'principal components','canonical discriminants'),
               selected = 'elements'
             ),
             uiOutput('xvarUI'),
@@ -116,6 +116,12 @@ visualizeAssignServer = function(input, output, session, rvals) {
         return(tibble::tibble())
       })
       rvals$plotVars = rvals$pca$x %>% colnames()
+    } else if (input$data.src == 'canonical discriminants') {
+      rvals$plotdf = tryCatch(rvals$CDAdf,error = function(e) {
+        shiny::showNotification("No CDA results",type = "warning")
+        return(tibble::tibble())
+      })
+      rvals$plotVars = rvals$CDAmod$means %>% colnames()
     } else {
       rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
         shiny::showNotification("No data",type = "warning")
@@ -137,19 +143,17 @@ visualizeAssignServer = function(input, output, session, rvals) {
 
   output$xvar2UI = renderUI({
     req(rvals$selectedData)
-    selectInput('xvar2', 'X', rvals$chem)
+    selectInput('xvar2', 'X', rvals$chem, multiple = T)
   })
 
   output$yvar2UI = renderUI({
     req(rvals$selectedData)
-    req(input$xvar2)
-    choices = setdiff(rvals$chem,input$xvar2)
     selectInput(
       'yvar2',
       'Y',
-      choices = choices,
+      choices = rvals$chem,
       multiple = T,
-      selected = choices
+      selected = rvals$chem
     )
   })
 
@@ -202,7 +206,8 @@ visualizeAssignServer = function(input, output, session, rvals) {
         y = input$yvar,
         color = rvals$attrGroups,
         shape = rvals$attrGroups
-      )
+      ) +
+      ggplot2::scale_color_viridis_d()
     if (input$Conf) {
       n = rvals$plotdf[[rvals$attrGroups]] %>% unique %>% length()
       if (n > 10) {
@@ -220,7 +225,11 @@ visualizeAssignServer = function(input, output, session, rvals) {
     if (is.null(rvals$brushSelected)) {
       p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
     } else {
+      if(isTRUE(input$data.src == "canonical discriminants")){
+        renderTable(rvals$brushSelected)
+      } else {
       renderTable(rvals$brushSelected[,rvals$attrs])
+      }
     }
   })
 
@@ -235,28 +244,37 @@ visualizeAssignServer = function(input, output, session, rvals) {
   observeEvent(input$updateMultiplot, {
     req(rvals$selectedData)
     req(input$xvar2)
-    p = rvals$selectedData %>%
-      dplyr::select(tidyselect::all_of(c(rvals$attrGroups,input$xvar2,input$yvar2))) %>%
-      tidyr::pivot_longer(-tidyselect::all_of(c(input$xvar2, rvals$attrGroups))) %>%
+    pdf1 = rvals$selectedData %>%
+      dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$xvar2))) %>%
+      tidyr::pivot_longer(tidyselect::all_of(input$xvar2), names_to = "xvar2", values_to = "elem1") %>%
+      tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
+    pdf2 = rvals$selectedData %>%
+      dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$yvar2))) %>%
+      tidyr::pivot_longer(tidyselect::all_of(input$yvar2), names_to = "yvar2", values_to = "elem2") %>%
+      tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
+    p = dplyr::full_join(pdf1,pdf2 %>% dplyr::select(-tidyselect::all_of(c('rowid',rvals$attrGroups))), by = 'id', relationship = "many-to-many") %>%
+      dplyr::filter(elem1 != elem2) %>%
       ggplot2::ggplot(ggplot2::aes(
-        y = !!as.name(input$xvar2),
-        x = value,
+        x = elem1,
+        y = elem2,
         color = !!as.name(rvals$attrGroups)
       )) +
       ggplot2::geom_point(size = input$ptsize) +
-      ggplot2::xlab("") +
-      ggplot2::theme_bw(base_size = 14)
-    if (length(input$yvar2) > 1) {
+      ggplot2::ylab("") +
+      ggplot2::theme_bw(base_size = 14,) +
+      ggplot2::scale_color_viridis_d() +
+      ggplot2::theme(
+        strip.background = ggplot2::element_rect(fill = '#404040'),
+        strip.text = ggplot2::element_text(color = "white")
+      )
+    if(length(input$xvar2) > 1){
       p = p +
-        ggplot2::facet_wrap( ~ name, scales = "free", strip.position = "left") +
-        ggplot2::theme(
-          strip.background = ggplot2::element_rect(fill = '#404040'),
-          strip.text = ggplot2::element_text(color = "white")
-        ) +
-        ggplot2::coord_flip()
+        ggplot2::facet_grid(rows = dplyr::vars(xvar2), cols = dplyr::vars(yvar2), scales = 'free', switch = "both") +
+        ggplot2::xlab("")
     } else {
-      p = p + ggplot2::xlab(input$yvar2) +
-        ggplot2::coord_flip()
+      p = p +
+        ggplot2::facet_wrap(~yvar2, scales = 'free',strip.position = "left") +
+        ggplot2::xlab(input$xvar2)
     }
     rvals$multiplot = p
   })

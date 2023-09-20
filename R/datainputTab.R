@@ -37,6 +37,19 @@ dataInputServer = function(input, output, session, rvals) {
   observeEvent(input$file1, {
     print("importing file")
     if (!is.null(input$file1)) {
+      rvals$chem = NULL
+      rvals$attrGroups = NULL
+      rvals$attr = NULL
+      rvals$attrs = NULL
+      rvals$attrGroupsSub = NULL
+      rvals$xvar = NULL
+      rvals$xvar2 = NULL
+      rvals$yvar = NULL
+      rvals$yvar2 = NULL
+      rvals$data.src = NULL
+      rvals$Conf = NULL
+      rvals$int.set = NULL
+      rvals$unselectedData = NULL
       rvals$importedData = rvals$selectedData = quietly(rio::import(input$file1$datapath, setclass = 'tibble')) %>%
         setNames(janitor::make_clean_names(names(.),case = 'none'))
     }
@@ -59,7 +72,7 @@ dataInputServer = function(input, output, session, rvals) {
     if(isTRUE(is.null(rvals[['attrGroups']])))
       selection2 = items else
         selection2 = rvals[['attrGroups']]
-      tagList(
+    tagList(
       selectInput(
         "attr",
         "Select attribute variables you want to display:",
@@ -72,7 +85,7 @@ dataInputServer = function(input, output, session, rvals) {
         "Select descriptive/group column:",
         items.all,
         multiple = F,
-        selected = selection2
+        selected = selection2[1]
       )
     )
   })
@@ -124,7 +137,11 @@ dataInputServer = function(input, output, session, rvals) {
   # Render button to update datatable based on variable selections
   output$actionUI <- renderUI({
     req(input$file1)
-    actionButton("action", "Press to confirm selections")
+    tagList(
+      checkboxInput("runPCA","check to run PCA", value = F),
+      checkboxInput("runCDA","check to run CDA", value = F),
+      actionButton("action", "Press to confirm selections")
+    )
   })
 
   output$resetUI <- renderUI({
@@ -167,18 +184,18 @@ dataInputServer = function(input, output, session, rvals) {
     if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
       rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>% dplyr::arrange(rowid)
     }
-    rvals$selectedData = quietly(
+    rvals$selectedData =
       rvals$selectedData %>%
-        dplyr::select(-tidyselect::any_of('rowid')) %>%
-        tibble::rowid_to_column() %>%
-        dplyr::select(
-          rowid,
-          tidyselect::all_of(input$attr),
-          tidyselect::all_of(input$attrGroups),
-          tidyselect::all_of(input$chem)
-        ) %>%
-        dplyr::mutate_at(dplyr::vars(input$attrGroups), factor)
-    )
+      dplyr::select(-tidyselect::any_of('rowid')) %>%
+      tibble::rowid_to_column() %>%
+      dplyr::select(
+        rowid,
+        tidyselect::all_of(input$attr),
+        tidyselect::all_of(input$attrGroups),
+        tidyselect::all_of(input$chem)
+      ) %>%
+      dplyr::mutate_at(dplyr::vars(input$attrGroups), factor) %>%
+      dplyr::mutate_at(dplyr::vars(input$chem), quietly(as.numeric))
     if(isTRUE(is.null(input$attrGroupsSub))){
       showNotification("Cannot proceed without any groups selected",type = "error")
     } else {
@@ -189,6 +206,10 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$selectedData = keep
       rvals$unselectedData = discard
     }
+    rvals$runPCA = input$runPCA
+    rvals$runCDA = input$runCDA
+    if(isTRUE(rvals$runPCA)) showNotification("Running PCA")
+    if(isTRUE(rvals$runCDA)) showNotification("Running CDA")
     showNotification("updated",duration = 3)
   })
 

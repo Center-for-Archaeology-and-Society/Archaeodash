@@ -4,7 +4,7 @@
 \alias{getBestGroup}
 \title{Find best group based on largest values}
 \usage{
-getBestGroup(probsAll, eligible)
+getBestGroup(probsAll, eligible, method)
 }
 \arguments{
 \item{probsAll}{result from group probability}

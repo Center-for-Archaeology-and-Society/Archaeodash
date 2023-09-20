@@ -154,7 +154,7 @@ imputeTransformServer = function(input, output, session, rvals) {
           dplyr::group_by(dplyr::across(tidyselect::all_of(
             c(input$crosstab1, input$crosstab2)
           ))) %>%
-          dplyr::summarize(count = n(), .groups = "drop")
+          dplyr::summarize(count = dplyr::n(), .groups = "drop")
       } else {
         suppressWarnings({
           dt = rvals$selectedData %>%
