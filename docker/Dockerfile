@@ -6,7 +6,7 @@ RUN apt-get update
 
 RUN  apt-get install -y --no-install-recommends \
 	vim \
-    git
+	git 
 
 RUN install2.r --error --skipinstalled \
     cluster \
