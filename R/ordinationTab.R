@@ -14,11 +14,11 @@ ordinationTab = function(){
                column(6,plotOutput("pca.plot")),
                column(6,plotOutput("pca.el.plot"))),
              fluidRow(
-               column(6,plotOutput("eigen.plot"))),
-             fluidRow(column(6,
-                             h1("CDA Results"))),
-             fluidRow(column(6,
-                             plotOutput("cda.plot")))
+               column(6,plotOutput("eigen.plot")))#,
+             # fluidRow(column(6,
+             #                 h1("CDA Results"))),
+             # fluidRow(column(6,
+             #                 plotOutput("cda.plot")))
            ) # end fluidPage Ordination
   )
 }

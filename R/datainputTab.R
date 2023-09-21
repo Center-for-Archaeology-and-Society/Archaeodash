@@ -139,7 +139,7 @@ dataInputServer = function(input, output, session, rvals) {
     req(input$file1)
     tagList(
       checkboxInput("runPCA","check to run PCA", value = F),
-      checkboxInput("runCDA","check to run CDA", value = F),
+      # checkboxInput("runCDA","check to run CDA", value = F),
       actionButton("action", "Press to confirm selections")
     )
   })

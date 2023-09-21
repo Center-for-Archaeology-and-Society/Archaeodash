@@ -28,7 +28,8 @@ visualizeassignTab = function() {
             selectInput(
               'data.src',
               'Choose data type',
-              choices = c('elements', 'principal components','canonical discriminants'),
+              choices = c('elements', 'principal components'),
+              # choices = c('elements', 'principal components','canonical discriminants'),
               selected = 'elements'
             ),
             uiOutput('xvarUI'),
