@@ -190,7 +190,8 @@ visualizeAssignServer = function(input, output, session, rvals) {
 
   # plot
   output$plot <- plotly::renderPlotly({
-    req(rvals$plotdf)
+    validate(need(inherits(rvals$plotdf,"data.frame"),"Waiting for plot data"))
+
     p1 <-
       ggplot2::ggplot(rvals$plotdf,
                       ggplot2::aes(
@@ -267,9 +268,9 @@ visualizeAssignServer = function(input, output, session, rvals) {
         strip.background = ggplot2::element_rect(fill = '#404040'),
         strip.text = ggplot2::element_text(color = "white")
       )
-    if(length(input$xvar2) > 1){
+    if(length(input$xvar2) > 1 || ((length(input$xvar2) == 1 & length(input$yvar2) == 1))){
       p = p +
-        ggplot2::facet_grid(rows = dplyr::vars(xvar2), cols = dplyr::vars(yvar2), scales = 'free', switch = "both") +
+        ggplot2::facet_grid(rows = dplyr::vars(yvar2), cols = dplyr::vars(xvar2), scales = 'free',switch = 'both') +
         ggplot2::xlab("")
     } else {
       p = p +

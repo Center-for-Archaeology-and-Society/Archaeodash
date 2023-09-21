@@ -227,7 +227,7 @@ imputeTransformServer = function(input, output, session, rvals) {
   # Render missing data plot
   output$miss.plot <- renderPlot({
     req(rvals[['selectedData']])
-    DataExplorer::plot_missing(rvals$selectedData[, rvals$chem], ggtheme = ggplot2::theme_bw())
+    plot_missing(data = rvals$selectedData[, rvals$chem])
   })
 
   # Render UI for univariate displays
