@@ -226,6 +226,7 @@ imputeTransformServer = function(input, output, session, rvals) {
 
   # Render missing data plot
   output$miss.plot <- renderPlot({
+    validate(need(isTRUE(inherits(rvals[['selectedData']],"data.frame")),""))
     req(rvals[['selectedData']])
     plot_missing(data = rvals$selectedData[, rvals$chem])
   })
