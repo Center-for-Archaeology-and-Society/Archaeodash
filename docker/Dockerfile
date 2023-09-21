@@ -6,7 +6,9 @@ RUN apt-get update
 
 RUN  apt-get install -y --no-install-recommends \
 	vim \
-    git
+	git \
+	libgl1-mesa-dev \
+	libglu1-mesa-dev
 
 RUN install2.r --error --skipinstalled \
     cluster \
@@ -31,9 +33,11 @@ RUN install2.r --error --skipinstalled \
     ICSNP \
     shinyjs \
     bslib \
-    janitor \ 
-    devtools
+    janitor \
+    devtools \
+    candisc
 
-RUN git clone https://github.com/Center-for-Archaeology-and-Society/Archaeodash.git /srv/shiny-server/Archaeodash
+RUN git clone -b dev https://github.com/Center-for-Archaeology-and-Society/Archaeodash.git /srv/shiny-server/Archaeodash
+
 
 RUN R -e "devtools::install_local('srv/shiny-server/Archaeodash',force = T, dependencies =F)"

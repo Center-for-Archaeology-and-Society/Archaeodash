@@ -1,19 +1,17 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 0.0.4
+Version: 0.1.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Rpbert", "Jacob", , "rbischoff@asu.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-8708-9041"))
+Description: Analytical dashboard for analyzing chemical composition of artifacts for archaeologists.
+License: `use_mit_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Imports: 
     cluster,
     cowplot,
-    DataExplorer,
     dendextend,
     dplyr,
     DT,
@@ -31,4 +29,9 @@ Imports:
     stats,
     tidyselect,
     ICSNP,
-    shinyjs
+    shinyjs,
+    bslib,
+    janitor,
+    candisc
+Depends: 
+    data.table

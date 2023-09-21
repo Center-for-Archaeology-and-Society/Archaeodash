@@ -8,78 +8,84 @@
 #' @export
 #'
 #' @examples
-group.mem.probs <- function(elements,assigned,method = "Hotellings", ID) {
-  # Initialize libraries
-  library(ICSNP)
-  library(kableExtra)
-  library(DataExplorer)
-  library(mice)
-  # elements = transformed element data
-  # assigned = group designation by sample
-  grps = assigned %>% unique %>% sort %>% as.character
+#'
 
-  if(method == "Hotellings"){
-    probs <- list()
-    for (g in 1:length(grps)) {
-      x <- elements[which(assigned==grps[g]),]
-      probs[[g]] <- matrix(0,nrow(x),length(grps))
-      colnames(probs[[g]]) <- grps
-      rownames(probs[[g]]) <- rownames(x)
+# group.mem.probs <- function(elements,assigned) {
+#
+#   grps = assigned %>% unique %>% sort %>% as.character
+#
+#   # Initialize libraries
+#   library(ICSNP)
+#   library(kableExtra)
+#   library(DataExplorer)
+#   library(mice)
+#   # elements = transformed element data
+#   # attr1 = group designation by sample
+#   # grps <- vector of groups to evaluate
+#
+#   probs <- list()
+#   for (m in 1:length(grps)) {
+#     x <- elements[which(assigned==grps[m]),]
+#     probs[[m]] <- matrix(0,nrow(x),length(grps))
+#     colnames(probs[[m]]) <- grps
+#     rownames(probs[[m]]) <- rownames(x)
+#
+#     grps2 <- grps[-m]
+#
+#     p.val <- NULL
+#     for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],x[-i,])$p.value}
+#     probs[[m]][,m] <- round(p.val,5)*100
+#
+#     for (j in 1:length(grps2)) {
+#       p.val2 <- NULL
+#       for (i in 1:nrow(x)) {p.val2[i] <- HotellingsT2(x[i,],elements[which(assigned==grps2[j]),])$p.value}
+#       probs[[m]][,which(grps==grps2[j])] <- round(p.val2,5)*100}}
+#   return(probs)}
 
-      for (gg in 1:length(grps)) {
-        p.val <- NULL
-        for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],elements[which(assigned==grps[gg]),])$p.value}
-        probs[[g]][,which(grps==grps[gg])] <- round(p.val,5)*100
+
+#' group.mem.probs(data = rvals$selectedData,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
+
+  probsAll = matrix(nrow = nrow(data), ncol = length(eligible))
+  colnames(probsAll) = eligible
+  rownames(probsAll) = data[[ID]]
+  p.val <- NULL
+  for (r in 1:nrow(data)) {
+    for(grp in eligible){
+      grpindx = which(data[[group]]==grp)
+      grpindx = setdiff(grpindx,r)
+      if(method == "Hotellings"){
+        p.val <- ICSNP::HotellingsT2(data[r,chem],data[grpindx,chem])$p.value %>%
+          round(.,5)*100
+      } else {
+        p.val <- getMahalanobis(data[r,chem],data[grpindx,chem])
       }
+      probsAll[r,which(eligible == grp)] <- p.val
     }
-  } else {
-    probs <- list()
-    for (g in 1:length(grps)) {
-      x <- elements[which(assigned==grps[g]),]
-      probs[[g]] <- matrix(0,nrow(x),length(grps))
-      colnames(probs[[g]]) <- grps
-      rownames(probs[[g]]) <- rownames(x)
 
-      for (gg in 1:length(grps)) {
-        tmp = elements[which(assigned==grps[gg]),]
-        p.val <- NULL
-        for (i in 1:nrow(x)) {
-          tmp = dplyr::bind_rows(x[i, ],tmp)
-          cov_matrix <- cov(tmp)
-          mean_data <- colMeans(tmp)
-          p.val[i] <- mahalanobis(x[i, ], mean_data, cov_matrix)
-        }
-        probs[[g]][,gg] <- round(p.val,3)
-      }
-    }
   }
+  bg = getBestGroup(probsAll,eligible,method = method)
+  probsAlldf = probsAll %>% tibble::as_tibble() %>% dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,.before = 1)
 
-  probs = getBestGroup(probs = probs)
-
-  probs = purrr::map(1:length(probs),function(i){
-    indx = which(assigned == grps[i])
-    cbind(tibble::tibble(ID = ID[indx]),probs[[i]])
-  })
-
-  names(probs) = grps
-  return(probs)
+  return(probsAlldf)
 }
 
 #' Calculate eligible groups
 #'
 #' number of rows must be 2 more than the number of columns per group
 #'
-#' @param elements dataframe with chemical elements
-#' @param attrs dataframe with descriptive attributes
 #' @param group selected group attribute
+#' @param data dataframe from imported data
+#' @param chem names of columns with chemical elements
 #'
 #' @return vector of eligible groups for further analysis
 #' @export
 #'
 #' @examples
-getEligible = function(elements,attrs,group){
-  nc = ncol(elements)
-  eligible = attrs %>%
+#' getEligible(data,chem,group)
+getEligible = function(data,chem,group){
+  nc = length(chem)
+  eligible = data %>%
     dplyr::group_by(dplyr::across(tidyselect::all_of(group))) %>%
     dplyr::count() %>%
     dplyr::filter(n > (nc + 1)) %>%
@@ -90,21 +96,41 @@ getEligible = function(elements,attrs,group){
 
 #' Find best group based on largest values
 #'
-#' @param probs
+#' @param probsAll result from group probability
+#' @param eligible groups
 #'
-#' @return
+#' @return vector of group names
 #' @export
 #'
 #' @examples
-getBestGroup = function(probs){
-  result = purrr::map(probs,function(p){
-    bestVal = apply(p,1,which.max)
-    best = sapply(bestVal,function(i) colnames(p)[i])
-    return(cbind(p,best))
-  })
-  return(result)
+#' getBestGroup(probsAll,eligible)
+getBestGroup = function(probsAll,eligible, method){
+  if(method == "Hotellings")
+  bestVal = apply(probsAll,1,which.max) else
+    bestVal = apply(probsAll,1,which.min)
+  if(method == "Hotellings")
+    val = apply(probsAll,1,max) else
+      val = apply(probsAll,1,min)
+  nms = sapply(bestVal,function(x)eligible[x]) %>% unname()
+  return(list(nms = nms, vals = val))
 }
 
+#' Get Mahalanobis distance
+#'
+#' @param row to get distance for
+#' @param data dataset to compare against
+#'
+#' @return distance
+#' @export
+#'
+#' @examples
+#' getMahalanobis(data[r,],data[,data[[group]] == grp])
+getMahalanobis = function(row, data){
+  cov_matrix <- cov(data)
+  mean_data <- colMeans(data)
+  result <- mahalanobis(row, mean_data, cov_matrix)
+  return(result)
+}
 # read in sample data INAA_test, create attribute and element data.frames, impute missing data and transform
 # mydat <- read.csv('inst/INAA_test.csv',header=T,row.names=1)
 # attr1 <- mydat[,c(1,3,5,7)] # pull out attributes for plotting

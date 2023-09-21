@@ -2,14 +2,14 @@
 
 # script to build archaeodash docker container
 
-docker build -t archaeodash Archaeodash/docker
+docker build -t archaeodashbeta Archaeodashbeta/docker
 
 docker run \
---name=archaeodash \
+--name=archaeodashbeta \
 -d \
--v ./Archaeodash:/srv/shiny-server/Archaeodash \
+-v ./Archaeodashbeta:/srv/shiny-server/Archaeodash \
 -w /srv/shiny-server/Archaeodash \
---publish=13838:3838 \
+--publish=23838:3838 \
 --restart unless-stopped \
-archaeodash
+archaeodashbeta
 

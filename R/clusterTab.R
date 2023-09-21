@@ -9,9 +9,6 @@ clusterTab = function(){
   tabPanel(title = "Cluster", icon = icon("adjust", lib = "glyphicon"),
            sidebarLayout(
              sidebarPanel(
-               chooseDFUI("ct"),
-               br(),
-               subsetModUI("ct"),
                radioButtons("cluster.parent", "Select Clustering Method",
                             choices = c("View optimal number of clusters" = "nClust",
                                         "Hierarchical Agglomerative Clustering" = "hca",
@@ -47,10 +44,6 @@ clusterTab = function(){
 #' @examples
 clusterServer = function(input,output,session,rvals){
 
-  chooseDFServer("ct",rvals)
-
-  subsetModServer("ct",rvals)
-
   # Render button to run clustering algorithm
   output$cluster.button <- renderUI({
     req(input$file1)
@@ -73,28 +66,28 @@ clusterServer = function(input,output,session,rvals){
   # Render WSS and Silhouette graphs for optimal number of clusters for each method
 
   observeEvent(input$cluster.button, {
-    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
+    req(rvals$selectedData[,rvals$chem])
     try({
       if(input$cluster.column.text == "") clusterName = "cluster" else clusterName = input$cluster.column.text
       if (input$cluster.parent == "nClust") {
         kmeans_wss <-
-          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, kmeans, method = "wss") +
+          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Elbow Method")
         kmeans_sil <-
-          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, kmeans, method = "silhouette") +
+          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Silhouette Method")
         kmedoids_wss <-
-          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, cluster::pam, method = "wss") +
+          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], cluster::pam, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids Elbow Method")
         kmedoids_sil <-
-          factoextra::fviz_nbclust(rvals$df[[input$`ct-selectedDF`]]$chemicalData, cluster::pam, method = "silhouette") +
+          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], cluster::pam, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids ")
 
         rvals$clusterPlot = function(){cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)}
       } else if (input$cluster.parent == "hca") {
         hc = as.dendrogram(
           hclust(
-            dist(rvals$df[[input$`ct-selectedDF`]]$chemicalData, method = input$clust.dist.method),
+            dist(rvals$selectedData[,rvals$chem], method = input$clust.dist.method),
             method = input$hclust.method
           )
         )
@@ -124,7 +117,7 @@ clusterServer = function(input,output,session,rvals){
           c("Sample", clusterName)
       } else if (input$cluster.parent == "hdca") {
         hc = as.dendrogram(
-          cluster::diana(rvals$df[[input$`ct-selectedDF`]]$chemicalData, metric = input$hdca.dist.method)
+          cluster::diana(rvals$selectedData[,rvals$chem], metric = input$hdca.dist.method)
         )
         rvals$clusterPlot = function(){plot(
           dendextend::color_branches(hc,
@@ -147,13 +140,13 @@ clusterServer = function(input,output,session,rvals){
           c("Sample", clusterName)
       } else if (input$cluster.parent == "kmeans") {
         kmeans_solution = kmeans(
-          rvals$df[[input$`ct-selectedDF`]]$chemicalData,
+          rvals$selectedData[,rvals$chem],
           centers = input$kmeans.centers,
           iter.max = input$kmeans.iter.max,
           nstart = input$kmeans.nstart
         )
         rvals$clusterPlot = function(){factoextra::fviz_cluster(
-          kmeans_solution, data = rvals$df[[input$`ct-selectedDF`]]$chemicalData
+          kmeans_solution, data = rvals$selectedData[,rvals$chem]
         ) +
             ggplot2::theme_bw()}
         rvals$clusterDT = kmeans_solution$cluster
@@ -164,11 +157,11 @@ clusterServer = function(input,output,session,rvals){
       } else if (input$cluster.parent == "kmedoids") {
         pam_solution =
           cluster::pam(
-            rvals$df[[input$`ct-selectedDF`]]$chemicalData,
+            rvals$selectedData[,rvals$chem],
             k = input$kmedoids.k,
             metric = input$kmedoids.dist.method
           )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = rvals$df[[input$`ct-selectedDF`]]$chemicalData) + ggplot2::theme_bw()}
+        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = rvals$selectedData[,rvals$chem]) + ggplot2::theme_bw()}
         rvals$clusterDT <- pam_solution$cluster
         rvals$clusterDT <-
           tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample")
@@ -191,7 +184,7 @@ clusterServer = function(input,output,session,rvals){
 
   # Render UI options for cluster analysis
   output$cluster.options <- renderUI({
-    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
+    req(rvals$selectedData[,rvals$chem])
     # Output of options if HCA chosen
     if (input$cluster.parent == "hca") {
       cluster_input_selections <- list(
@@ -335,13 +328,17 @@ clusterServer = function(input,output,session,rvals){
   # Assign cluster assignments based on cluster solution
 
   observeEvent(input$cluster.assign.button,{
-    req(rvals$df[[input$`ct-selectedDF`]]$chemicalData)
+    req(rvals$selectedData)
     req(rvals$clusterDT)
-    rvals$df[[input$`ct-selectedDF`]]$attrData =
-      rvals$df[[input$`ct-selectedDF`]]$attrData %>%
+    quietly({
+    nms = rvals$clusterDT %>% names()
+    nms = setdiff(nms,'Sample')
+    rvals$selectedData =
+      rvals$selectedData %>%
       dplyr::bind_cols(rvals$clusterDT %>%
                          dplyr::select(-Sample) %>%
-                         dplyr::mutate_all(factor))
+                         dplyr::mutate_at(dplyr::vars(nms),factor))
+    })
     showNotification("assigned cluster")
   })
 

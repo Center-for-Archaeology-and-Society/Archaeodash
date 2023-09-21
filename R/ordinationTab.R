@@ -5,26 +5,22 @@
 #' @export
 #'
 #' @examples
-ordinationTab = function(){tabPanel(title = "Ordination", icon = icon("equalizer", lib = "glyphicon"),
-                  sidebarLayout(
-                    sidebarPanel(
-                      chooseDFUI("ot"),
-                      br(),
-                      subsetModUI("ot"),
-                      br(),
-                      uiOutput("chem.pca"),
-                      uiOutput("pca.button")
-                    ), # end sidebarPanel
-
-                    mainPanel(
-                      fluidRow(
-                        column(6,plotOutput("pca.plot")),
-                        column(6,plotOutput("pca.el.plot"))),
-                      fluidRow(
-                        column(6,plotOutput("eigen.plot")))
-                    ) # end mainPanel Ordination
-                  ) # end sidebarLayout Ordination
-)
+ordinationTab = function(){
+  tabPanel(title = "Ordination", icon = icon("equalizer", lib = "glyphicon"),
+           fluidPage(
+             fluidRow(column(6,
+                             h1("PCA Results"))),
+             fluidRow(
+               column(6,plotOutput("pca.plot")),
+               column(6,plotOutput("pca.el.plot"))),
+             fluidRow(
+               column(6,plotOutput("eigen.plot")))#,
+             # fluidRow(column(6,
+             #                 h1("CDA Results"))),
+             # fluidRow(column(6,
+             #                 plotOutput("cda.plot")))
+           ) # end fluidPage Ordination
+  )
 }
 
 #' Ordination Server
@@ -40,39 +36,36 @@ ordinationTab = function(){tabPanel(title = "Ordination", icon = icon("equalizer
 #' @examples
 ordinationServer = function(input,output,session,rvals){
 
-  chooseDFServer("ot",rvals)
-
-  subsetModServer("ot",rvals)
-
-  # Render multi-select lookup for choosing chemical concentration columns to include in
-  # Principal Components Analysis
-  output$chem.pca <- renderUI({
-    items.all <- names(rvals$df[[input$`ot-selectedDF`]]$chemicalData)
-    names(items.all) = items.all
-    selectInput(
-      "chem.pca.sel",
-      "Select transformed elements to include in PCA:",
-      items.all,
-      multiple = TRUE,
-      selected = items.all
-    )
+  observeEvent(rvals$runPCA, {
+    req(rvals$runPCA)
+    req(rvals$selectedData)
+    if(isTRUE(rvals$runPCA)){
+      quietly({
+      rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
+      rvals$pcadf = dplyr::bind_cols(rvals$selectedData[,rvals$attrs],rvals$pca$x)
+      rvals$runPCA = F
+      })
+    }
   })
 
-  output$pca.button <- renderUI({
-    actionButton("runPCA", "Run PCA and Save Results")
-  })
-
-  observeEvent(input$runPCA, {
-    req(rvals$df[[input$`ot-selectedDF`]]$chemicalData)
-    req(input$chem.pca.sel)
-    rvals$df[[input$`ot-selectedDF`]]$pcaResults = prcomp(rvals$df[[input$`ot-selectedDF`]]$chemicalData[input$chem.pca.sel])
+  observeEvent(rvals$runCDA, {
+    req(rvals$runCDA)
+    req(rvals$selectedData)
+    if(isTRUE(rvals$runCDA)){
+      quietly({
+        cda = tryCatch(getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(CDAdf = tibble::tibble(), mod = NULL)))
+        rvals$CDAdf = cda$CDAdf
+        rvals$CDAmod = cda$mod
+        rvals$runCDA = F
+      })
+    }
   })
 
   # Render PCA plot
   output$pca.plot <- renderPlot({
-    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
+    req(rvals$pca)
     factoextra::fviz_pca_ind(
-      rvals$df[[input$`ot-selectedDF`]]$pcaResults,
+      rvals$pca,
       col.ind = "cos2",
       # Color by the quality of representation
       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
@@ -83,19 +76,30 @@ ordinationServer = function(input,output,session,rvals){
 
   # Render PCA Eigenvalue plot
   output$eigen.plot <- renderPlot({
-    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
-    factoextra::fviz_eig(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
+    req(rvals$pca)
+    factoextra::fviz_eig(rvals$pca)
   })
 
   # Render PCA Eigenvalue plot
   output$pca.el.plot <- renderPlot({
-    req(rvals$df[[input$`ot-selectedDF`]]$pcaResults)
+    req(rvals$pca)
     factoextra::fviz_pca_var(
-      rvals$df[[input$`ot-selectedDF`]]$pcaResults,
+      rvals$pca,
       col.var = "contrib",
       # Color by contributions to the PC
       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
       repel = TRUE
     )     # Avoid text overlapping
+  })
+
+  # Render CDA plot
+  output$cda.plot <- renderPlot({
+    validate(need(inherits(rvals$CDAmod,"candisc"),""))
+    req(rvals$CDAmod)
+    levels = nrow(rvals$CDAdf)
+    cp = viridis::cividis(n = length(levels))
+    xlim = c(min(rvals$CDAdf$Can1) * 1.25,max(rvals$CDAdf$Can1) * 1.25)
+    ylim = c(min(rvals$CDAdf$Can2) * 1.25,max(rvals$CDAdf$Can2) * 1.25)
+    heplots::heplot(rvals$CDAmod, col = cp, xlim = xlim, ylim = ylim)
   })
 }

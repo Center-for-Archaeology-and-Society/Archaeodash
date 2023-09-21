@@ -8,30 +8,35 @@
 groupTab = function(){
   tabPanel(title = "Group Membership",
            sidebarLayout(sidebarPanel(
-             chooseDFUI("gm"),
-             br(),
-             subsetModUI("gm"),
-             br(),
-             uiOutput("membershipGroupUI"),
              uiOutput("eligibleGroupUI"),
-             uiOutput("projectionGroupUI"),
              uiOutput("sampleIDUI"),
-             uiOutput("membershipGroupChoiceUI"),
              selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
              actionButton("membershipRun","Calculate"),
            ),
            mainPanel(
-             fluidRow(
-               column(8,
-                      DT::DTOutput('membershipTbl')
-               ),
-               column(4,
-                      fluidRow(actionButton("gAddGroup","Add New Column")),
-                      fluidRow(br()),
-                      fluidRow(actionButton("gChangeGroup","Change Group Assignment")),
-                      fluidRow(textInput("gNewGroup","Enter new group designation")))
-             )
-           ))
+             tabsetPanel(id = "GroupMembershipPanels",
+                         type = "pills",
+                         tabPanel(title = "Group Sizes",
+                                  id = "groupSizePanel",
+                                  uiOutput("grpSizeUI")
+                         ),
+                         tabPanel(
+                           title = "Membership Probabilities",
+                           id = "membershipProbs",
+                           wellPanel(
+                           fluidRow(
+                               column(4,actionButton("gChangeGroup","Change Group Assignment")),
+                               column(4, offset = 2,
+                                      textInput("gNewGroup","Enter new group designation")
+                               )
+                             )
+                           ),
+                           br(),
+                           DT::DTOutput('membershipTbl')
+                         )
+             ) # end tabset panel
+           ) # end main panel
+           ) # end sidebar layout
   ) # end group membership panel
 }
 
@@ -48,60 +53,69 @@ groupTab = function(){
 #' @examples
 groupServer = function(input,output,session,rvals){
 
-  chooseDFServer("gm",rvals)
-
-  subsetModServer("gm",rvals)
-
   ##### UI Outputs for membership groups ####
 
-  output$membershipGroupUI = renderUI({
-    req(rvals$df[[input$`gm-selectedDF`]]$attrData)
-    selectInput("membershipGroup","Choose Group Column",choices = colnames(rvals$df[[input$`gm-selectedDF`]]$attrData)[sapply(rvals$df[[input$`gm-selectedDF`]]$attrData, is.factor)])
+  output$grpSizeUI = renderUI({
+    req(rvals$selectedData)
+    tbl = table(rvals$selectedData[[rvals$attrGroups]]) %>%
+      as.data.frame() %>%
+      setNames(c("Group","Count"))
+    DT::renderDataTable(tbl)
   })
 
   output$eligibleGroupUI = renderUI({
-    req(input$membershipGroup %in% names(rvals$df[[input$`gm-selectedDF`]]$attrData))
-    eligible = getEligible(elements = rvals$df[[input$`gm-selectedDF`]]$chemicalData, attrs = rvals$df[[input$`gm-selectedDF`]]$attrData, group = input$membershipGroup)
+    req(rvals$selectedData)
+    eligible = getEligible(rvals$selectedData, chem = rvals$chem, group = rvals$attrGroups)
     selectInput("eligibleGroups","Choose Eligible Groups",choices = eligible, multiple = T, selected = eligible)
   })
 
-  output$projectionGroupUI = renderUI({
-    req(input$eligibleGroups)
-    req(input$membershipGroup)
-    choices = rvals$df[[input$`gm-selectedDF`]]$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
-      dplyr::pull() %>%
-      sort()
-    selectInput("projectionGroups","Choose Groups to Project Against",choices = choices, multiple = T, selected = choices)
-  })
-
   output$sampleIDUI = renderUI({
-    req(rvals$df[[input$`gm-selectedDF`]]$attrData)
-    selectInput("sampleID","Choose sample ID Column",choices = names(rvals$df[[input$`gm-selectedDF`]]$attrData))
-  })
-
-  output$membershipGroupChoiceUI = renderUI({
-    req(input$eligibleGroups)
-    req(input$membershipGroup)
-    choices = rvals$df[[input$`gm-selectedDF`]]$attrData %>% dplyr::distinct(!!as.name(input$membershipGroup)) %>%
-      dplyr::pull() %>%
-      sort()
-    selectInput("membershipGroupChoice","Choose Group to View",choices = choices)
+    req(rvals$selectedData)
+    selectInput("sampleID","Choose sample ID Column",choices = names(rvals$selectedData[,rvals$attrs]))
   })
 
   observeEvent(input$membershipRun,{
-    req(input$membershipGroup)
+    req(rvals$attrGroups)
     showNotification("calculating membership")
-    grps = c(input$eligibleGroups,input$projectionGroups)
-    indx = which(rvals$df[[input$`gm-selectedDF`]]$attrData[[input$membershipGroup]] %in% grps)
-    elements = rvals$df[[input$`gm-selectedDF`]]$chemicalData[indx,]
-    attrs = rvals$df[[input$`gm-selectedDF`]]$attrData[indx,]
-    rvals$membershipProbs = try(group.mem.probs(elements = elements,assigned = attrs[[input$membershipGroup]],method = input$membershipMethod, ID = attrs[[input$sampleID]]))
-    if(inherits(rvals$membershipProbs,"try-error")) showNotification(paste("Error"),rvals$membershipProbs[[1]])
-    showNotification("completed")
+    rvals$membershipProbs = try(group.mem.probs(data = rvals$selectedData,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID))
+    if(inherits(rvals$membershipProbs,"try-error"))
+      showNotification(paste("Error"),rvals$membershipProbs[[1]])
+    showNotification("completed Calculation")
   })
 
   output$membershipTbl = DT::renderDataTable({
-    DT::datatable(rvals$membershipProbs[[input$membershipGroupChoice]] %>%
-      tibble::as_tibble(),rownames = F,selection = 'multiple', style = 'bootstrap')
+    req(rvals$membershipProbs)
+    DT::datatable(rvals$membershipProbs,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap')
   })
+
+  observeEvent(input$gChangeGroup, {
+    quietly({
+    selRows = input$membershipTbl_rows_selected
+    new = rvals$selectedData %>%
+      dplyr::slice(selRows) %>%
+      dplyr::mutate(!!as.name(rvals$attrGroups) := input$gNewGroup)
+    old = rvals$selectedData %>%
+      dplyr::slice(-selRows)
+    rvals$selectedData = dplyr::bind_rows(new, old) %>%
+      dplyr::arrange(rowid) %>%
+      dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)),factor)
+    rvals$membershipProbs[['GroupVal']] = rvals$selectedData[[rvals$attrGroups]]
+            })
+    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
+    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
+    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
+    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
+    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+  })
+
+  observeEvent(input$gNewGroup,{
+    if(stringr::str_detect(input$gNewGroup,"[a-zA-z]|[0-9]")){
+      shinyjs::enable("gChangeGroup")
+    } else {
+      shinyjs::disable("gChangeGroup")
+    }
+  })
+
 }

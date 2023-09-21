@@ -9,3 +9,6 @@ datainputTab()
 \description{
 UI elements for Data Input tab
 }
+\examples{
+datainputTab()
+}

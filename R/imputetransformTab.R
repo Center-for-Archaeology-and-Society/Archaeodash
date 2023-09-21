@@ -1,43 +1,62 @@
 
+
+
+
+
 #' UI elements for Impute - Transform Tab
 #'
 #' @return
 #' @export
 #'
 #' @examples
-imputetransformTab = function(){tabPanel(title = "Impute & Transform", icon = icon("transfer", lib= "glyphicon"), id = "imputetransform",
+imputetransformTab = function() {
+  tabPanel(
+    title = "Impute & Transform & Explore",
+    icon = icon("transfer", lib = "glyphicon"),
+    id = "imputetransform",
 
-         sidebarLayout(
-           sidebarPanel(
-             chooseDFUI("it"),
-             br(),
-             subsetModUI("it"),
-             br(),
-             uiOutput("impute.options"),
-             br(),
-             uiOutput("ui.impute"),
-             tags$hr(),
-             uiOutput("transform.options"),
-             br(),
-             uiOutput("ui.transform"),
-             tags$hr(),
-             "Numbers of samples with missing data by element (pre-imputation)",
-             plotOutput("miss.plot", width = "250px")
-           ), # end sidebarPanel
+    sidebarLayout(
+      sidebarPanel(
+        uiOutput("impute.options"),
+        br(),
+        uiOutput("ui.impute"),
+        tags$hr(),
+        uiOutput("transform.options"),
+        br(),
+        uiOutput("ui.transform"),
+        tags$hr(),
+        "Numbers of samples with missing data by element (pre-imputation)",
+        plotOutput("miss.plot", width = "250px")
+      ),
+      # end sidebarPanel
 
-           mainPanel(
-             tabsetPanel(
-               id = "dataset.impute",
-               tabPanel("Elements", DT::dataTableOutput("elementsDT")),
-               tabPanel("Univariate Plots",
-                        uiOutput("ui.univariate"),
-                        uiOutput("ui.hist.bin"),
-                        plotOutput("element.hist")),
-               tabPanel("Compositional Profile Plot", br(), uiOutput("ui.comp"),
-                        plotOutput("comp.profile")))
-           ) # end mainPanel Impute
-         ) # end sidebarLayout Impute
-) # end tabPanel "Impute"
+      mainPanel(
+        tabsetPanel(
+          type = "pills",
+          id = "dataset.impute",
+          tabPanel("Elements", DT::dataTableOutput("elementsDT")),
+          tabPanel("Attributes", DT::dataTableOutput("attributesDT")),
+          tabPanel(
+            "Crosstabs",
+            wellPanel(uiOutput("crosstabsUI")),
+            DT::dataTableOutput("crosstabsDT")
+          ),
+          tabPanel(
+            "Univariate Plots",
+            uiOutput("ui.univariate"),
+            uiOutput("ui.hist.bin"),
+            plotOutput("element.hist")
+          ),
+          tabPanel(
+            "Compositional Profile Plot",
+            br(),
+            uiOutput("ui.comp"),
+            plotOutput("comp.profile")
+          )
+        )
+      ) # end mainPanel Impute
+    ) # end sidebarLayout Impute
+  ) # end tabPanel "Impute"
 }
 
 
@@ -52,15 +71,10 @@ imputetransformTab = function(){tabPanel(title = "Impute & Transform", icon = ic
 #' @export
 #'
 #' @examples
-imputeTransformServer = function(input,output,session,rvals){
-
-  chooseDFServer("it",rvals)
-
-  subsetModServer("it",rvals)
-
+imputeTransformServer = function(input, output, session, rvals) {
   # Render options for data imputation
   output$impute.options <- renderUI({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
+    req(rvals$selectedData)
     radioButtons(
       "impute.method",
       label = ("Select Imputation Method"),
@@ -76,7 +90,7 @@ imputeTransformServer = function(input,output,session,rvals){
 
   # Render button and controls to Impute data
   output$ui.impute <- renderUI({
-    req(input$file1)
+    req(rvals$selectedData)
     actionButton("impute", "Impute missing data")
   })
 
@@ -84,27 +98,89 @@ imputeTransformServer = function(input,output,session,rvals){
     req(input$impute.method)
     if (input$impute.method != "none") {
       showNotification("imputing data")
-      rvals$df[[input$`it-selectedDF`]]$chemicalData = mice::complete(mice::mice(rvals$df[[input$`it-selectedDF`]]$chemicalData, method = input$impute.method))
+      quietly({
+        rvals$selectedData[, rvals$chem] = mice::complete(mice::mice(rvals$selectedData[, rvals$chem], method = input$impute.method))
+      })
       showNotification("completed imputing data")
     }
   })
 
   # Render datatable of imputed chemical data
   output$elementsDT <- DT::renderDataTable({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    DT::datatable(rvals$df[[input$`it-selectedDF`]]$chemicalData, rownames = F)
+    req(rvals$selectedData)
+    quietly(DT::datatable(rvals$selectedData[, rvals$chem], rownames = F))
   })
+
+  # Render datatable of imputed chemical data
+  output$attributesDT <- DT::renderDataTable({
+    req(rvals$selectedData)
+    quietly(DT::datatable(rvals$selectedData[, rvals$attrs], rownames = F))
+  })
+
+  output$crosstabsUI = renderUI({
+    req(rvals$selectedData)
+    fluidRow(
+      column(3,
+             selectInput(
+               inputId = 'crosstab1', "column 1", names(rvals$selectedData)
+             )),
+      column(
+        3,
+        offset = 1,
+        selectInput(inputId = 'crosstab2', "column 2", names(rvals$selectedData))
+      ),
+      column(
+        3,
+        offset = 1,
+        selectInput(
+          inputId = 'crosstab3',
+          "summary function",
+          c(
+            count = "count",
+            mean = "mean",
+            median = "median",
+            sd = "sd"
+          )
+        )
+      )
+    )
+  })
+
+  output$crosstabsDT = DT::renderDT({
+    req(input$crosstab1)
+    quietly({
+      if (input$crosstab3 == "count") {
+        dt = rvals$selectedData %>%
+          dplyr::group_by(dplyr::across(tidyselect::all_of(
+            c(input$crosstab1, input$crosstab2)
+          ))) %>%
+          dplyr::summarize(count = dplyr::n(), .groups = "drop")
+      } else {
+        suppressWarnings({
+          dt = rvals$selectedData %>%
+            dplyr::group_by(dplyr::across(tidyselect::all_of(input$crosstab1))) %>%
+            dplyr::summarize(dplyr::across(
+              .names = paste0("result-", input$crosstab2),
+              .cols = tidyselect::all_of(input$crosstab2),
+              .fns = list(!!rlang::sym(input$crosstab3))
+            ))
+        })
+      }
+      dt
+    })
+  })
+
 
 
   # Render button and controls to transform data
   output$ui.transform <- renderUI({
-    req(input$file1)
+    req(rvals$selectedData)
     actionButton("transform", "Transform data")
   })
 
   # Render options for data transformation
   output$transform.options <- renderUI({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
+    req(req(rvals$selectedData))
     radioButtons(
       "transform.method",
       label = ("Select Transformation"),
@@ -119,41 +195,53 @@ imputeTransformServer = function(input,output,session,rvals){
   })
 
   observeEvent(input$transform, {
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    if (input$transform.method == 'zscale') {
-      rvals$df[[input$`it-selectedDF`]]$chemicalData = zScale(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    } else if (input$transform.method %in% c("log10", "log")) {
-      rvals$df[[input$`it-selectedDF`]]$chemicalData = rvals$df[[input$`it-selectedDF`]]$chemicalData %>%
-        dplyr::mutate_all(input$transform.method) %>%
-        dplyr::mutate_all(round, digits = 3)
-    } else if (input$transform.method == "none") {
-      rvals$df[[input$`it-selectedDF`]]$chemicalData = rvals$df[[input$`it-selectedDF`]]$chemicalData %>%
-        dplyr::mutate_all(round, digits = 3)
-    }
-    # get rid of infinite values
-    rvals$df[[input$`it-selectedDF`]]$chemicalData = rvals$df[[input$`it-selectedDF`]]$chemicalData %>% dplyr::mutate_all(list(function(c)
-      dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
+    req(rvals$selectedData)
+    print("starting transform")
+    quietly({
+      suppressWarnings({
+        if (input$transform.method == 'zscale') {
+          rvals$selectedData[, rvals$chem] = zScale(rvals$selectedData[, rvals$chem])
+        } else if (input$transform.method %in% c("log10", "log")) {
+          rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+            dplyr::mutate_all(input$transform.method) %>%
+            dplyr::mutate_all(round, digits = 3)
+        } else if (input$transform.method == "none") {
+          rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+            dplyr::mutate_all(round, digits = 3)
+        }
+      })
+      # get rid of infinite values
+      rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+        dplyr::mutate_all(list(function(c)
+          dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
+    })
+    print("ending transform")
   })
 
   # Render datatable of transformed chemical data
   output$transform.contents <- DT::renderDataTable({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    DT::datatable(rvals$df[[input$`it-selectedDF`]]$chemicalData, rownames = F)
+    req(rvals$selectedData)
+    quietly(DT::datatable(rvals$selectedData[, rvals$chem], rownames = F))
   })
 
   # Render missing data plot
   output$miss.plot <- renderPlot({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    DataExplorer::plot_missing(rvals$df[[input$`it-selectedDF`]]$chemicalData, ggtheme = ggplot2::theme_bw())
+    validate(need(isTRUE(inherits(rvals[['selectedData']],"data.frame")),""))
+    req(rvals[['selectedData']])
+    plot_missing(data = rvals$selectedData[, rvals$chem])
   })
 
   # Render UI for univariate displays
   output$ui.univariate <- renderUI({
-    selectInput("hist.el", "Element", choices = names(rvals$df[[input$`it-selectedDF`]]$chemicalData))
+    req(rvals$selectedData)
+    selectInput("hist.el",
+                "Element",
+                choices = names(rvals$selectedData[, rvals$chem]))
   })
 
   # Render UI for univariate displays
   output$ui.hist.bin <- renderUI({
+    req(rvals$selectedData)
     sliderInput(
       "hist.bin",
       "Number of Bins",
@@ -172,18 +260,23 @@ imputeTransformServer = function(input,output,session,rvals){
 
   # Render compositional profile plot
   output$comp.profile <- renderPlot({
-    req(rvals$df[[input$`it-selectedDF`]]$chemicalData)
-    comp.profile(rvals$df[[input$`it-selectedDF`]]$chemicalData)
+    req(rvals$selectedData)
+    quietly({
+      comp.profile(rvals$selectedData[, rvals$chem])
+    })
   })
 
   # Render Element Histogram plot UI
   output$element.hist <- renderPlot({
-    if (length(rvals$df[[input$`it-selectedDF`]]$chemicalData[input$hist.el]) == 0)
-      return(NULL)
-    ggplot2::ggplot(data = rvals$df[[input$`it-selectedDF`]]$chemicalData, ggplot2::aes_string(x = input$hist.el)) +
-      ggplot2::geom_histogram(fill = "blue",
-                              alpha = 0.5,
-                              bins = input$hist.bin) +
-      ggplot2::labs(x = input$hist.el, y = " ")
+    quietly({
+      if (length(rvals$selectedData[, rvals$chem][input$hist.el]) == 0)
+        return(NULL)
+      ggplot2::ggplot(data = rvals$selectedData[, rvals$chem],
+                      ggplot2::aes_string(x = input$hist.el)) +
+        ggplot2::geom_histogram(fill = "blue",
+                                alpha = 0.5,
+                                bins = input$hist.bin) +
+        ggplot2::labs(x = input$hist.el, y = " ")
+    })
   })
 }
