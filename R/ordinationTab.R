@@ -53,7 +53,7 @@ ordinationServer = function(input,output,session,rvals){
     req(rvals$selectedData)
     if(isTRUE(rvals$runCDA)){
       quietly({
-        cda = getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups)
+        cda = tryCatch(getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(CDAdf = tibble::tibble(), mod = NULL)))
         rvals$CDAdf = cda$CDAdf
         rvals$CDAmod = cda$mod
         rvals$runCDA = F
@@ -94,6 +94,7 @@ ordinationServer = function(input,output,session,rvals){
 
   # Render CDA plot
   output$cda.plot <- renderPlot({
+    validate(need(inherits(rvals$CDAmod,"candisc"),""))
     req(rvals$CDAmod)
     levels = nrow(rvals$CDAdf)
     cp = viridis::cividis(n = length(levels))
