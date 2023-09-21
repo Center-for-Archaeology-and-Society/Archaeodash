@@ -206,10 +206,12 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$selectedData = keep
       rvals$unselectedData = discard
     }
+    try({
     rvals$runPCA = input$runPCA
     rvals$runCDA = input$runCDA
     if(isTRUE(rvals$runPCA)) showNotification("Running PCA")
     if(isTRUE(rvals$runCDA)) showNotification("Running CDA")
+    })
     showNotification("updated",duration = 3)
   })
 
