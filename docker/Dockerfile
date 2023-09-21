@@ -6,7 +6,9 @@ RUN apt-get update
 
 RUN  apt-get install -y --no-install-recommends \
 	vim \
-	git 
+	git \
+	libgl1-mesa-dev \
+	libglu1-mesa-dev
 
 RUN install2.r --error --skipinstalled \
     cluster \
