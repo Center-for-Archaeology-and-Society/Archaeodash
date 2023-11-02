@@ -14,8 +14,8 @@ shinyServer(function(input, output, session) {
   #### Import data ####
   dataInputServer(input,output,session,rvals)
 
-  ####  Impute & Transform ####
-  imputeTransformServer(input,output,session,rvals)
+  ####  Explore ####
+  exploreServer(input,output,session,rvals)
 
   ####   Ordination   ####
   ordinationServer(input,output,session,rvals)
@@ -33,6 +33,6 @@ shinyServer(function(input, output, session) {
   saveExportServer(input,output,session,rvals)
 
   #### subsetDataServer ####
-  subsetDataServer(input,output,session,rvals)
+  # subsetDataServer(input,output,session,rvals) # no longer used?
 
 }) # end server

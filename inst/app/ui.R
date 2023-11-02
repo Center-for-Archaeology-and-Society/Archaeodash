@@ -6,7 +6,7 @@ library(shiny)
 library(bslib)
 
 shinyUI(
-  bslib::page_sidebar(
+  fluidPage(
     tags$head(
       tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
     ),
@@ -15,25 +15,29 @@ shinyUI(
     shinyjs::useShinyjs(),
     fluid = TRUE,
     id = "nav",
-    sidebar = bslib::sidebar(
-      class = "mysidebar",
-      h1("Data Manager"),
-      open = T,
-      bg = "#9dd4b9",
-      datainputTab(),
-      saveexportTab()
-    ),
-    div(
-      class = "mymainpanel",
-      navbarPage(
-        title = "ArchaeoDash",
-        homeTab(),
-        imputetransformTab(),
-        ordinationTab(),
-        clusterTab(),
-        groupTab(),
-        visualizeassignTab()
-      )
-    )
-  )
-)
+    fluidRow(
+      column(3,
+             div(
+               class = 'mysidecol',
+               h1("Data Manager"),
+               datainputTab(),
+               saveexportTab()
+             )
+      ),
+      column(9,
+             div(
+               class = "mymainpanel",
+               navbarPage(
+                 title = "ArchaeoDash",
+                 homeTab(),
+                 exploreTab(),
+                 ordinationTab(),
+                 clusterTab(),
+                 groupTab(),
+                 visualizeassignTab()
+               ) # end navbar
+             ) # end div
+      ) # end column
+    ) # end row
+  ) # end page
+) # end UI

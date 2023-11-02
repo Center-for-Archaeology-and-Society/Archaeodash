@@ -7,7 +7,7 @@
 #' datainputTab()
 datainputTab = function() {
   tagList(
-    fileInput("file1", "Choose File (csv, xlsx or other supported format)"),
+    fileInput("file1", "Choose File(s) (csv, xlsx or other supported format)",multiple = T),
     uiOutput("attr"),
     uiOutput("subSelect"),
     uiOutput("chem"),
@@ -50,8 +50,11 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$Conf = NULL
       rvals$int.set = NULL
       rvals$unselectedData = NULL
-      rvals$importedData = rvals$selectedData = quietly(rio::import(input$file1$datapath, setclass = 'tibble')) %>%
-        setNames(janitor::make_clean_names(names(.),case = 'none'))
+      print(input$file1$datapath)
+      rvals$importedData = rvals$selectedData = quietly(purrr::map_df(input$file1$datapath,function(fp)rio::import(fp, setclass = 'tibble') %>% dplyr:mutate(file = basename(fp)))) %>%
+        setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
+        dplyr::select(-tidyselect::any_of('rowid')) %>%
+        tibble::rowid_to_column()
     }
   })
 
@@ -138,16 +141,59 @@ dataInputServer = function(input, output, session, rvals) {
   output$actionUI <- renderUI({
     req(input$file1)
     tagList(
+      uiOutput("impute.options"),
+      br(),
+      uiOutput("transform.options"),
+      br(),
       checkboxInput("runPCA","check to run PCA", value = F),
       # checkboxInput("runCDA","check to run CDA", value = F),
-      actionButton("action", "Press to confirm selections")
+      actionButton("action", "Press to confirm selections", class = "mybtn")
+    )
+  })
+
+  # Render options for data imputation
+  output$impute.options <- renderUI({
+    req(rvals$selectedData)
+    radioButtons(
+      "impute.method",
+      label = ("Select Imputation Method"),
+      choices = list(
+        "None" = "none",
+        "Random Forest" = "rf",
+        "Predictive Mean Matching" = "pmm",
+        "Weighted Predictive Mean Matching" = "midastouch"
+      ),
+      selected = "none"
+    )
+  })
+
+  # Render options for data transformation
+  output$transform.options <- renderUI({
+    req(req(rvals$selectedData))
+    radioButtons(
+      "transform.method",
+      label = ("Select Transformation"),
+      choices = list(
+        "None" = "none",
+        "Log-10" = "log10",
+        "Natural Log" = "log",
+        "Percent/Z-score" = "zScore"
+      ),
+      selected = "none"
     )
   })
 
   output$resetUI <- renderUI({
     req(rvals$selectedData)
     rvals$selectedData
-    actionButton("reset", "Reset all to original")
+    tagList(
+      actionButton("resetElements", "Reset elements to original", class = "mybtn"),
+      actionButton("reset", "Reset all to original", class = "mybtn")
+    )
+  })
+
+  observeEvent(input$resetElements,{
+    rvals$selectedData[,rvals$chem] = rvals$importedData[,rvals$chem]
   })
 
   observeEvent(input$reset,{
@@ -181,13 +227,27 @@ dataInputServer = function(input, output, session, rvals) {
     rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
     rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    transform.method = input$transform.method
+    impute.method = input$impute.method
+
     if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
-      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>% dplyr::arrange(rowid)
+      if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
+        impute.method = attr(rvals$selectedData,"impute.method")
+      }
+      if(transform.method == "none" & attr(rvals$selectedData,"transform.method") != "none"){
+        transform.method = attr(rvals$selectedData,"transform.method")
+      }
+
+      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>%
+        dplyr::arrange(rowid) %>%
+        dplyr::select(-tidyselect::all_of(input$chem)) %>%
+        dplyr::left_join(rvals$importedData %>%
+                           dplyr::select(rowid, tidyselect::all_of(input$chem)),by = "rowid")
+
+
     }
     rvals$selectedData =
       rvals$selectedData %>%
-      dplyr::select(-tidyselect::any_of('rowid')) %>%
-      tibble::rowid_to_column() %>%
       dplyr::select(
         rowid,
         tidyselect::all_of(input$attr),
@@ -196,6 +256,7 @@ dataInputServer = function(input, output, session, rvals) {
       ) %>%
       dplyr::mutate_at(dplyr::vars(input$attrGroups), factor) %>%
       dplyr::mutate_at(dplyr::vars(input$chem), quietly(as.numeric))
+
     if(isTRUE(is.null(input$attrGroupsSub))){
       showNotification("Cannot proceed without any groups selected",type = "error")
     } else {
@@ -206,11 +267,46 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$selectedData = keep
       rvals$unselectedData = discard
     }
+
+    # imputation
+    if (impute.method  != "none") {
+      quietly({
+        rvals$selectedData[, rvals$chem] = mice::complete(mice::mice(rvals$selectedData[, rvals$chem], method = impute.method ))
+      })
+    }
+    attr(rvals$selectedData,"impute.method") = impute.method
+    showNotification("imputed data")
+
+    # Transforming data
+    quietly({
+      suppressWarnings({
+        if(transform.method != "none"){
+          if (transform.method == 'zscale') {
+            rvals$selectedData[, rvals$chem] = zScale(rvals$selectedData[, rvals$chem])
+          } else if (transform.method %in% c("log10", "log")) {
+            rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+              dplyr::mutate_all(transform.method) %>%
+              dplyr::mutate_all(round, digits = 3)
+          }
+          showNotification('transformed data')
+        } else {
+          rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+            dplyr::mutate_all(round, digits = 3)
+        }
+      })
+      # get rid of infinite values
+      rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
+        dplyr::mutate_all(list(function(c)
+          dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
+    })
+    attr(rvals$selectedData,"transform.method") = transform.method
+
+
     try({
-    rvals$runPCA = input$runPCA
-    rvals$runCDA = input$runCDA
-    if(isTRUE(rvals$runPCA)) showNotification("Running PCA")
-    if(isTRUE(rvals$runCDA)) showNotification("Running CDA")
+      rvals$runPCA = input$runPCA
+      rvals$runCDA = input$runCDA
+      if(isTRUE(rvals$runPCA)) showNotification("Ran PCA")
+      if(isTRUE(rvals$runCDA)) showNotification("Ran CDA")
     })
     showNotification("updated",duration = 3)
   })
@@ -222,7 +318,7 @@ dataInputServer = function(input, output, session, rvals) {
 
   output$newCol = renderUI({
     req(rvals$selectedData)
-    actionButton('addNewCol', "Add New Column")
+    actionButton('addNewCol', "Add New Column", class = "mybtn")
   })
 
   observeEvent(input$addNewCol, {

@@ -1,8 +1,8 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
-    person("Rpbert", "Jacob", , "rbischoff@asu.edu", role = c("aut", "cre"),
+    person("Robert", "Bischoff", , "rbischoff@asu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8708-9041"))
 Description: Analytical dashboard for analyzing chemical composition of artifacts for archaeologists.
 License: `use_mit_license()`
