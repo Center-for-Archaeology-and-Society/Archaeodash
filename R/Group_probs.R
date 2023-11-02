@@ -65,7 +65,10 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
 
   }
   bg = getBestGroup(probsAll,eligible,method = method)
-  probsAlldf = probsAll %>% tibble::as_tibble() %>% dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,.before = 1)
+  probsAlldf = probsAll %>%
+    tibble::as_tibble() %>%
+    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,.before = 1) %>%
+    dplyr::mutate_if(is.numeric,round,digits = 2)
 
   return(probsAlldf)
 }

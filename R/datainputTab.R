@@ -50,8 +50,8 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$Conf = NULL
       rvals$int.set = NULL
       rvals$unselectedData = NULL
-      print(input$file1$datapath)
-      rvals$importedData = rvals$selectedData = quietly(purrr::map_df(input$file1$datapath,function(fp)rio::import(fp, setclass = 'tibble') %>% dplyr:mutate(file = basename(fp)))) %>%
+      # print(dput(input$file1))
+      rvals$importedData = rvals$selectedData = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i]))) %>%
         setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
         tibble::rowid_to_column()
@@ -95,6 +95,7 @@ dataInputServer = function(input, output, session, rvals) {
 
   # Render select lookup for choosing groups to include
   output$subSelect <- renderUI({
+    quietly({
     req(rvals$selectedData)
     req(input$attrGroups)
     df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
@@ -113,10 +114,13 @@ dataInputServer = function(input, output, session, rvals) {
         selected = selection
       )
     )
+    })
   })
 
   # Render multi-select lookup for choosing chemical concentration columns
   output$chem <- renderUI({
+    print("chem")
+    quietly({
     req(rvals$selectedData)
     df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
     if (is.null(df))
@@ -135,10 +139,13 @@ dataInputServer = function(input, output, session, rvals) {
       multiple = TRUE,
       selected = items
     )
+    })
   })
 
   # Render button to update datatable based on variable selections
   output$actionUI <- renderUI({
+    print("actionUI")
+    quietly({
     req(input$file1)
     tagList(
       uiOutput("impute.options"),
@@ -149,11 +156,14 @@ dataInputServer = function(input, output, session, rvals) {
       # checkboxInput("runCDA","check to run CDA", value = F),
       actionButton("action", "Press to confirm selections", class = "mybtn")
     )
+    })
   })
 
   # Render options for data imputation
   output$impute.options <- renderUI({
     req(rvals$selectedData)
+    print("impute.options")
+    quietly({
     radioButtons(
       "impute.method",
       label = ("Select Imputation Method"),
@@ -165,11 +175,14 @@ dataInputServer = function(input, output, session, rvals) {
       ),
       selected = "none"
     )
+    })
   })
 
   # Render options for data transformation
   output$transform.options <- renderUI({
     req(req(rvals$selectedData))
+    print("transform.options")
+    quietly({
     radioButtons(
       "transform.method",
       label = ("Select Transformation"),
@@ -181,26 +194,32 @@ dataInputServer = function(input, output, session, rvals) {
       ),
       selected = "none"
     )
+    })
   })
 
   output$resetUI <- renderUI({
     req(rvals$selectedData)
-    rvals$selectedData
+    print("resetUI")
+    quietly({
     tagList(
       actionButton("resetElements", "Reset elements to original", class = "mybtn"),
       actionButton("reset", "Reset all to original", class = "mybtn")
     )
+    })
   })
 
   observeEvent(input$resetElements,{
+    print("resetElements")
     rvals$selectedData[,rvals$chem] = rvals$importedData[,rvals$chem]
   })
 
   observeEvent(input$reset,{
+    print("reset")
     showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All changes will be lost"),footer = tagList(actionButton("confirmReset","confirm"),modalButton("cancel")),easyClose = T))
   })
 
   observeEvent(input$confirmReset,{
+    print("confirmReset")
     removeModal()
     rvals$chem = NULL
     rvals$attrGroups = NULL
@@ -212,6 +231,7 @@ dataInputServer = function(input, output, session, rvals) {
 
   # create subset data frame
   observeEvent(input$action, {
+    print("action")
     req(rvals$selectedData)
     req(input$attr)
     req(input$chem)
@@ -230,6 +250,7 @@ dataInputServer = function(input, output, session, rvals) {
     transform.method = input$transform.method
     impute.method = input$impute.method
 
+    quietly({
     if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
       if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
         impute.method = attr(rvals$selectedData,"impute.method")
@@ -246,6 +267,7 @@ dataInputServer = function(input, output, session, rvals) {
 
 
     }
+    })
     rvals$selectedData =
       rvals$selectedData %>%
       dplyr::select(
@@ -317,11 +339,13 @@ dataInputServer = function(input, output, session, rvals) {
   })
 
   output$newCol = renderUI({
+    print("rendering new column")
     req(rvals$selectedData)
     actionButton('addNewCol', "Add New Column", class = "mybtn")
   })
 
   observeEvent(input$addNewCol, {
+    print("adding new column")
     showModal(modalDialog(
       textInput('createGroup', "New Group Name", value = "cluster"),
       textInput('createGroupVal', "New Group Default Value", value = "1"),
