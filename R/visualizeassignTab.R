@@ -175,7 +175,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
 
   observeEvent(input$Change, {
     req(rvals$brushSelected)
-    quietly({
+    quietly(label = "change group assignment",{
       new = rvals$selectedData %>%
         dplyr::inner_join(rvals$brushSelected) %>%
         dplyr::mutate(!!as.name(rvals$attrGroups) := input$NewGroup)
@@ -199,47 +199,53 @@ visualizeAssignServer = function(input, output, session, rvals) {
   # plot
   output$plot <- plotly::renderPlotly({
     validate(need(inherits(rvals$plotdf,"data.frame"),"Waiting for plot data"))
-
-    p1 <-
-      ggplot2::ggplot(rvals$plotdf,
-                      ggplot2::aes(
-                        x = !!as.name(input$xvar),
-                        y = !!as.name(input$yvar),
-                        color = !!as.name(rvals$attrGroups),
-                        shape = !!as.name(rvals$attrGroups),
-                        key = rowid
-                      )) +
-      ggplot2::geom_point() +
-      ggplot2::labs(
-        x = input$xvar,
-        y = input$yvar,
-        color = rvals$attrGroups,
-        shape = rvals$attrGroups
-      ) +
-      ggplot2::scale_color_viridis_d()
-    if (input$Conf) {
-      n = rvals$plotdf[[rvals$attrGroups]] %>% unique %>% length()
-      if (n > 10) {
-        mynotification("too many group members to plot confidence ellipses")
-      } else {
-        p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
+    req(nrow(rvals$plotdf) > 0)
+    req(input$xvar %in% names(rvals$plotdf))
+    req(input$yvar %in% names(rvals$plotdf))
+    quietly(label = "plotting data",{
+      p1 <-
+        ggplot2::ggplot(rvals$plotdf,
+                        ggplot2::aes(
+                          x = !!as.name(input$xvar),
+                          y = !!as.name(input$yvar),
+                          color = !!as.name(rvals$attrGroups),
+                          shape = !!as.name(rvals$attrGroups),
+                          key = rowid
+                        )) +
+        ggplot2::geom_point() +
+        ggplot2::labs(
+          x = input$xvar,
+          y = input$yvar,
+          color = rvals$attrGroups,
+          shape = rvals$attrGroups
+        ) +
+        ggplot2::scale_color_viridis_d()
+      if (input$Conf) {
+        n = rvals$plotdf[[rvals$attrGroups]] %>% unique %>% length()
+        if (n > 10) {
+          mynotification("too many group members to plot confidence ellipses")
+        } else {
+          p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
+        }
       }
-    }
-    suppressWarnings({
-      plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'lasso')
+      suppressWarnings({
+        plotly::ggplotly(p1) %>% plotly::layout(dragmode = 'lasso')
+      })
     })
   })
 
   output$brush <- renderUI({
-    if (is.null(rvals$brushSelected)) {
-      p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
-    } else {
-      if(isTRUE(input$data.src == "canonical discriminants")){
-        renderTable(rvals$brushSelected)
+    quietly(label = "brush UI",{
+      if (is.null(rvals$brushSelected)) {
+        p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
       } else {
-        renderTable(rvals$brushSelected[,rvals$attrs])
+        if(isTRUE(input$data.src == "canonical discriminants")){
+          renderTable(rvals$brushSelected)
+        } else {
+          renderTable(rvals$brushSelected[,rvals$attrs])
+        }
       }
-    }
+    })
   })
 
   #### multiplots ####
@@ -253,60 +259,62 @@ visualizeAssignServer = function(input, output, session, rvals) {
   observeEvent(input$updateMultiplot, {
     req(nrow(rvals$selectedData) > 0)
     req(input$xvar2)
-    pdf1 = rvals$selectedData %>%
-      dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$xvar2))) %>%
-      tidyr::pivot_longer(tidyselect::all_of(input$xvar2), names_to = "xvar2", values_to = "elem1") %>%
-      tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
-    pdf2 = rvals$selectedData %>%
-      dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$yvar2))) %>%
-      tidyr::pivot_longer(tidyselect::all_of(input$yvar2), names_to = "yvar2", values_to = "elem2") %>%
-      tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
-    p = dplyr::full_join(pdf1,pdf2 %>% dplyr::select(-tidyselect::all_of(c('rowid',rvals$attrGroups))), by = 'id', relationship = "many-to-many") %>%
-      dplyr::filter(elem1 != elem2) %>%
-      ggplot2::ggplot(ggplot2::aes(
-        x = elem1,
-        y = elem2,
-        color = !!as.name(rvals$attrGroups)
-      )) +
-      ggplot2::geom_point(size = input$ptsize) +
-      ggplot2::ylab("") +
-      ggplot2::theme_bw(base_size = 14,) +
-      ggplot2::scale_color_viridis_d() +
-      ggplot2::theme(
-        strip.background = ggplot2::element_rect(fill = '#404040'),
-        strip.text = ggplot2::element_text(color = "white")
-      )
-    if(length(input$xvar2) > 1 || ((length(input$xvar2) == 1 & length(input$yvar2) == 1))){
-      p = p +
-        ggplot2::facet_grid(rows = dplyr::vars(yvar2), cols = dplyr::vars(xvar2), scales = 'free',switch = 'both') +
-        ggplot2::xlab("")
-    } else {
-      p = p +
-        ggplot2::facet_wrap(~yvar2, scales = 'free',strip.position = "left") +
-        ggplot2::xlab(input$xvar2)
-    }
-    rvals$multiplot = p
-  })
+    quietly(label = "multiplot",{
+      pdf1 = rvals$selectedData %>%
+        dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$xvar2))) %>%
+        tidyr::pivot_longer(tidyselect::all_of(input$xvar2), names_to = "xvar2", values_to = "elem1") %>%
+        tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
+      pdf2 = rvals$selectedData %>%
+        dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$yvar2))) %>%
+        tidyr::pivot_longer(tidyselect::all_of(input$yvar2), names_to = "yvar2", values_to = "elem2") %>%
+        tidyr::unite(id, c('rowid',rvals$attrGroups), sep = "_", remove = F)
+      p = dplyr::full_join(pdf1,pdf2 %>% dplyr::select(-tidyselect::all_of(c('rowid',rvals$attrGroups))), by = 'id', relationship = "many-to-many") %>%
+        dplyr::filter(elem1 != elem2) %>%
+        ggplot2::ggplot(ggplot2::aes(
+          x = elem1,
+          y = elem2,
+          color = !!as.name(rvals$attrGroups)
+        )) +
+        ggplot2::geom_point(size = input$ptsize) +
+        ggplot2::ylab("") +
+        ggplot2::theme_bw(base_size = 14,) +
+        ggplot2::scale_color_viridis_d() +
+        ggplot2::theme(
+          strip.background = ggplot2::element_rect(fill = '#404040'),
+          strip.text = ggplot2::element_text(color = "white")
+        )
+      if(length(input$xvar2) > 1 || ((length(input$xvar2) == 1 & length(input$yvar2) == 1))){
+        p = p +
+          ggplot2::facet_grid(rows = dplyr::vars(yvar2), cols = dplyr::vars(xvar2), scales = 'free',switch = 'both') +
+          ggplot2::xlab("")
+      } else {
+        p = p +
+          ggplot2::facet_wrap(~yvar2, scales = 'free',strip.position = "left") +
+          ggplot2::xlab(input$xvar2)
+      }
+      rvals$multiplot = p
+    })
 
-  output$multiplot = renderPlot({
-    req(rvals$multiplot)
-    rvals$multiplot
-  })
+    output$multiplot = renderPlot({
+      req(rvals$multiplot)
+      rvals$multiplot
+    })
 
-  observeEvent(input$savePlot, {
-    showModal(
-      modalDialog(
-        title = "Save Plot",
-        textInput("plotfilename", "File name:", value = "ggplot.png"),
-        numericInput("width", "Width (inches):", value = 7),
-        numericInput("height", "Height (inches):", value = 5),
-        numericInput("res", "Resolution (dpi):", value = 300),
-        footer = tagList(
-          modalButton("Cancel"),
-          downloadButton("saveMultiPlot", "Save")
+    observeEvent(input$savePlot, {
+      showModal(
+        modalDialog(
+          title = "Save Plot",
+          textInput("plotfilename", "File name:", value = "ggplot.png"),
+          numericInput("width", "Width (inches):", value = 7),
+          numericInput("height", "Height (inches):", value = 5),
+          numericInput("res", "Resolution (dpi):", value = 300),
+          footer = tagList(
+            modalButton("Cancel"),
+            downloadButton("saveMultiPlot", "Save")
+          )
         )
       )
-    )
+    })
   })
 
   output$saveMultiPlot <- downloadHandler(
