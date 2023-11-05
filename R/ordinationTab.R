@@ -102,7 +102,7 @@ ordinationServer = function(input,output,session,rvals){
   })
   # Render CDA plot
   output$cda.plot <- renderPlot({
-    validate(need(inherits(rvals$CDAmod,"candisc"),""))
+    # validate(need(inherits(rvals$CDAmod,"candisc"),""))
     req(rvals$CDAmod)
     quietly(label = 'CDA plot',{
       levels = nrow(rvals$CDAdf)

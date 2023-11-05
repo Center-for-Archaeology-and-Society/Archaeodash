@@ -116,25 +116,27 @@ visualizeAssignServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     req(input$data.src)
     req(rvals$attrGroups)
-    if (input$data.src == 'principal components') {
-      rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
-        shiny::showNotification("No PCA results",type = "warning")
-        return(tibble::tibble())
-      })
-      rvals$plotVars = rvals$pca$x %>% colnames()
-    } else if (input$data.src == 'canonical discriminants') {
-      rvals$plotdf = tryCatch(rvals$CDAdf,error = function(e) {
-        shiny::showNotification("No CDA results",type = "warning")
-        return(tibble::tibble())
-      })
-      rvals$plotVars = rvals$CDAmod$means %>% colnames()
-    } else {
-      rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
-        shiny::showNotification("No data",type = "warning")
-        return(tibble::tibble())
-      })
-      rvals$plotVars = rvals$chem
-    }
+    quietly(label = "get plotdf",{
+      if (input$data.src == 'principal components') {
+        rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
+          mynotification("No PCA results",type = "warning")
+          return(tibble::tibble())
+        })
+        rvals$plotVars = rvals$pca$x %>% colnames()
+      } else if (input$data.src == 'canonical discriminants') {
+        rvals$plotdf = tryCatch(rvals$CDAdf,error = function(e) {
+          mynotification("No CDA results",type = "warning")
+          return(tibble::tibble())
+        })
+        rvals$plotVars = rvals$CDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
+      } else {
+        rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
+          mynotification("No data",type = "warning")
+          return(tibble::tibble())
+        })
+        rvals$plotVars = rvals$chem
+      }
+    })
   })
 
   output$xvarUI = renderUI({
@@ -218,7 +220,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
     if (input$Conf) {
       n = rvals$plotdf[[rvals$attrGroups]] %>% unique %>% length()
       if (n > 10) {
-        showNotification("too many group members to plot confidence ellipses")
+        mynotification("too many group members to plot confidence ellipses")
       } else {
         p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
       }
@@ -235,7 +237,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
       if(isTRUE(input$data.src == "canonical discriminants")){
         renderTable(rvals$brushSelected)
       } else {
-      renderTable(rvals$brushSelected[,rvals$attrs])
+        renderTable(rvals$brushSelected[,rvals$attrs])
       }
     }
   })
