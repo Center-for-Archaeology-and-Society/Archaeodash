@@ -3,6 +3,7 @@
 #' @param .expr expression
 #'
 #' @return results of function
+#' @export
 #'
 #' @examples
 #' f = sum(1 + 'a')

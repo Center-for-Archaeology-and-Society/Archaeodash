@@ -14,28 +14,28 @@ shinyServer(function(input, output, session) {
   # input <<- input
 
   #### Import data ####
-  dataInputServer(input,output,session,rvals)
+  quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals))
 
   ####  Explore ####
-  exploreServer(input,output,session,rvals)
+  quietly(label = "exploreServer",exploreServer(input,output,session,rvals))
 
   ####   Ordination   ####
-  ordinationServer(input,output,session,rvals)
+  quietly(label = "ordinationServer",ordinationServer(input,output,session,rvals))
 
   ####   Cluster  ####
-  clusterServer(input,output,session,rvals)
+  quietly(label = "clusterServer",clusterServer(input,output,session,rvals))
 
   ####   Group Membership  ####
-  groupServer(input,output,session,rvals)
+  quietly(label = "groupServer",groupServer(input,output,session,rvals))
 
   ####   Euclidean Distance  ####
-  euclideanDistanceSrvr(input,output,session,rvals)
+  quietly(label = "euclideanDistanceSrvr",euclideanDistanceSrvr(input,output,session,rvals))
 
   ####   Visualize & Assign  ####
-  visualizeAssignServer(input,output,session,rvals)
+  quietly(label = "visualizeAssignServer",visualizeAssignServer(input,output,session,rvals))
 
   ####   Save & Export  ####
-  saveExportServer(input,output,session,rvals)
+  quietly(label = "saveExportServer",saveExportServer(input,output,session,rvals))
 
   #### subsetDataServer ####
   # subsetDataServer(input,output,session,rvals) # no longer used?

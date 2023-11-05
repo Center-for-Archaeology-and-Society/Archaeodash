@@ -15,11 +15,11 @@ ordinationTab = function(){
                column(6,plotOutput("pca.plot")),
                column(6,plotOutput("pca.el.plot"))),
              fluidRow(
-               column(6,plotOutput("eigen.plot")))#,
-             # fluidRow(column(6,
-             #                 h1("CDA Results"))),
-             # fluidRow(column(6,
-             #                 plotOutput("cda.plot")))
+               column(6,plotOutput("eigen.plot"))),
+             fluidRow(column(6,
+                             h1("CDA Results"))),
+             fluidRow(column(6,
+                             plotOutput("cda.plot")))
            ) # end fluidPage Ordination
   )
 }
@@ -41,13 +41,13 @@ ordinationServer = function(input,output,session,rvals){
   observeEvent(rvals$runPCA, {
     req(rvals$runPCA)
     req(rvals$selectedData)
-    if(isTRUE(rvals$runPCA)){
-      quietly({
+    quietly(label = "running PCA",{
+      if(isTRUE(rvals$runPCA)){
         rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
         rvals$pcadf = dplyr::bind_cols(rvals$selectedData[,rvals$attrs],rvals$pca$x)
         rvals$runPCA = F
-      })
-    }
+      }
+    })
   })
 
   observeEvent(rvals$runCDA, {
