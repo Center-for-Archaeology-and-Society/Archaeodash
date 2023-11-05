@@ -6,6 +6,12 @@
 \usage{
 saveexportTab()
 }
+\value{
+UI
+}
 \description{
 UI Elements for Saving and Exporting
+}
+\examples{
+saveexportTab()
 }

@@ -4,46 +4,11 @@
 #' @param elements  transformed element data
 #' @param assigned group designation by sample
 #'
-#' @return
+#' @return data frame
 #' @export
 #'
 #' @examples
-#'
-
-# group.mem.probs <- function(elements,assigned) {
-#
-#   grps = assigned %>% unique %>% sort %>% as.character
-#
-#   # Initialize libraries
-#   library(ICSNP)
-#   library(kableExtra)
-#   library(DataExplorer)
-#   library(mice)
-#   # elements = transformed element data
-#   # attr1 = group designation by sample
-#   # grps <- vector of groups to evaluate
-#
-#   probs <- list()
-#   for (m in 1:length(grps)) {
-#     x <- elements[which(assigned==grps[m]),]
-#     probs[[m]] <- matrix(0,nrow(x),length(grps))
-#     colnames(probs[[m]]) <- grps
-#     rownames(probs[[m]]) <- rownames(x)
-#
-#     grps2 <- grps[-m]
-#
-#     p.val <- NULL
-#     for (i in 1:nrow(x)) {p.val[i] <- HotellingsT2(x[i,],x[-i,])$p.value}
-#     probs[[m]][,m] <- round(p.val,5)*100
-#
-#     for (j in 1:length(grps2)) {
-#       p.val2 <- NULL
-#       for (i in 1:nrow(x)) {p.val2[i] <- HotellingsT2(x[i,],elements[which(assigned==grps2[j]),])$p.value}
-#       probs[[m]][,which(grps==grps2[j])] <- round(p.val2,5)*100}}
-#   return(probs)}
-
-
-#' group.mem.probs(data = rvals$selectedData,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+#' group.mem.probs(elements,assigned)
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
 
   probsAll = matrix(nrow = nrow(data), ncol = length(eligible))
@@ -67,8 +32,8 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
   bg = getBestGroup(probsAll,eligible,method = method)
   probsAlldf = probsAll %>%
     tibble::as_tibble() %>%
-    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,.before = 1) %>%
-    dplyr::mutate_if(is.numeric,round,digits = 2)
+    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1) %>%
+    dplyr::mutate_if(is.numeric,sprintf,fmt = "%05.2f")
 
   return(probsAlldf)
 }

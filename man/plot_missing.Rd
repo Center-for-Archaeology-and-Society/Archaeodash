@@ -7,7 +7,7 @@
 plot_missing(data)
 }
 \arguments{
-\item{data}{}
+\item{data}{elements}
 }
 \value{
 ggplot object

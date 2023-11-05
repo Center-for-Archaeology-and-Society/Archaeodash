@@ -7,8 +7,16 @@
 subsetModUI(id, label = "subset")
 }
 \arguments{
-\item{label}{}
+\item{id}{module ID}
+
+\item{label}{module label}
+}
+\value{
+module
 }
 \description{
 Subset Module UI
+}
+\examples{
+subsetModUI("subset")
 }

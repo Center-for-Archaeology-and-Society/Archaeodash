@@ -2,10 +2,11 @@
 
 #' UI Elements for Saving and Exporting
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' saveexportTab()
 saveexportTab = function() {
   div(class = "exportSection",
       br(),
@@ -26,15 +27,16 @@ saveexportTab = function() {
 
 #' Save and Export Server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' saveExportServer(input,output,session,rvals)
 saveExportServer = function(input, output, session, rvals) {
 
   # observeEvent(rvals$selectedData,{
@@ -67,8 +69,10 @@ saveExportServer = function(input, output, session, rvals) {
       } else {
         data = rvals$selectedData
       }
+      if(!is.null(input$fileDownload)){
         data = data %>%
           dplyr::filter(file %in% input$fileDownload)
+      }
       rio::export(data,file)
   }
   )

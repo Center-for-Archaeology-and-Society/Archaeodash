@@ -6,6 +6,12 @@
 \usage{
 runArchaeoDash()
 }
+\value{
+shiny app
+}
 \description{
 Run Application
+}
+\examples{
+runArchaeoDash()
 }

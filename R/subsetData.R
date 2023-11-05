@@ -1,9 +1,10 @@
 #' Subset Data UI
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' subsetData()
 subsetData = function(){
   showModal(modalDialog(
     title = "Subset dataset",
@@ -22,15 +23,16 @@ subsetData = function(){
 
 #' Subset data server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' subsetDataServer(input,output,session,rvals)
 subsetDataServer = function(input,output,session,rvals){
 
   output$subsetDFUI = renderUI({
@@ -114,13 +116,14 @@ subsetDataServer = function(input,output,session,rvals){
 
 #' Subset Module UI
 #'
-#' @param id
-#' @param label
+#' @param id module ID
+#' @param label module label
 #'
-#' @return
+#' @return module
 #' @export
 #'
 #' @examples
+#' subsetModUI("subset")
 subsetModUI = function(id,label = "subset"){
   ns <- NS(id)
   uiOutput(ns('subsetButton'))
@@ -128,13 +131,14 @@ subsetModUI = function(id,label = "subset"){
 
 #' Subset Module Server
 #'
-#' @param id
-#' @param rvals
+#' @param id module ID
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return module server
 #' @export
 #'
 #' @examples
+#' subsetModServer("subset",rvals)
 subsetModServer <- function(id,rvals) {
   moduleServer(
     id,
@@ -158,13 +162,14 @@ subsetModServer <- function(id,rvals) {
 
 #' Choose dataset UI
 #'
-#' @param id
-#' @param label
+#' @param id module ID
+#' @param label module label
 #'
-#' @return
+#' @return module
 #' @export
 #'
 #' @examples
+#' chooseDFUI("chooseDF")
 chooseDFUI = function(id, label = "choose DF"){
   ns <- NS(id)
   uiOutput(ns('availableDFsUI'))
@@ -172,13 +177,14 @@ chooseDFUI = function(id, label = "choose DF"){
 
 #' Choose dataset server
 #'
-#' @param id
-#' @param rvals
+#' @param id module ID
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return module server
 #' @export
 #'
 #' @examples
+#' chooseDFServer("chooseDF",rvals)
 chooseDFServer = function(id,rvals) {
   moduleServer(
     id,

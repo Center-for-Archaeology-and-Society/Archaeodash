@@ -4,7 +4,7 @@
 \alias{quietly}
 \title{Quiet Warning Function}
 \usage{
-quietly(.expr)
+quietly(.expr, label = NULL)
 }
 \arguments{
 \item{.expr}{expression}

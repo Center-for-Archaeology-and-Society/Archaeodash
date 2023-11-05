@@ -6,6 +6,12 @@
 \usage{
 groupTab()
 }
+\value{
+UI
+}
 \description{
 UI elements for group membership tab
+}
+\examples{
+groupTab()
 }

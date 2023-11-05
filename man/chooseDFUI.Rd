@@ -7,8 +7,16 @@
 chooseDFUI(id, label = "choose DF")
 }
 \arguments{
-\item{label}{}
+\item{id}{module ID}
+
+\item{label}{module label}
+}
+\value{
+module
 }
 \description{
 Choose dataset UI
+}
+\examples{
+chooseDFUI("chooseDF")
 }

@@ -1,13 +1,14 @@
 #' comp.profile
 #'
-#' plots concentrations?
+#' plots concentrations
 #'
-#' @param x
+#' @param x vector of concentrations
 #'
-#' @return
+#' @return plot
 #' @export
 #'
 #' @examples
+#' comp.profile(x)
 comp.profile <- function(x) {
   cols = names(x)
   plotdf = x %>%

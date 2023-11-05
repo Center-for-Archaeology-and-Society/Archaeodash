@@ -5,11 +5,13 @@ library(shiny)
 shinyServer(function(input, output, session) {
 
   ####  create reactive values  ####
-  rvals = reactiveValues()
+  # rvals = reactiveValues(importedData = tibble::tibble(),
+                         # selectedData = tibble::tibble())
 
   ## for testing
-  # rvals <<- reactiveValues(); showNotification("warning: global variable is only for testing")
-  # input <<- input
+  rvals <<- reactiveValues(importedData = tibble::tibble(),
+  selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing")
+  input <<- input
 
   #### Import data ####
   dataInputServer(input,output,session,rvals)
@@ -25,6 +27,9 @@ shinyServer(function(input, output, session) {
 
   ####   Group Membership  ####
   groupServer(input,output,session,rvals)
+
+  ####   Euclidean Distance  ####
+  euclideanDistanceSrvr(input,output,session,rvals)
 
   ####   Visualize & Assign  ####
   visualizeAssignServer(input,output,session,rvals)

@@ -7,8 +7,16 @@
 subsetModServer(id, rvals)
 }
 \arguments{
-\item{rvals}{}
+\item{id}{module ID}
+
+\item{rvals}{reactive values object}
+}
+\value{
+module server
 }
 \description{
 Subset Module Server
+}
+\examples{
+subsetModServer("subset",rvals)
 }

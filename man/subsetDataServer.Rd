@@ -7,8 +7,20 @@
 subsetDataServer(input, output, session, rvals)
 }
 \arguments{
-\item{rvals}{}
+\item{input}{shiny input object}
+
+\item{output}{shiny output object}
+
+\item{session}{shiny session object}
+
+\item{rvals}{reactive values object}
+}
+\value{
+server
 }
 \description{
 Subset data server
+}
+\examples{
+subsetDataServer(input,output,session,rvals)
 }

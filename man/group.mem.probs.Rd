@@ -11,10 +11,12 @@ group.mem.probs(data, chem, group, eligible, method = "Hotellings", ID)
 
 \item{assigned}{group designation by sample}
 }
+\value{
+data frame
+}
 \description{
 Function for calculating group membership probabilities by chemical compositional distance using Mahalanobis distances and Hotellings T^2 statistic
 }
 \examples{
-
-group.mem.probs(data = rvals$selectedData,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+group.mem.probs(elements,assigned)
 }

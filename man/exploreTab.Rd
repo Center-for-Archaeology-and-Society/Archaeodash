@@ -9,3 +9,6 @@ exploreTab()
 \description{
 UI elements for Explore Tab
 }
+\examples{
+exploreTab()
+}

@@ -8,10 +8,11 @@
 # info for developers, and a link to a Google group or similar forum
 # for Q+A's as well as FAQ's
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' homeTab()
 homeTab = function(){tabPanel(title = "Home", icon = icon("home"),
 
 

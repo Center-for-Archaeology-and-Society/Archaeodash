@@ -6,6 +6,9 @@
 \usage{
 datainputTab()
 }
+\value{
+UI
+}
 \description{
 UI elements for Data Input tab
 }

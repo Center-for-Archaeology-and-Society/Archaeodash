@@ -17,6 +17,12 @@ getCDA(
 
 \item{attrGroups}{selected attribute}
 }
+\value{
+list of results
+}
 \description{
 Get Canonical Discriminant Analysis Results
+}
+\examples{
+getCDA(df,chem,attrGroups)
 }

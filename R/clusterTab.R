@@ -1,10 +1,11 @@
 
 #' UI elements for cluster tab
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' clusterTab()
 clusterTab = function(){
   tabPanel(title = "Cluster", icon = icon("adjust", lib = "glyphicon"),
            sidebarLayout(
@@ -33,15 +34,16 @@ clusterTab = function(){
 
 #' Cluster Server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' clusterServer(input,output,session,rvals)
 clusterServer = function(input,output,session,rvals){
 
   # Render button to run clustering algorithm

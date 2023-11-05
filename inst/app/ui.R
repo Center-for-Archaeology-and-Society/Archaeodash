@@ -34,6 +34,7 @@ shinyUI(
                  ordinationTab(),
                  clusterTab(),
                  groupTab(),
+                 euclideanDistanceTab(),
                  visualizeassignTab()
                ) # end navbar
              ) # end div

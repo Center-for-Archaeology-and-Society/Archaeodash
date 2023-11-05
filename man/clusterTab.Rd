@@ -6,6 +6,12 @@
 \usage{
 clusterTab()
 }
+\value{
+UI
+}
 \description{
 UI elements for cluster tab
+}
+\examples{
+clusterTab()
 }

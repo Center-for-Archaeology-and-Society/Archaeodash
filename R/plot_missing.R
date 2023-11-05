@@ -2,7 +2,7 @@
 #'
 #' From DataExplorer
 #'
-#' @param data
+#' @param data elements
 #'
 #' @return ggplot object
 #' @export

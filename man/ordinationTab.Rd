@@ -6,6 +6,12 @@
 \usage{
 ordinationTab()
 }
+\value{
+UI
+}
 \description{
 UI elements for ordination
+}
+\examples{
+ordinationTab()
 }

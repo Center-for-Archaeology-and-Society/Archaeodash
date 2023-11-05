@@ -6,6 +6,12 @@
 \usage{
 subsetData()
 }
+\value{
+UI
+}
 \description{
 Subset Data UI
+}
+\examples{
+subsetData()
 }

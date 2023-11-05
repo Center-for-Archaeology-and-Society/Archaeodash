@@ -1,10 +1,11 @@
 
 #' UI elements for ordination
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' ordinationTab()
 ordinationTab = function(){
   tabPanel(title = "Ordination", icon = icon("equalizer", lib = "glyphicon"),
            fluidPage(
@@ -25,15 +26,16 @@ ordinationTab = function(){
 
 #' Ordination Server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' ordinationServer(input,output,session,rvals)
 ordinationServer = function(input,output,session,rvals){
 
   observeEvent(rvals$runPCA, {
@@ -41,9 +43,9 @@ ordinationServer = function(input,output,session,rvals){
     req(rvals$selectedData)
     if(isTRUE(rvals$runPCA)){
       quietly({
-      rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
-      rvals$pcadf = dplyr::bind_cols(rvals$selectedData[,rvals$attrs],rvals$pca$x)
-      rvals$runPCA = F
+        rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
+        rvals$pcadf = dplyr::bind_cols(rvals$selectedData[,rvals$attrs],rvals$pca$x)
+        rvals$runPCA = F
       })
     }
   })
@@ -51,55 +53,63 @@ ordinationServer = function(input,output,session,rvals){
   observeEvent(rvals$runCDA, {
     req(rvals$runCDA)
     req(rvals$selectedData)
-    if(isTRUE(rvals$runCDA)){
-      quietly({
+    print("running CDA")
+    quietly(label = 'running CDA',{
+      if(isTRUE(rvals$runCDA)){
         cda = tryCatch(getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(CDAdf = tibble::tibble(), mod = NULL)))
         rvals$CDAdf = cda$CDAdf
         rvals$CDAmod = cda$mod
         rvals$runCDA = F
-      })
-    }
+      }
+    })
   })
 
   # Render PCA plot
   output$pca.plot <- renderPlot({
     req(rvals$pca)
-    factoextra::fviz_pca_ind(
-      rvals$pca,
-      col.ind = "cos2",
-      # Color by the quality of representation
-      gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-      label = 'none',
-      repel = TRUE
-    )     # Avoid text overlapping
+    quietly(label = 'PCA plot',{
+      factoextra::fviz_pca_ind(
+        rvals$pca,
+        col.ind = "cos2",
+        # Color by the quality of representation
+        gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+        label = 'none',
+        repel = TRUE
+      )     # Avoid text overlapping
+    })
   })
 
   # Render PCA Eigenvalue plot
   output$eigen.plot <- renderPlot({
     req(rvals$pca)
-    factoextra::fviz_eig(rvals$pca)
+    quietly(label = "PCA plot 2",{
+      factoextra::fviz_eig(rvals$pca)
+    })
   })
 
   # Render PCA Eigenvalue plot
   output$pca.el.plot <- renderPlot({
     req(rvals$pca)
-    factoextra::fviz_pca_var(
-      rvals$pca,
-      col.var = "contrib",
-      # Color by contributions to the PC
-      gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-      repel = TRUE
-    )     # Avoid text overlapping
+    quietly(label = "PCA plot 3",{
+      factoextra::fviz_pca_var(
+        rvals$pca,
+        col.var = "contrib",
+        # Color by contributions to the PC
+        gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+        repel = TRUE
+      )     # Avoid text overlapping
+    })
   })
-
   # Render CDA plot
   output$cda.plot <- renderPlot({
     validate(need(inherits(rvals$CDAmod,"candisc"),""))
     req(rvals$CDAmod)
-    levels = nrow(rvals$CDAdf)
-    cp = viridis::cividis(n = length(levels))
-    xlim = c(min(rvals$CDAdf$Can1) * 1.25,max(rvals$CDAdf$Can1) * 1.25)
-    ylim = c(min(rvals$CDAdf$Can2) * 1.25,max(rvals$CDAdf$Can2) * 1.25)
-    heplots::heplot(rvals$CDAmod, col = cp, xlim = xlim, ylim = ylim)
+    quietly(label = 'CDA plot',{
+      levels = nrow(rvals$CDAdf)
+      cp = viridis::cividis(n = length(levels))
+      xlim = c(min(rvals$CDAdf$Can1) * 1.25,max(rvals$CDAdf$Can1) * 1.25)
+      ylim = c(min(rvals$CDAdf$Can2) * 1.25,max(rvals$CDAdf$Can2) * 1.25)
+      heplots::heplot(rvals$CDAmod, col = cp, xlim = xlim, ylim = ylim)
+    })
   })
 }

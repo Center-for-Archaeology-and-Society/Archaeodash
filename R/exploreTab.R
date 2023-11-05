@@ -2,10 +2,11 @@
 
 #' UI elements for Explore Tab
 #'
-#' @return
+#' @return NULL
 #' @export
 #'
 #' @examples
+#' exploreTab()
 exploreTab = function() {
   tabPanel(
     title = "Explore",
@@ -48,15 +49,16 @@ exploreTab = function() {
 
 #' Explore Server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' exploreServer(input,output,session,rvals)
 exploreServer = function(input, output, session, rvals) {
   # Render datatable of imputed chemical data
   output$elementsDT <- DT::renderDataTable({

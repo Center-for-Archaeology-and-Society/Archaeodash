@@ -12,9 +12,6 @@ body {
 }
 
 .mybtn {
-  overflow: hidden !important;
   max-width: 100% !important;
-  min-width: 0 !important;
   margin: 10px !important;
-  width: 80% !important;
 }

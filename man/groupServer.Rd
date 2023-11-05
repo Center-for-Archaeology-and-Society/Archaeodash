@@ -7,8 +7,20 @@
 groupServer(input, output, session, rvals)
 }
 \arguments{
-\item{rvals}{}
+\item{input}{Shiny input object}
+
+\item{output}{Shiny output object}
+
+\item{session}{Shiny session object}
+
+\item{rvals}{reactive values object}
+}
+\value{
+server
 }
 \description{
 Group Membership Server
+}
+\examples{
+groupServer(input,output,session,rvals)
 }

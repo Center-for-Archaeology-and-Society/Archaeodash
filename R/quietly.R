@@ -7,7 +7,7 @@
 #' @examples
 #' f = sum(1 + 'a')
 #' quietly(f())
-quietly <- function(.expr) {
+quietly <- function(.expr,label = NULL) {
   result = function(...) {
     res <- tryCatch(
       {
@@ -23,17 +23,37 @@ quietly <- function(.expr) {
     )
 
     if (!is.null(res$error)) {
-      showNotification(res$error$message, duration = 10, type = "error")
+      mynotification(paste(label,res$error$message), duration = 10, type = "error")
       return(NULL)
     }
 
     if (!is.null(res$warnings) && length(res$warnings) > 0) {
       lapply(unique(res$warnings), function(w) {
-        showNotification(w$message, duration = 10, type = "warning")
+        mynotification(paste(label,w$message), duration = 10, type = "warning")
       })
     }
 
     return(res$result)
   }
   return(result(.expr))
+}
+
+#' custom notification
+#'
+#' @param message message to display
+#' @param type type of message
+#'
+#' @return notification
+#' @export
+#'
+#' @examples
+#' mynotification("hello world")
+mynotification <- function(message, type = c("default", "message", "warning", "error", "success"), duration = 5) {
+  type <- match.arg(type)
+  if(type %in% c("warning", "error")) {
+    warning(message)
+  } else {
+    print(message)
+  }
+  try(showNotification(message, type = type, duration = duration),silent = T)
 }

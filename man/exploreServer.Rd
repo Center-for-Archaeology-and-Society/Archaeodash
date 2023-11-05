@@ -7,8 +7,20 @@
 exploreServer(input, output, session, rvals)
 }
 \arguments{
-\item{rvals}{}
+\item{input}{shiny input object}
+
+\item{output}{shiny output object}
+
+\item{session}{shiny session object}
+
+\item{rvals}{reactive values object}
+}
+\value{
+server
 }
 \description{
 Explore Server
+}
+\examples{
+exploreServer(input,output,session,rvals)
 }

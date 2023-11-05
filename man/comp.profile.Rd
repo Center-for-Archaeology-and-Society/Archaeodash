@@ -7,8 +7,14 @@
 comp.profile(x)
 }
 \arguments{
-\item{x}{}
+\item{x}{vector of concentrations}
+}
+\value{
+plot
 }
 \description{
-plots concentrations?
+plots concentrations
+}
+\examples{
+comp.profile(x)
 }

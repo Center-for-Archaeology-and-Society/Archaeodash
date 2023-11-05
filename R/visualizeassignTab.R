@@ -3,10 +3,11 @@
 
 #' UI elements for visualization and group reassignment
 #'
-#' @return
+#' @return UI
 #' @export
 #'
 #' @examples
+#' visualizeassignTab()
 visualizeassignTab = function() {
   tabPanel(
     title = "Visualize & Assign",
@@ -28,8 +29,8 @@ visualizeassignTab = function() {
             selectInput(
               'data.src',
               'Choose data type',
-              choices = c('elements', 'principal components'),
-              # choices = c('elements', 'principal components','canonical discriminants'),
+              # choices = c('elements', 'principal components'),
+              choices = c('elements', 'principal components','canonical discriminants'),
               selected = 'elements'
             ),
             uiOutput('xvarUI'),
@@ -94,15 +95,16 @@ visualizeassignTab = function() {
 
 #' Visualize Assign Server
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' visualizeAssignServer(input,output,session,rvals)
 visualizeAssignServer = function(input, output, session, rvals) {
 
   observeEvent({
@@ -111,6 +113,9 @@ visualizeAssignServer = function(input, output, session, rvals) {
     rvals$pcadf
     rvals$attrGroups
   },{
+    req(nrow(rvals$selectedData) > 0)
+    req(input$data.src)
+    req(rvals$attrGroups)
     if (input$data.src == 'principal components') {
       rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
         shiny::showNotification("No PCA results",type = "warning")
@@ -133,22 +138,22 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   output$xvarUI = renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     selectInput('xvar', 'X', rvals$plotVars, selected = rvals$plotVars[1])
   })
 
   output$yvarUI = renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     selectInput('yvar', 'y', rvals$plotVars, selected = rvals$plotVars[2])
   })
 
   output$xvar2UI = renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     selectInput('xvar2', 'X', rvals$chem, multiple = T)
   })
 
   output$yvar2UI = renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     selectInput(
       'yvar2',
       'Y',
@@ -244,7 +249,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   observeEvent(input$updateMultiplot, {
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     req(input$xvar2)
     pdf1 = rvals$selectedData %>%
       dplyr::select(rowid,tidyselect::all_of(c(rvals$attrGroups,input$xvar2))) %>%

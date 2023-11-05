@@ -1,6 +1,6 @@
 #' UI elements for Data Input tab
 #'
-#' @return NULL
+#' @return UI
 #' @export
 #'
 #' @examples
@@ -23,18 +23,20 @@ datainputTab = function() {
 
 #' Data Input
 #'
-#' @param input
-#' @param output
-#' @param session
-#' @param rvals
+#' @param input shiny input object
+#' @param output shiny output object
+#' @param session shiny session object
+#' @param rvals reactive values object
 #'
-#' @return
+#' @return server
 #' @export
 #'
 #' @examples
+#' dataInputServer(input, output, session, rvals)
 dataInputServer = function(input, output, session, rvals) {
 
   observeEvent(input$file1, {
+    req(input$file1)
     print("importing file")
     if (!is.null(input$file1)) {
       rvals$chem = NULL
@@ -50,30 +52,43 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$Conf = NULL
       rvals$int.set = NULL
       rvals$unselectedData = NULL
+      rvals$eligibleGroups = NULL
+      rvals$sampleID = NULL
       # print(dput(input$file1))
-      rvals$importedData = rvals$selectedData = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i]))) %>%
+      data = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i]))) %>%
         setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
         tibble::rowid_to_column()
+      rvals$importedData = dplyr::bind_rows(rvals$importedData,data)
+      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,data)
+
     }
   })
 
   # Render multi-select lookup for choosing attribute columns
   output$attr <- renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
+    print("attr")
+    quietly(label = "attr",{
     df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
     # Remove numeric columns from default selection
     nums1 <- unlist(lapply(df, is.numeric))
     items = names(df[,!nums1])
+    # hide columns with all unique values
+    n = nrow(df)
+    colLengths = vapply(df, function(x) length(unique(x)), integer(1))
+    cols = which(colLengths < n)
+    items2 = items[which(items %in% names(cols))]
     # Set names as all columns in datatable
     items.all <- names(df)
     names(items.all) = items.all
     names(items) = items
+    names(items2) = items2
     if(isTRUE(is.null(rvals[['attr']])))
       selection = items else
         selection = rvals[['attr']]
     if(isTRUE(is.null(rvals[['attrGroups']])))
-      selection2 = items else
+      selection2 = items2 else
         selection2 = rvals[['attrGroups']]
     tagList(
       selectInput(
@@ -91,15 +106,17 @@ dataInputServer = function(input, output, session, rvals) {
         selected = selection2[1]
       )
     )
+    })
   })
 
   # Render select lookup for choosing groups to include
   output$subSelect <- renderUI({
-    quietly({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     req(input$attrGroups)
+    print("subselect")
+    quietly(label = "subselect",{
     df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
-    items.all = quietly(df[[input$attrGroups]] %>% unique %>% sort)
+    items.all = quietly(label = 'items.all',df[[input$attrGroups]] %>% unique %>% sort)
     print("subSelect")
     print(rvals[['attrGroupsSub']])
     if(isTRUE(is.null(rvals[['attrGroupsSub']])))
@@ -119,9 +136,9 @@ dataInputServer = function(input, output, session, rvals) {
 
   # Render multi-select lookup for choosing chemical concentration columns
   output$chem <- renderUI({
+    req(nrow(rvals$selectedData) > 0)
     print("chem")
-    quietly({
-    req(rvals$selectedData)
+    quietly(label = "chem",{
     df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
     if (is.null(df))
       return(NULL)
@@ -144,16 +161,16 @@ dataInputServer = function(input, output, session, rvals) {
 
   # Render button to update datatable based on variable selections
   output$actionUI <- renderUI({
-    print("actionUI")
-    quietly({
     req(input$file1)
+    print("actionUI")
+    quietly(label = "actionUI",{
     tagList(
       uiOutput("impute.options"),
       br(),
       uiOutput("transform.options"),
       br(),
       checkboxInput("runPCA","check to run PCA", value = F),
-      # checkboxInput("runCDA","check to run CDA", value = F),
+      checkboxInput("runCDA","check to run CDA", value = F),
       actionButton("action", "Press to confirm selections", class = "mybtn")
     )
     })
@@ -161,9 +178,9 @@ dataInputServer = function(input, output, session, rvals) {
 
   # Render options for data imputation
   output$impute.options <- renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     print("impute.options")
-    quietly({
+    quietly(label = "impute.options",{
     radioButtons(
       "impute.method",
       label = ("Select Imputation Method"),
@@ -180,9 +197,9 @@ dataInputServer = function(input, output, session, rvals) {
 
   # Render options for data transformation
   output$transform.options <- renderUI({
-    req(req(rvals$selectedData))
+    req(req(nrow(rvals$selectedData) > 0))
     print("transform.options")
-    quietly({
+    quietly(label = "transform.options",{
     radioButtons(
       "transform.method",
       label = ("Select Transformation"),
@@ -198,12 +215,14 @@ dataInputServer = function(input, output, session, rvals) {
   })
 
   output$resetUI <- renderUI({
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     print("resetUI")
-    quietly({
+    quietly(label = "resetUI",{
     tagList(
       actionButton("resetElements", "Reset elements to original", class = "mybtn"),
-      actionButton("reset", "Reset all to original", class = "mybtn")
+      actionButton("reset", "Reset to last file import", class = "mybtn"),
+      actionButton("resetClear", "Clear workspace", class = "mybtn"),
+
     )
     })
   })
@@ -218,6 +237,11 @@ dataInputServer = function(input, output, session, rvals) {
     showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All changes will be lost"),footer = tagList(actionButton("confirmReset","confirm"),modalButton("cancel")),easyClose = T))
   })
 
+  observeEvent(input$resetClear,{
+    print("resetClear")
+    showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All data will be lost"),footer = tagList(actionButton("confirmResetClear","confirm"),modalButton("cancel")),easyClose = T))
+  })
+
   observeEvent(input$confirmReset,{
     print("confirmReset")
     removeModal()
@@ -229,10 +253,16 @@ dataInputServer = function(input, output, session, rvals) {
     rvals$selectedData = rvals$importedData
   })
 
+  observeEvent(input$confirmResetClear,{
+    print("confirmResetClear")
+    removeModal()
+    session$reload()
+  })
+
   # create subset data frame
   observeEvent(input$action, {
     print("action")
-    req(rvals$selectedData)
+    req(nrow(rvals$selectedData) > 0)
     req(input$attr)
     req(input$chem)
     rvals$chem = input$chem
@@ -250,7 +280,7 @@ dataInputServer = function(input, output, session, rvals) {
     transform.method = input$transform.method
     impute.method = input$impute.method
 
-    quietly({
+    quietly(label = "combine prior data",{
     if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
       if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
         impute.method = attr(rvals$selectedData,"impute.method")
@@ -280,11 +310,11 @@ dataInputServer = function(input, output, session, rvals) {
       dplyr::mutate_at(dplyr::vars(input$chem), quietly(as.numeric))
 
     if(isTRUE(is.null(input$attrGroupsSub))){
-      showNotification("Cannot proceed without any groups selected",type = "error")
+      mynotification("Cannot proceed without any groups selected",type = "error")
     } else {
-      keep = quietly(rvals$selectedData %>%
+      keep = quietly(label = "keep",rvals$selectedData %>%
                        dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub))
-      discard = quietly(rvals$selectedData %>%
+      discard = quietly(label = "discard",rvals$selectedData %>%
                           dplyr::filter(!rowid %in% keep$rowid))
       rvals$selectedData = keep
       rvals$unselectedData = discard
@@ -292,15 +322,15 @@ dataInputServer = function(input, output, session, rvals) {
 
     # imputation
     if (impute.method  != "none") {
-      quietly({
+      quietly(label = "impute",{
         rvals$selectedData[, rvals$chem] = mice::complete(mice::mice(rvals$selectedData[, rvals$chem], method = impute.method ))
       })
     }
     attr(rvals$selectedData,"impute.method") = impute.method
-    showNotification("imputed data")
+    mynotification("imputed data")
 
     # Transforming data
-    quietly({
+    quietly(label = "transform",{
       suppressWarnings({
         if(transform.method != "none"){
           if (transform.method == 'zscale') {
@@ -310,7 +340,7 @@ dataInputServer = function(input, output, session, rvals) {
               dplyr::mutate_all(transform.method) %>%
               dplyr::mutate_all(round, digits = 3)
           }
-          showNotification('transformed data')
+          mynotification('transformed data')
         } else {
           rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
             dplyr::mutate_all(round, digits = 3)
@@ -327,20 +357,21 @@ dataInputServer = function(input, output, session, rvals) {
     try({
       rvals$runPCA = input$runPCA
       rvals$runCDA = input$runCDA
-      if(isTRUE(rvals$runPCA)) showNotification("Ran PCA")
-      if(isTRUE(rvals$runCDA)) showNotification("Ran CDA")
+      if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
+      if(isTRUE(rvals$runCDA)) mynotification("Ran CDA")
     })
-    showNotification("updated",duration = 3)
+    mynotification("updated",duration = 3)
   })
 
   observeEvent(rvals$selectedData,{
+    req(nrow(rvals$selectedData) > 0)
     print("restoring state")
     restoreState(rvals = rvals,input = input,session = session)
   })
 
   output$newCol = renderUI({
+    req(nrow(rvals$selectedData) > 0)
     print("rendering new column")
-    req(rvals$selectedData)
     actionButton('addNewCol', "Add New Column", class = "mybtn")
   })
 
@@ -361,11 +392,11 @@ dataInputServer = function(input, output, session, rvals) {
     print("adding column")
     if(isTRUE(is.null(input$createGroup))) newCol = "cluster" else newCol = input$createGroup
     if(isTRUE(is.null(input$createGroupVal))) val = "1" else val = input$createGroupVal
-    rvals$selectedData = quietly(
+    rvals$selectedData = quietly(label = "addNewCol",{
       rvals$selectedData %>%
         dplyr::select(-tidyselect::any_of(newCol)) %>%
         dplyr::mutate(!!as.name(newCol) := factor(val))
-    )
+    })
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
     rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))

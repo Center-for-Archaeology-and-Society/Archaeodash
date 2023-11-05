@@ -6,6 +6,12 @@
 \usage{
 visualizeassignTab()
 }
+\value{
+UI
+}
 \description{
 UI elements for visualization and group reassignment
+}
+\examples{
+visualizeassignTab()
 }

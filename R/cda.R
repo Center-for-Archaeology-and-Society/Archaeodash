@@ -4,16 +4,19 @@
 #' @param chem  chemical element columns
 #' @param attrGroups selected attribute
 #'
-#' @return
+#' @return list of results
 #' @export
 #'
 #' @examples
+#' getCDA(df,chem,attrGroups)
 getCDA = function(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups){
 
   mdl = lm(as.formula(glue::glue("cbind({paste(chem,collapse = \",\")}) ~ {attrGroups}")), data = df)
-  mdl_can = tryCatch(candisc::candisc(mdl, data = df),error = function(e){
+  mdl_can = tryCatch(candisc::candisc(mdl, data = df1),error = function(e){
     showNotification("unable to return CDA")
     return(NULL)
   })
-  return(tryCatch(list(mod = mdl_can, CDAdf = dplyr::left_join(df %>% dplyr::select(-tidyselect::any_of(chem)),mdl_can$scores %>% dplyr::mutate(rowid = 1:dplyr::n()) %>% dplyr::select(-tidyselect::any_of(attrGroups)), by = "rowid"))),error = function(e)return(NULL))
+
+  result = tryCatch(list(mod = mdl_can, CDAdf = dplyr::bind_cols(df %>% dplyr::select(-tidyselect::any_of(chem),-tidyselect::any_of(attrGroups)),mdl_can$scores)),error = function(e)return(NULL))
+  return(result)
 }

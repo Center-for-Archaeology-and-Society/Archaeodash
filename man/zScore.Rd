@@ -7,8 +7,14 @@
 zScore(x)
 }
 \arguments{
-\item{x}{}
+\item{x}{vector of values}
+}
+\value{
+data frame of z scores
 }
 \description{
 Convert to z score
+}
+\examples{
+zScore(x)
 }

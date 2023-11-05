@@ -1,9 +1,10 @@
 #' Run Application
 #'
-#' @return
+#' @return shiny app
 #' @export
 #'
 #' @examples
+#' runArchaeoDash()
 runArchaeoDash = function(){
   appDir <- system.file("app", package = "ArchaeoDash")
   if (appDir == "") {

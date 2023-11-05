@@ -7,8 +7,16 @@
 chooseDFServer(id, rvals)
 }
 \arguments{
-\item{rvals}{}
+\item{id}{module ID}
+
+\item{rvals}{reactive values object}
+}
+\value{
+module server
 }
 \description{
 Choose dataset server
+}
+\examples{
+chooseDFServer("chooseDF",rvals)
 }
