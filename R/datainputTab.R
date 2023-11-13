@@ -61,8 +61,8 @@ dataInputServer = function(input, output, session, rvals) {
         setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
         tibble::rowid_to_column()
-      rvals$importedData = dplyr::bind_rows(rvals$importedData,data)
-      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,data)
+      rvals$importedData = dplyr::bind_rows(rvals$importedData %>% dplyr::mutate_all(as.character),data)
+      rvals$selectedData = dplyr::bind_rows(rvals$selectedData %>% dplyr::mutate_all(as.character),data)
 
     }
   })
@@ -166,7 +166,7 @@ dataInputServer = function(input, output, session, rvals) {
         uiOutput("transform.options"),
         br(),
         checkboxInput("runPCA","check to run PCA", value = F),
-        checkboxInput("runCDA","check to run CDA", value = F),
+        # checkboxInput("runCDA","check to run CDA", value = F),
         actionButton("action", "Press to confirm selections", class = "mybtn")
       )
     })
