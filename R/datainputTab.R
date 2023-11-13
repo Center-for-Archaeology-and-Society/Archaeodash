@@ -54,8 +54,10 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$unselectedData = NULL
       rvals$eligibleGroups = NULL
       rvals$sampleID = NULL
+      rvals$numCols = NULL
       # print(dput(input$file1))
-      data = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i]))) %>%
+      data = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i])) %>%
+                             dplyr::mutate_all(as.character)) %>%
         setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
         tibble::rowid_to_column()
@@ -70,42 +72,45 @@ dataInputServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     print("attr")
     quietly(label = "attr",{
-    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
-    # Remove numeric columns from default selection
-    nums1 <- unlist(lapply(df, is.numeric))
-    items = names(df[,!nums1])
-    # hide columns with all unique values
-    n = nrow(df)
-    colLengths = vapply(df, function(x) length(unique(x)), integer(1))
-    cols = which(colLengths < n)
-    items2 = items[which(items %in% names(cols))]
-    # Set names as all columns in datatable
-    items.all <- names(df)
-    names(items.all) = items.all
-    names(items) = items
-    names(items2) = items2
-    if(isTRUE(is.null(rvals[['attr']])))
-      selection = items else
-        selection = rvals[['attr']]
-    if(isTRUE(is.null(rvals[['attrGroups']])))
-      selection2 = items2 else
-        selection2 = rvals[['attrGroups']]
-    tagList(
-      selectInput(
-        "attr",
-        "Select attribute variables you want to display:",
-        items.all,
-        multiple = TRUE,
-        selected = selection
-      ),
-      selectInput(
-        "attrGroups",
-        "Select descriptive/group column:",
-        items.all,
-        multiple = F,
-        selected = selection2[1]
+      df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
+      dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
+                                 janitor::remove_empty("cols"))
+      # Remove numeric columns from default selection
+      nums1 <- names(dfNum)
+      rvals$numCols = nums1
+      items = names(df[,which(!names(df) %in% nums1)])
+      # hide columns with all unique values
+      n = nrow(df)
+      colLengths = vapply(df, function(x) length(unique(x)), integer(1))
+      cols = which(colLengths < n)
+      items2 = items[which(items %in% names(cols))]
+      # Set names as all columns in datatable
+      items.all <- names(df)
+      names(items.all) = items.all
+      names(items) = items
+      names(items2) = items2
+      if(isTRUE(is.null(rvals[['attr']])))
+        selection = items else
+          selection = rvals[['attr']]
+      if(isTRUE(is.null(rvals[['attrGroups']])))
+        selection2 = items2 else
+          selection2 = rvals[['attrGroups']]
+      tagList(
+        selectInput(
+          "attr",
+          "Select attribute variables you want to display:",
+          items.all,
+          multiple = TRUE,
+          selected = selection
+        ),
+        selectInput(
+          "attrGroups",
+          "Select descriptive/group column:",
+          items.all,
+          multiple = F,
+          selected = selection2[1]
+        )
       )
-    )
     })
   })
 
@@ -115,22 +120,22 @@ dataInputServer = function(input, output, session, rvals) {
     req(input$attrGroups)
     print("subselect")
     quietly(label = "subselect",{
-    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
-    items.all = quietly(label = 'items.all',df[[input$attrGroups]] %>% unique %>% sort)
-    print("subSelect")
-    print(rvals[['attrGroupsSub']])
-    if(isTRUE(is.null(rvals[['attrGroupsSub']])))
-      selection = items.all else
-        selection = rvals[['attrGroupsSub']]
-    tagList(
-      selectInput(
-        "attrGroupsSub",
-        "Select groups to include",
-        choices = items.all,
-        multiple = TRUE,
-        selected = selection
+      df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
+      items.all = quietly(label = 'items.all',df[[input$attrGroups]] %>% unique %>% sort)
+      print("subSelect")
+      print(rvals[['attrGroupsSub']])
+      if(isTRUE(is.null(rvals[['attrGroupsSub']])))
+        selection = items.all else
+          selection = rvals[['attrGroupsSub']]
+      tagList(
+        selectInput(
+          "attrGroupsSub",
+          "Select groups to include",
+          choices = items.all,
+          multiple = TRUE,
+          selected = selection
+        )
       )
-    )
     })
   })
 
@@ -139,23 +144,14 @@ dataInputServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     print("chem")
     quietly(label = "chem",{
-    df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
-    if (is.null(df))
-      return(NULL)
-    # Only include numeric columns in default selection
-    nums <- unlist(lapply(df, is.numeric))
-    items = names(df[, nums]) %>% .[which(. != "rowid")]
-    # Set names as all columns in datatable
-    items.all <- names(df)
-    names(items) = items
-    names(items.all) = items.all
-    selectInput(
-      "chem",
-      "Select element concentrations:",
-      items.all,
-      multiple = TRUE,
-      selected = items
-    )
+      selected = rvals$numCols[which(rvals$numCols != 'rowid')]
+      selectInput(
+        "chem",
+        "Select element concentrations:",
+        rvals$numCols,
+        multiple = TRUE,
+        selected = selected
+      )
     })
   })
 
@@ -164,15 +160,15 @@ dataInputServer = function(input, output, session, rvals) {
     req(input$file1)
     print("actionUI")
     quietly(label = "actionUI",{
-    tagList(
-      uiOutput("impute.options"),
-      br(),
-      uiOutput("transform.options"),
-      br(),
-      checkboxInput("runPCA","check to run PCA", value = F),
-      checkboxInput("runCDA","check to run CDA", value = F),
-      actionButton("action", "Press to confirm selections", class = "mybtn")
-    )
+      tagList(
+        uiOutput("impute.options"),
+        br(),
+        uiOutput("transform.options"),
+        br(),
+        checkboxInput("runPCA","check to run PCA", value = F),
+        checkboxInput("runCDA","check to run CDA", value = F),
+        actionButton("action", "Press to confirm selections", class = "mybtn")
+      )
     })
   })
 
@@ -181,17 +177,17 @@ dataInputServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     print("impute.options")
     quietly(label = "impute.options",{
-    radioButtons(
-      "impute.method",
-      label = ("Select Imputation Method"),
-      choices = list(
-        "None" = "none",
-        "Random Forest" = "rf",
-        "Predictive Mean Matching" = "pmm",
-        "Weighted Predictive Mean Matching" = "midastouch"
-      ),
-      selected = "none"
-    )
+      radioButtons(
+        "impute.method",
+        label = ("Select Imputation Method"),
+        choices = list(
+          "None" = "none",
+          "Random Forest" = "rf",
+          "Predictive Mean Matching" = "pmm",
+          "Weighted Predictive Mean Matching" = "midastouch"
+        ),
+        selected = "none"
+      )
     })
   })
 
@@ -200,17 +196,17 @@ dataInputServer = function(input, output, session, rvals) {
     req(req(nrow(rvals$selectedData) > 0))
     print("transform.options")
     quietly(label = "transform.options",{
-    radioButtons(
-      "transform.method",
-      label = ("Select Transformation"),
-      choices = list(
-        "None" = "none",
-        "Log-10" = "log10",
-        "Natural Log" = "log",
-        "Percent/Z-score" = "zScore"
-      ),
-      selected = "none"
-    )
+      radioButtons(
+        "transform.method",
+        label = ("Select Transformation"),
+        choices = list(
+          "None" = "none",
+          "Log-10" = "log10",
+          "Natural Log" = "log",
+          "Percent/Z-score" = "zScore"
+        ),
+        selected = "none"
+      )
     })
   })
 
@@ -218,12 +214,12 @@ dataInputServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     print("resetUI")
     quietly(label = "resetUI",{
-    tagList(
-      actionButton("resetElements", "Reset elements to original", class = "mybtn"),
-      actionButton("reset", "Reset to last file import", class = "mybtn"),
-      actionButton("resetClear", "Clear workspace", class = "mybtn"),
+      tagList(
+        actionButton("resetElements", "Reset elements to original", class = "mybtn"),
+        actionButton("reset", "Reset to last file import", class = "mybtn"),
+        actionButton("resetClear", "Clear workspace", class = "mybtn"),
 
-    )
+      )
     })
   })
 
@@ -281,22 +277,22 @@ dataInputServer = function(input, output, session, rvals) {
     impute.method = input$impute.method
 
     quietly(label = "combine prior data",{
-    if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
-      if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
-        impute.method = attr(rvals$selectedData,"impute.method")
+      if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
+        if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
+          impute.method = attr(rvals$selectedData,"impute.method")
+        }
+        if(transform.method == "none" & attr(rvals$selectedData,"transform.method") != "none"){
+          transform.method = attr(rvals$selectedData,"transform.method")
+        }
+
+        rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>%
+          dplyr::arrange(rowid) %>%
+          dplyr::select(-tidyselect::all_of(input$chem)) %>%
+          dplyr::left_join(rvals$importedData %>%
+                             dplyr::select(rowid, tidyselect::all_of(input$chem)),by = "rowid")
+
+
       }
-      if(transform.method == "none" & attr(rvals$selectedData,"transform.method") != "none"){
-        transform.method = attr(rvals$selectedData,"transform.method")
-      }
-
-      rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>%
-        dplyr::arrange(rowid) %>%
-        dplyr::select(-tidyselect::all_of(input$chem)) %>%
-        dplyr::left_join(rvals$importedData %>%
-                           dplyr::select(rowid, tidyselect::all_of(input$chem)),by = "rowid")
-
-
-    }
     })
     rvals$selectedData =
       rvals$selectedData %>%

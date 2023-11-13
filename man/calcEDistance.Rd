@@ -4,7 +4,7 @@
 \alias{calcEDistance}
 \title{Calculate Euclidean Distance}
 \usage{
-calcEDistance(data, projection, id, attrGroups, chem, limit)
+calcEDistance(data, projection, id, attrGroups, chem, limit, withinGroup)
 }
 \arguments{
 \item{data}{selected data}
@@ -18,6 +18,8 @@ calcEDistance(data, projection, id, attrGroups, chem, limit)
 \item{chem}{chemical data}
 
 \item{limit}{number of closest matches to return}
+
+\item{withinGroup}{whether to match within the same group}
 }
 \value{
 data frame of closest matches
@@ -26,5 +28,5 @@ data frame of closest matches
 Calculate Euclidean Distance
 }
 \examples{
-calcEDistance(rvals$selectedData,input$projectionGroup,input$edsampleID,rvals$attrGroups,rvals$chem,input$EDlimit)
+calcEDistance(rvals$selectedData,input$projectionGroup,input$edsampleID,rvals$attrGroups,rvals$chem,input$EDlimit,input$EDmethod)
 }
