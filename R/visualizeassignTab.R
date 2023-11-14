@@ -118,18 +118,21 @@ visualizeAssignServer = function(input, output, session, rvals) {
     req(rvals$attrGroups)
     quietly(label = "get plotdf",{
       if (input$data.src == 'principal components') {
+        validate(need(nrow(rvals$pcadf) > 0, "No PCA results"))
         rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
           mynotification("No PCA results",type = "warning")
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$pca$x %>% colnames()
       } else if (input$data.src == 'canonical discriminants') {
+        validate(need(nrow(rvals$CDAdf) > 0, "No CDA results"))
         rvals$plotdf = tryCatch(rvals$CDAdf,error = function(e) {
           mynotification("No CDA results",type = "warning")
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$CDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
       } else {
+        req(nrow(rvals$selectedData) > 0)
         rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
           mynotification("No data",type = "warning")
           return(tibble::tibble())
@@ -140,22 +143,22 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   output$xvarUI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    req(rvals$plotVars)
     selectInput('xvar', 'X', rvals$plotVars, selected = rvals$plotVars[1])
   })
 
   output$yvarUI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    req(rvals$plotVars)
     selectInput('yvar', 'y', rvals$plotVars, selected = rvals$plotVars[2])
   })
 
   output$xvar2UI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    req(rvals$chem)
     selectInput('xvar2', 'X', rvals$chem, multiple = T)
   })
 
   output$yvar2UI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    req(rvals$chem)
     selectInput(
       'yvar2',
       'Y',
@@ -166,6 +169,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   observeEvent(input$`plotly_selected-A`, {
+    req(rvals$plotdf)
     plotlySelect <<- plotly::event_data("plotly_selected")
     if (length(plotlySelect) > 0) {
       rvals$brushSelected = rvals$plotdf %>%
@@ -175,6 +179,8 @@ visualizeAssignServer = function(input, output, session, rvals) {
 
   observeEvent(input$Change, {
     req(rvals$brushSelected)
+    req(rvals$plotdf)
+    req(rvals$selectedData)
     quietly(label = "change group assignment",{
       new = rvals$selectedData %>%
         dplyr::inner_join(rvals$brushSelected) %>%
@@ -184,6 +190,9 @@ visualizeAssignServer = function(input, output, session, rvals) {
       rvals$selectedData = dplyr::bind_rows(new, old) %>%
         dplyr::arrange(rowid) %>%
         dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)), factor)
+      if(nrow(rvals$pcadf) > 0){
+        rvals$pcadf[,rvals$attrs] = rvals$selectedData[,rvals$attrs]
+      }
       if(isFALSE(is.null(rvals$membershipProps)))
         rvals$membershipProbs[['GroupVal']] = rvals$selectedData[[rvals$attrGroups]]
     })
@@ -202,6 +211,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
     req(nrow(rvals$plotdf) > 0)
     req(input$xvar %in% names(rvals$plotdf))
     req(input$yvar %in% names(rvals$plotdf))
+    req(rvals$attrGroups)
     quietly(label = "plotting data",{
       p1 <-
         ggplot2::ggplot(rvals$plotdf,
@@ -222,10 +232,10 @@ visualizeAssignServer = function(input, output, session, rvals) {
         ggplot2::scale_color_viridis_d()
       if (input$Conf) {
         n = rvals$plotdf[[rvals$attrGroups]] %>% unique %>% length()
-        if (n > 10) {
+        if (n > 5) {
           mynotification("too many group members to plot confidence ellipses")
         } else {
-          p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
+          # p1 <- p1 + ggplot2::stat_ellipse(level = input$int.set)
         }
       }
       suppressWarnings({
@@ -235,6 +245,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
   })
 
   output$brush <- renderUI({
+    req(rvals$brushSelected)
     quietly(label = "brush UI",{
       if (is.null(rvals$brushSelected)) {
         p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")

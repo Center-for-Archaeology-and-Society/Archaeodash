@@ -10,6 +10,9 @@
 #' @examples
 #' plot_missing(data)
 plot_missing = function (data){
+  data = data %>%
+    dplyr::mutate_all(quietly(as.numeric)) %>%
+    dplyr::mutate_all(dplyr::na_if,y = 0)
   group = list(Good = 0.05, OK = 0.4, Bad = 0.8,
                Remove = 1)
   num_missing <- pct_missing <- Band <- NULL

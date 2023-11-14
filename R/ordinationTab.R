@@ -15,7 +15,8 @@ ordinationTab = function(){
                column(6,plotOutput("pca.plot")),
                column(6,plotOutput("pca.el.plot"))),
              fluidRow(
-               column(6,plotOutput("eigen.plot"))),
+               column(6,plotOutput("eigen.plot")),
+             column(6,tableOutput("contribTbl"))),
              fluidRow(column(6,
                              h1("CDA Results"))),
              fluidRow(column(6,
@@ -41,6 +42,7 @@ ordinationServer = function(input,output,session,rvals){
   observeEvent(rvals$runPCA, {
     req(rvals$runPCA)
     req(rvals$selectedData)
+    message("running PCA")
     quietly(label = "running PCA",{
       if(isTRUE(rvals$runPCA)){
         rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
@@ -53,7 +55,7 @@ ordinationServer = function(input,output,session,rvals){
   observeEvent(rvals$runCDA, {
     req(rvals$runCDA)
     req(rvals$selectedData)
-    print("running CDA")
+    message("running CDA")
     quietly(label = 'running CDA',{
       if(isTRUE(rvals$runCDA)){
         cda = tryCatch(getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(CDAdf = tibble::tibble(), mod = NULL)))
@@ -67,6 +69,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA plot
   output$pca.plot <- renderPlot({
     req(rvals$pca)
+    message("rendering PCA plot")
     quietly(label = 'PCA plot',{
       factoextra::fviz_pca_ind(
         rvals$pca,
@@ -82,6 +85,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA Eigenvalue plot
   output$eigen.plot <- renderPlot({
     req(rvals$pca)
+    message("rendering eigenvalue plot")
     quietly(label = "PCA plot 2",{
       factoextra::fviz_eig(rvals$pca)
     })
@@ -100,10 +104,23 @@ ordinationServer = function(input,output,session,rvals){
       )     # Avoid text overlapping
     })
   })
+
+  # Render PCA contribution table
+  output$contribTbl = renderTable({
+    req(rvals$pca)
+    message("rendering contribution table")
+    rowSums(factoextra::get_pca_var(rvals$pca)$contrib[,1:4]) %>%
+      as.data.frame() %>%
+      setNames("contribution") %>%
+      tibble::rownames_to_column("variable") %>%
+      dplyr::arrange(dplyr::desc(contribution))
+  })
+
   # Render CDA plot
   output$cda.plot <- renderPlot({
     # validate(need(inherits(rvals$CDAmod,"candisc"),""))
     req(rvals$CDAmod)
+    message("rendering CDA plot")
     quietly(label = 'CDA plot',{
       levels = nrow(rvals$CDAdf)
       cp = viridis::cividis(n = length(levels))

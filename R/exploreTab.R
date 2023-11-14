@@ -186,7 +186,9 @@ exploreServer = function(input, output, session, rvals) {
     quietly({
       if (length(rvals$selectedData[, rvals$chem][input$hist.el]) == 0)
         return(NULL)
-      ggplot2::ggplot(data = rvals$selectedData[, rvals$chem],
+      plotdf = rvals$selectedData[, rvals$chem] %>%
+        dplyr::mutate_all(quietly(as.numeric))
+      ggplot2::ggplot(data = plotdf,
                       ggplot2::aes_string(x = input$hist.el)) +
         ggplot2::geom_histogram(fill = "blue",
                                 alpha = 0.5,

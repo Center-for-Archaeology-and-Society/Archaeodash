@@ -1,19 +1,23 @@
 #' server.R
 library(ArchaeoDash)
 library(shiny)
+library(profvis)
+
+# options(shiny.reactlog = TRUE)
 
 shinyServer(function(input, output, session) {
 
   ####  create reactive values  ####
-  rvals = reactiveValues(importedData = tibble::tibble(),
-                         selectedData = tibble::tibble())
+  # rvals = reactiveValues(importedData = tibble::tibble(),
+  #                        selectedData = tibble::tibble())
 
   ## for testing
-  # rvals <<- reactiveValues(importedData = tibble::tibble(),
-  # selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing")
-  # input <<- input
+  rvals <<- reactiveValues(importedData = tibble::tibble(),
+  selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing")
+  input <<- input
 
   #### Import data ####
+
   quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals))
 
   ####  Explore ####

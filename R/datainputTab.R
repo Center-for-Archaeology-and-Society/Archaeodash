@@ -51,19 +51,19 @@ dataInputServer = function(input, output, session, rvals) {
       rvals$data.src = NULL
       rvals$Conf = NULL
       rvals$int.set = NULL
-      rvals$unselectedData = NULL
       rvals$eligibleGroups = NULL
       rvals$sampleID = NULL
-      rvals$numCols = NULL
+      rvals$impute.method = input$impute.method
+      transform.method = input$transform.method
       # print(dput(input$file1))
       data = purrr::map_df(1:length(input$file1$datapath),function(i)rio::import(input$file1$datapath[i], setclass = 'tibble') %>% dplyr::mutate(file = tools::file_path_sans_ext(input$file1$name[i])) %>%
                              dplyr::mutate_all(as.character)) %>%
         setNames(janitor::make_clean_names(names(.),case = 'none')) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
-        tibble::rowid_to_column()
+        tibble::rowid_to_column() %>%
+        dplyr::mutate_all("as.character")
       rvals$importedData = dplyr::bind_rows(rvals$importedData %>% dplyr::mutate_all(as.character),data)
       rvals$selectedData = dplyr::bind_rows(rvals$selectedData %>% dplyr::mutate_all(as.character),data)
-
     }
   })
 
@@ -72,12 +72,11 @@ dataInputServer = function(input, output, session, rvals) {
     req(nrow(rvals$selectedData) > 0)
     print("attr")
     quietly(label = "attr",{
-      df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
+      df <- rvals$importedData
       dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
                                  janitor::remove_empty("cols"))
       # Remove numeric columns from default selection
       nums1 <- names(dfNum)
-      rvals$numCols = nums1
       items = names(df[,which(!names(df) %in% nums1)])
       # hide columns with all unique values
       n = nrow(df)
@@ -120,7 +119,7 @@ dataInputServer = function(input, output, session, rvals) {
     req(input$attrGroups)
     print("subselect")
     quietly(label = "subselect",{
-      df <- dplyr::bind_rows(rvals$selectedData,rvals$unselectedData)
+      df <- rvals$importedData
       items.all = quietly(label = 'items.all',df[[input$attrGroups]] %>% unique %>% sort)
       print("subSelect")
       print(rvals[['attrGroupsSub']])
@@ -143,12 +142,18 @@ dataInputServer = function(input, output, session, rvals) {
   output$chem <- renderUI({
     req(nrow(rvals$selectedData) > 0)
     print("chem")
+    df <- rvals$importedData
+    dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
+                               janitor::remove_empty("cols"))
+    # Remove numeric columns from default selection
+    nums1 <- names(dfNum)
     quietly(label = "chem",{
-      selected = rvals$numCols[which(rvals$numCols != 'rowid')]
+      selected = nums1[which(nums1 != 'rowid')]
+      choices = nums1[which(nums1 != 'rowid')]
       selectInput(
         "chem",
         "Select element concentrations:",
-        rvals$numCols,
+        choices,
         multiple = TRUE,
         selected = selected
       )
@@ -176,6 +181,11 @@ dataInputServer = function(input, output, session, rvals) {
   output$impute.options <- renderUI({
     req(nrow(rvals$selectedData) > 0)
     print("impute.options")
+    if(is.null(rvals$impute.method)){
+      sel = "none"
+    } else {
+      sel = rvals$impute.method
+    }
     quietly(label = "impute.options",{
       radioButtons(
         "impute.method",
@@ -186,7 +196,7 @@ dataInputServer = function(input, output, session, rvals) {
           "Predictive Mean Matching" = "pmm",
           "Weighted Predictive Mean Matching" = "midastouch"
         ),
-        selected = "none"
+        selected = sel
       )
     })
   })
@@ -195,6 +205,11 @@ dataInputServer = function(input, output, session, rvals) {
   output$transform.options <- renderUI({
     req(req(nrow(rvals$selectedData) > 0))
     print("transform.options")
+    if(is.null(rvals$transform.method)){
+      sel = "none"
+    } else {
+      sel = rvals$transform.method
+    }
     quietly(label = "transform.options",{
       radioButtons(
         "transform.method",
@@ -205,7 +220,7 @@ dataInputServer = function(input, output, session, rvals) {
           "Natural Log" = "log",
           "Percent/Z-score" = "zScore"
         ),
-        selected = "none"
+        selected = sel
       )
     })
   })
@@ -264,7 +279,7 @@ dataInputServer = function(input, output, session, rvals) {
     rvals$chem = input$chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
-    rvals$attrs = unique(c('rowid',rvals$attr,rvals$attrGroups))
+    rvals$attrs = unique(c('rowid','file',rvals$attr,rvals$attrGroups))
     rvals$attrGroupsSub = input$attrGroupsSub
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
@@ -273,82 +288,93 @@ dataInputServer = function(input, output, session, rvals) {
     rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
     rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    rvals$transform.method = input$transform.method
+    rvals$impute.method = input$impute.method
     transform.method = input$transform.method
     impute.method = input$impute.method
 
-    quietly(label = "combine prior data",{
-      if(isTRUE(inherits(rvals$unselectedData,"data.frame"))){
-        if(impute.method == "none" & attr(rvals$selectedData,"impute.method") != "none"){
-          impute.method = attr(rvals$selectedData,"impute.method")
+    message("subsetting data")
+    print(rvals$chem)
+    rvals$selectedData =
+      quietly(label = "selectedData",{
+        rvals$importedData %>%
+          dplyr::select(
+            rowid,
+            file,
+            tidyselect::any_of(input$attr),
+            tidyselect::any_of(input$attrGroups),
+            tidyselect::any_of(rvals$chem)
+          ) %>%
+          dplyr::mutate_at(dplyr::vars(input$attrGroups), factor) %>%
+          dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric))
+      })
+
+    # imputation
+    quietly(label = 'impute',{
+      if (impute.method  != "none") {
+        message("imputing")
+        if(!is.null(rvals[[impute.method]]) && nrow(rvals[[impute.method]]) == nrow(rvals$importedData)){
+          rvals$chem = rvals$chem[which(rvals$chem %in% colnames(rvals$selectedData))]
+          rvals$selectedData[, rvals$chem] = rvals[[impute.method]]
+        } else {
+          transformed = rvals$importedData[, rvals$chem] %>%
+            dplyr::mutate_all(dplyr::na_if,y = "0")
+          rvals[[impute.method]] = tryCatch(mice::complete(mice::mice(transformed, method = impute.method)),error = function(e){
+            mynotification(e)
+            return(rvals$importedData[,rvals$chem])
+          })
+          if(!is.null(rvals[[impute.method]])){
+            transformed = dplyr::bind_cols(rvals$importedData %>% dplyr::select(rowid), rvals[[impute.method]]) %>%
+              dplyr::filter(rowid %in% rvals$selectedData$rowid)
+            rvals$selectedData = dplyr::left_join(rvals$selectedData, transformed, by = 'rowid')
+              missing = rvals$chem[which(!rvals$chem %in% names(rvals$selectedData))]
+            if(length(missing) > 0){
+              mynotification(paste("could not impute data for",missing))
+              rvals$selectedData = dplyr::left_join(rvals$selectedData, rvals$importedData %>% dplyr::select(rowid,tidyselect::any_of(missing)), by = 'rowid') %>%
+                dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric))
+            }
+            mynotification("imputed data")
+          }
         }
-        if(transform.method == "none" & attr(rvals$selectedData,"transform.method") != "none"){
-          transform.method = attr(rvals$selectedData,"transform.method")
-        }
-
-        rvals$selectedData = dplyr::bind_rows(rvals$selectedData,rvals$unselectedData) %>%
-          dplyr::arrange(rowid) %>%
-          dplyr::select(-tidyselect::all_of(input$chem)) %>%
-          dplyr::left_join(rvals$importedData %>%
-                             dplyr::select(rowid, tidyselect::all_of(input$chem)),by = "rowid")
-
-
       }
     })
-    rvals$selectedData =
-      rvals$selectedData %>%
-      dplyr::select(
-        rowid,
-        tidyselect::all_of(input$attr),
-        tidyselect::all_of(input$attrGroups),
-        tidyselect::all_of(input$chem)
-      ) %>%
-      dplyr::mutate_at(dplyr::vars(input$attrGroups), factor) %>%
-      dplyr::mutate_at(dplyr::vars(input$chem), quietly(as.numeric))
+
+    rvals$chem = rvals$chem[which(rvals$chem %in% colnames(rvals$selectedData))]
+
+    # Transforming data
+    quietly(label = "transform",{
+      if(transform.method != "none"){
+        message("transforming")
+        suppressWarnings({
+          if(!is.null(rvals[[transform.method]]) && nrow(rvals[[transform.method]]) == nrow(rvals$importedData)){
+            rvals$selectedData[, rvals$chem ] = rvals[[transform.method]]
+          } else {
+            transformed = rvals$importedData[, rvals$chem ]  %>%
+              dplyr::mutate_all(quietly(as.numeric))
+            if (transform.method == 'zscale') {
+              transformed = zScale(transformed)
+            } else if (transform.method %in% c("log10", "log")) {
+              transformed = transformed  %>%
+                dplyr::mutate_all(transform.method) %>%
+                dplyr::mutate_all(round, digits = 3)
+            }
+            # get rid of infinite values
+            transformed = transformed %>%
+              dplyr::mutate_all(list(function(c)
+                dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
+            rvals$selectedData[, rvals$chem] = transformed
+            mynotification('transformed data')
+          }
+        })
+      }
+    })
 
     if(isTRUE(is.null(input$attrGroupsSub))){
       mynotification("Cannot proceed without any groups selected",type = "error")
     } else {
-      keep = quietly(label = "keep",rvals$selectedData %>%
-                       dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub))
-      discard = quietly(label = "discard",rvals$selectedData %>%
-                          dplyr::filter(!rowid %in% keep$rowid))
-      rvals$selectedData = keep
-      rvals$unselectedData = discard
+      quietly(label = "keep",{rvals$selectedData = rvals$selectedData %>%
+        dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub)})
     }
-
-    # imputation
-    if (impute.method  != "none") {
-      quietly(label = "impute",{
-        rvals$selectedData[, rvals$chem] = mice::complete(mice::mice(rvals$selectedData[, rvals$chem], method = impute.method ))
-      })
-    }
-    attr(rvals$selectedData,"impute.method") = impute.method
-    mynotification("imputed data")
-
-    # Transforming data
-    quietly(label = "transform",{
-      suppressWarnings({
-        if(transform.method != "none"){
-          if (transform.method == 'zscale') {
-            rvals$selectedData[, rvals$chem] = zScale(rvals$selectedData[, rvals$chem])
-          } else if (transform.method %in% c("log10", "log")) {
-            rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
-              dplyr::mutate_all(transform.method) %>%
-              dplyr::mutate_all(round, digits = 3)
-          }
-          mynotification('transformed data')
-        } else {
-          rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
-            dplyr::mutate_all(round, digits = 3)
-        }
-      })
-      # get rid of infinite values
-      rvals$selectedData[, rvals$chem] = rvals$selectedData[, rvals$chem] %>%
-        dplyr::mutate_all(list(function(c)
-          dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
-    })
-    attr(rvals$selectedData,"transform.method") = transform.method
-
 
     try({
       rvals$runPCA = input$runPCA
@@ -367,7 +393,6 @@ dataInputServer = function(input, output, session, rvals) {
 
   output$newCol = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    print("rendering new column")
     actionButton('addNewCol', "Add New Column", class = "mybtn")
   })
 
