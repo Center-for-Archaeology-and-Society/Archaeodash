@@ -1,7 +1,7 @@
 # update repository
-git -C /home/rjbischo/app/apps/Archaeodash pull;
+git -C /mnt/storage/apps/CASRShinySrvr/Archaeodash pull;
 # install package
-docker exec -it -w /home/shiny/Archaeodash casrshiny R -e 'devtools::install_local("/home/shiny/Archaeodash", force = T, dependencies = F)';
+docker exec -it -w /srv/shiny-server  archaeodash R -e 'devtools::install_local("/home/shiny/Archaeodash", force = T, dependencies = F)';
 # restart container
-docker restart casrshiny;
+docker restart archaeodash;
 
