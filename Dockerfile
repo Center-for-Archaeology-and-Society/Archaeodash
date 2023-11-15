@@ -38,3 +38,5 @@ RUN install2.r --error --skipinstalled \
     janitor \
     devtools \
     candisc
+
+RUN R -e 'devtools::install_local(".", force = T, dependencies = F)
