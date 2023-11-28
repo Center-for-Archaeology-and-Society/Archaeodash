@@ -21,7 +21,8 @@ shinyUI(
                class = 'mysidecol',
                h1("Data Manager"),
                datainputTab(),
-               saveexportTab()
+               saveexportTab(),
+               br()
              )
       ),
       column(9,
