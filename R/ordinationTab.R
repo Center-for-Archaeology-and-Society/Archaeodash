@@ -18,9 +18,9 @@ ordinationTab = function(){
                column(6,plotOutput("eigen.plot")),
              column(6,tableOutput("contribTbl"))),
              fluidRow(column(6,
-                             h1("CDA Results"))),
+                             h1("LDA Results"))),
              fluidRow(column(6,
-                             plotOutput("cda.plot")))
+                             plotOutput("lda.plot")))
            ) # end fluidPage Ordination
   )
 }
@@ -52,16 +52,16 @@ ordinationServer = function(input,output,session,rvals){
     })
   })
 
-  observeEvent(rvals$runCDA, {
-    req(rvals$runCDA)
+  observeEvent(rvals$runLDA, {
+    req(rvals$runLDA)
     req(rvals$selectedData)
-    message("running CDA")
-    quietly(label = 'running CDA',{
-      if(isTRUE(rvals$runCDA)){
-        cda = tryCatch(getCDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(CDAdf = tibble::tibble(), mod = NULL)))
-        rvals$CDAdf = cda$CDAdf
-        rvals$CDAmod = cda$mod
-        rvals$runCDA = F
+    message("running LDA")
+    quietly(label = 'running LDA',{
+      if(isTRUE(rvals$runLDA)){
+        lda = tryCatch(getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(LDAdf = tibble::tibble(), mod = NULL)))
+        rvals$LDAdf = lda$LDAdf
+        rvals$LDAmod = lda$mod
+        rvals$runLDA = F
       }
     })
   })
@@ -116,17 +116,13 @@ ordinationServer = function(input,output,session,rvals){
       dplyr::arrange(dplyr::desc(contribution))
   })
 
-  # Render CDA plot
-  output$cda.plot <- renderPlot({
-    # validate(need(inherits(rvals$CDAmod,"candisc"),""))
-    req(rvals$CDAmod)
-    message("rendering CDA plot")
-    quietly(label = 'CDA plot',{
-      levels = nrow(rvals$CDAdf)
-      cp = viridis::cividis(n = length(levels))
-      xlim = c(min(rvals$CDAdf$Can1) * 1.25,max(rvals$CDAdf$Can1) * 1.25)
-      ylim = c(min(rvals$CDAdf$Can2) * 1.25,max(rvals$CDAdf$Can2) * 1.25)
-      heplots::heplot(rvals$CDAmod, col = cp, xlim = xlim, ylim = ylim)
+  # Render LDA plot
+  output$lda.plot <- renderPlot({
+    # validate(need(inherits(rvals$LDAmod,"candisc"),""))
+    req(rvals$LDAmod)
+    message("rendering LDA plot")
+    quietly(label = 'LDA plot',{
+      plotLDAvectors(rvals$LDAmod)
     })
   })
 }

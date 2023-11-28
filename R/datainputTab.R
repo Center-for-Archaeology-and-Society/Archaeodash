@@ -171,7 +171,7 @@ dataInputServer = function(input, output, session, rvals) {
         uiOutput("transform.options"),
         br(),
         checkboxInput("runPCA","check to run PCA", value = F),
-        checkboxInput("runCDA","check to run CDA", value = F),
+        checkboxInput("runLDA","check to run LDA", value = F),
         actionButton("action", "Press to confirm selections", class = "mybtn")
       )
     })
@@ -378,9 +378,9 @@ dataInputServer = function(input, output, session, rvals) {
 
     try({
       rvals$runPCA = input$runPCA
-      rvals$runCDA = input$runCDA
+      rvals$runLDA = input$runLDA
       if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
-      if(isTRUE(rvals$runCDA)) mynotification("Ran CDA")
+      if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
     })
     mynotification("updated",duration = 3)
   })

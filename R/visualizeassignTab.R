@@ -30,7 +30,7 @@ visualizeassignTab = function() {
               'data.src',
               'Choose data type',
               # choices = c('elements', 'principal components'),
-              choices = c('elements', 'principal components','canonical discriminants'),
+              choices = c('elements', 'principal components','linear discriminants'),
               selected = 'elements'
             ),
             uiOutput('xvarUI'),
@@ -124,13 +124,13 @@ visualizeAssignServer = function(input, output, session, rvals) {
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$pca$x %>% colnames()
-      } else if (input$data.src == 'canonical discriminants') {
-        validate(need(nrow(rvals$CDAdf) > 0, "No CDA results"))
-        rvals$plotdf = tryCatch(rvals$CDAdf,error = function(e) {
-          mynotification("No CDA results",type = "warning")
+      } else if (input$data.src == 'linear discriminants') {
+        validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
+        rvals$plotdf = tryCatch(rvals$LDAdf,error = function(e) {
+          mynotification("No LDA results",type = "warning")
           return(tibble::tibble())
         })
-        rvals$plotVars = rvals$CDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
+        rvals$plotVars = rvals$LDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
       } else {
         req(nrow(rvals$selectedData) > 0)
         rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
@@ -250,7 +250,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
       if (is.null(rvals$brushSelected)) {
         p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
       } else {
-        if(isTRUE(input$data.src == "canonical discriminants")){
+        if(isTRUE(input$data.src == "linear discriminants")){
           renderTable(rvals$brushSelected)
         } else {
           renderTable(rvals$brushSelected[,rvals$attrs])
