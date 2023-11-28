@@ -39,4 +39,4 @@ RUN install2.r --error --skipinstalled \
     devtools \
     candisc
 
-RUN R -e 'devtools::install_local(".", force = T, dependencies = F)
+RUN R -e 'devtools::install_local("/srv/shiny-server", force = T, dependencies = F)'
