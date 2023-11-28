@@ -122,6 +122,7 @@ ordinationServer = function(input,output,session,rvals){
     req(rvals$LDAmod)
     message("rendering LDA plot")
     quietly(label = 'LDA plot',{
+      pdf(file = NULL)
       plotly::ggplotly(plotLDAvectors(rvals$LDAmod))
     })
   })
