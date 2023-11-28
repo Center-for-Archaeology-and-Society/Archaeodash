@@ -2,6 +2,8 @@ FROM rocker/shiny-verse:4.3.2
 
 LABEL description="This is the docker container for Archaeodash"
 
+COPY . /srv/shiny-server
+
 RUN apt-get update
 
 RUN  apt-get install -y --no-install-recommends \

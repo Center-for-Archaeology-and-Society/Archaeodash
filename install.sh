@@ -1,7 +1,15 @@
-# update repository
-git -C /mnt/storage/apps/CASRShinySrvr/Archaeodash pull;
-# install package
-docker exec -it -w /srv/shiny-server  archaeodash R -e 'devtools::install_local("/home/shiny/Archaeodash", force = T, dependencies = F)';
-# restart container
-docker restart archaeodash;
+#!/bin/bash
+echo "updating repository";
+
+ARG1=${1};
+echo "selected repository is $ARG1";
+lower="${ARG1,,}";
+
+echo "Pulling git repository"
+git -C /mnt/storage/apps/CASRShinySrvr/$ARG1 pull;
+echo "installing package"
+docker exec -it -w /srv/shiny-server  $lower R -e 'devtools::install_local(".", force = T, dependencies = F)';
+echo "restarting container"
+docker restart $lower;
+echo "completed"
 
