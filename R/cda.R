@@ -12,7 +12,7 @@
 getCDA = function(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups){
 
   mdl = lm(as.formula(glue::glue("cbind({paste(chem,collapse = \",\")}) ~ {attrGroups}")), data = df)
-  mdl_can = tryCatch(candisc::candisc(mdl, data = df1),error = function(e){
+  mdl_can = tryCatch(candisc::candisc(mdl, data = df),error = function(e){
     showNotification("unable to return CDA")
     return(NULL)
   })
