@@ -171,7 +171,7 @@ dataInputServer = function(input, output, session, rvals) {
         uiOutput("transform.options"),
         br(),
         checkboxInput("runPCA","check to run PCA", value = F),
-        # checkboxInput("runCDA","check to run CDA", value = F),
+        checkboxInput("runCDA","check to run CDA", value = F),
         actionButton("action", "Press to confirm selections", class = "mybtn")
       )
     })
