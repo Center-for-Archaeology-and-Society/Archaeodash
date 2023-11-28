@@ -57,7 +57,7 @@ getLDA = function(df = rvals$selectedData,
 #'
 #' @param lda_model lda model
 #'
-#' @return
+#' @return plot
 #' @export
 #'
 #' @examples

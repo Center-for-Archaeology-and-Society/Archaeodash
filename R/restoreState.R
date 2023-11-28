@@ -11,8 +11,8 @@
 #' @examples
 #' restoreState(rvals,input,session)
 restoreState = function(rvals,input,session){
-  inputIDs = c("attr","attrGroups","attrGroupsSub","chem","xvar","xvar2","yvar","yvar2","data.src","Conf","int.set", "runPCA")
-  types = c("select","select","select","select","select","select","select","select","select","checkbox","slider","checkbox")
+  inputIDs = c("attr","attrGroups","attrGroupsSub","chem","xvar","xvar2","yvar","yvar2","data.src","Conf","int.set", "runPCA","runLDA")
+  types = c("select","select","select","select","select","select","select","select","select","checkbox","slider","checkbox","checkbox")
   purrr::walk2(inputIDs,types,function(inputID,type){
     if(isTRUE(type == "select")) {
      try( updateSelectInput(session = session,inputId = inputID,selected = rvals[[inputID]]))

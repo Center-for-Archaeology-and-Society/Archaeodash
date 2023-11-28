@@ -327,7 +327,7 @@ dataInputServer = function(input, output, session, rvals) {
             transformed = dplyr::bind_cols(rvals$importedData %>% dplyr::select(rowid), rvals[[impute.method]]) %>%
               dplyr::filter(rowid %in% rvals$selectedData$rowid)
             rvals$selectedData = dplyr::left_join(rvals$selectedData, transformed, by = 'rowid')
-              missing = rvals$chem[which(!rvals$chem %in% names(rvals$selectedData))]
+            missing = rvals$chem[which(!rvals$chem %in% names(rvals$selectedData))]
             if(length(missing) > 0){
               mynotification(paste("could not impute data for",missing))
               rvals$selectedData = dplyr::left_join(rvals$selectedData, rvals$importedData %>% dplyr::select(rowid,tidyselect::any_of(missing)), by = 'rowid') %>%
@@ -376,12 +376,15 @@ dataInputServer = function(input, output, session, rvals) {
         dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub)})
     }
 
-    try({
-      rvals$runPCA = input$runPCA
-      rvals$runLDA = input$runLDA
-      if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
-      if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
-    })
+    rvals$selectedData = rvals$selectedData %>%
+      dplyr::mutate_at(dplyr::vars(input$attrGroups), droplevels)
+
+      try({
+        rvals$runPCA = input$runPCA
+        rvals$runLDA = input$runLDA
+        if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
+        if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
+      })
     mynotification("updated",duration = 3)
   })
 
