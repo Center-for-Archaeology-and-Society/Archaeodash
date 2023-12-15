@@ -8,6 +8,7 @@
 #' groupTab()
 groupTab = function(){
   tabPanel(title = "Group Membership",
+           id = "groupMembershiptab",
            sidebarLayout(sidebarPanel(
              uiOutput("eligibleGroupUI"),
              uiOutput("sampleIDUI"),
@@ -91,8 +92,11 @@ groupServer = function(input,output,session,rvals){
       choices = NULL
     }
     if(is.null(rvals$sampleID)){
-      selected = choices[1]
-      if(selected == "rowid") selected = choices[2]
+      if("anid" %in% tolower(choices)){
+        selected = choices[which(tolower(choices) == "anid")]
+      } else {
+        selected = choices[which(!choices %in% c("rowid","file"))][1]
+      }
     } else {
       selected = rvals$sampleID
     }
@@ -101,13 +105,17 @@ groupServer = function(input,output,session,rvals){
 
   observeEvent(input$membershipRun,{
     req(rvals$attrGroups)
-    showNotification("calculating membership")
+    mynotification("calculating membership")
     rvals$eligibleGroups = input$eligibleGroups
     rvals$sampleID = input$sampleID
-    rvals$membershipProbs = try(group.mem.probs(data = rvals$selectedData,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID))
-    if(inherits(rvals$membershipProbs,"try-error"))
-      showNotification(paste("Error"),rvals$membershipProbs[[1]])
-    showNotification("completed calculation")
+    rvals$membershipProbs = tryCatch(group.mem.probs(data = rvals$selectedData,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID) %>%
+                                       dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$sampleID)),by = dplyr::join_by("ID" == !!input$sampleID)),error = function(e){
+                                         mynotification(paste("error calculating membership:",e),type = "error")
+                                         return(NULL)
+                                       })
+    if(!is.null(rvals$membershipProbs)){
+      mynotification("completed calculation")
+    }
   })
 
   output$membershipTbl = DT::renderDataTable({
@@ -115,9 +123,18 @@ groupServer = function(input,output,session,rvals){
     if(is.null(rvals$membershipTbl_state_length)){
       rvals$membershipTbl_state_length = 25
     }
-    DT::datatable(rvals$membershipProbs,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap',options = list(
-      pageLength = rvals$membershipTbl_state_length,
-                                                                                                                               lengthMenu = c(10,25,50,100, 500,1000)))
+    DT::datatable(
+      rvals$membershipProbs,
+      filter = "top",
+      rownames = F,
+      selection = 'multiple',
+      style = 'bootstrap',
+      options = list(
+        pageLength = rvals$membershipTbl_state_length,
+        lengthMenu = c(10,25,50,100, 500,1000),
+        columnDefs = list(list(visible = F, targets = "rowid"))
+      )
+    )
   })
 
   observeEvent(input$gAssignBestGroup,{
@@ -135,26 +152,14 @@ groupServer = function(input,output,session,rvals){
 
   observeEvent(rvals$gNewValue, {
     quietly(label = "updating group",{
-      value = rvals$gNewValue
-      rvals$gNewValue = NULL
-      selRows = input$membershipTbl_rows_selected
-      if(length(selRows)!= length(value)){
-        value = value[1]
-      }
       if(!is.null(input$membershipTbl_state$length)){
         rvals$membershipTbl_state_length = input$membershipTbl_state$length
       } else {
         rvals$membershipTbl_state_length = 25
       }
-      new = rvals$selectedData %>%
-        dplyr::slice(selRows) %>%
-        dplyr::mutate(!!as.name(rvals$attrGroups) := value)
-      old = rvals$selectedData %>%
-        dplyr::slice(-selRows)
-      rvals$selectedData = dplyr::bind_rows(new, old) %>%
-        dplyr::arrange(rowid) %>%
-        dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)),factor)
-      rvals$membershipProbs[['GroupVal']] = rvals$selectedData[[rvals$attrGroups]]
+      rowid = rvals$membershipProbs$rowid[input$membershipTbl_rows_selected]
+      replaceCell(rvals,rowid,rvals$attrGroups,rvals$gNewValue)
+      rvals$gNewValue = NULL
     })
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))

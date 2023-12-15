@@ -14,6 +14,7 @@
 #' mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
 mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   message("main plot")
+  i = 1
   # print(head(plotdf))
   # print(xvar)
   # print(yvar)
@@ -25,7 +26,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   if(nfac > 6) mynotification("Too many groups to show symbols")
 
   if(nfac < 7) {
-    print("1")
+  print(i); i = i + 1
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -39,7 +40,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       ggplot2::geom_point() +
       ggplot2::scale_color_viridis_d()
   } else {
-    print("2")
+  print(i); i = i + 1
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -53,7 +54,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       ggplot2::scale_color_viridis_d()
   }
   if(Conf){
-    print("3")
+  print(i); i = i + 1
     gg = gg +
       ggplot2::stat_ellipse(
         data = plotdf,
@@ -68,7 +69,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       )
   }
   # Convert ggplot to plotly1
-  print("4")
+print(i); i = i + 1
   pSymbolsF = function(x) {
     psymbols = c(
       "circle",
@@ -84,7 +85,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
     x = data.frame(x = x) %>% dplyr::left_join(dict, by = "x")
     return(x$symbol)
   }
-  print("5")
+print(i); i = i + 1
   # Extract the data used by ggplot
   gg_data <- ggplot2::ggplot_build(gg)$data[[1]] %>%
     dplyr::rename(rowid = key) %>%
@@ -98,9 +99,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       shape = pSymbolsF(shape)
     ) %>%
     dplyr::mutate_at(dplyr::vars(colour,shape,name),factor)
-  print("6")
+print(i); i = i + 1
   if(Conf){
-    print("7")
+  print(i); i = i + 1
     gg_data_ellipse <- ggplot2::ggplot_build(gg)$data[[2]] %>%
       dplyr::left_join(
         gg_data %>% dplyr::select(colour, name) %>% dplyr::distinct_all(),
@@ -110,7 +111,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   } else {
     gg_data_ellipse = NULL
   }
-  print("8")
+print(i); i = i + 1
   # Add scatter plot trace
   ggP <-
     plotly::plot_ly() %>%
@@ -125,6 +126,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
                       symbol = ~shape,
                       symbols = ~levels(shape),
                       legendgroup = ~ name,
+                      key = ~ rowid,
                       marker = list(
                         size = ~ size * 7,
                         stroke = ~ stroke,
@@ -135,9 +137,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
                       ),
                       hoverinfo = 'text'
     )
-  print("9")
+print(i); i = i + 1
   if(shiny::isTruthy(inherits(gg_data_ellipse,"data.frame"))){
-    print("10")
+  print(i); i = i + 1
     ggP = ggP %>%
       plotly::add_trace(
         data = gg_data_ellipse,
@@ -158,14 +160,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
         text = ~ glue::glue("{name}<br>color:{colour}")
       )
   }
-  print("11")
+print(i); i = i + 1
   ggP = ggP %>%
     plotly::layout(
       xaxis = list(title = xvar),
       yaxis = list(title = yvar),
       dragmode = 'lasso'
     )
-  print("12")
+print(i); i = i + 1
   ggP
 }
 

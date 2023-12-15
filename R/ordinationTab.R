@@ -7,7 +7,7 @@
 #' @examples
 #' ordinationTab()
 ordinationTab = function(){
-  tabPanel(title = "Ordination", icon = icon("equalizer", lib = "glyphicon"),
+  tabPanel(title = "Ordination", id = "ordinationtab",icon = icon("equalizer", lib = "glyphicon"),
            fluidPage(
              fluidRow(column(6,
                              h1("PCA Results"))),

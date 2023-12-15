@@ -54,7 +54,7 @@ mynotification <- function(message, type = c("default", "message", "warning", "e
   if(type %in% c("warning", "error")) {
     warning(message)
   } else {
-    print(message)
+    message(message)
   }
   try(showNotification(message, type = type, duration = duration),silent = T)
 }

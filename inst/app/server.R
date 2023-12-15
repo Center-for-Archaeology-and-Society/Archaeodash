@@ -7,14 +7,14 @@ library(profvis)
 
 shinyServer(function(input, output, session) {
 
-  ####  create reactive values  ####
-  rvals = reactiveValues(importedData = tibble::tibble(),
-                         selectedData = tibble::tibble())
-
-  ## for testing
-  # rvals <<- reactiveValues(importedData = tibble::tibble(),
-  # selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing")
-  # input <<- input
+  ###  create reactive values  ####
+  # rvals = reactiveValues(importedData = tibble::tibble(),
+                         # selectedData = tibble::tibble())
+  # for testing
+  rvals <<- reactiveValues(importedData = tibble::tibble(),
+  selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing", type = "warning")
+  input <<- input
+  session <<- session
 
   #### Import data ####
 

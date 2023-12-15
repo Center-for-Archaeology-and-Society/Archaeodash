@@ -416,10 +416,10 @@ dataInputServer = function(input, output, session, rvals) {
     print("adding column")
     if(isTRUE(is.null(input$createGroup))) newCol = "cluster" else newCol = input$createGroup
     if(isTRUE(is.null(input$createGroupVal))) val = "1" else val = input$createGroupVal
-    rvals$selectedData = quietly(label = "addNewCol",{
-      rvals$selectedData %>%
+    rvals$importedData = quietly(label = "addNewCol",{
+      rvals$importedData %>%
         dplyr::select(-tidyselect::any_of(newCol)) %>%
-        dplyr::mutate(!!as.name(newCol) := factor(val))
+        dplyr::mutate(!!as.name(newCol) := factor(as.character(val)))
     })
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))

@@ -7,7 +7,7 @@
 #' @examples
 #' clusterTab()
 clusterTab = function(){
-  tabPanel(title = "Cluster", icon = icon("adjust", lib = "glyphicon"),
+  tabPanel(title = "Cluster", id = "clustertab", icon = icon("adjust", lib = "glyphicon"),
            sidebarLayout(
              sidebarPanel(
                radioButtons("cluster.parent", "Select Clustering Method",

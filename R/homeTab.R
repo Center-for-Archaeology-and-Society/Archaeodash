@@ -16,6 +16,7 @@
 #' homeTab()
 homeTab = function() {
   tabPanel(title = "Home",
+           id = "hometab",
            icon = icon("home"),
 
 

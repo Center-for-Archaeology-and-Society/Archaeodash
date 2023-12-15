@@ -7,6 +7,7 @@
 #' euclideanDistanceTab()
 euclideanDistanceTab = function() {
   tabPanel(title = "Euclidean Distance",
+           id = "euclideanDistancetab",
            sidebarLayout(
              sidebarPanel(
                uiOutput("projectionGroupUI"),
@@ -86,14 +87,20 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
       } else {
         choices = NULL
       }
-      selectInput("edsampleID","Choose sample ID Column",choices = choices)
+      if("anid" %in% tolower(choices)){
+        selected = choices[which(tolower(choices) == "anid")]
+      } else {
+        selected = choices[which(!choices %in% c("rowid","file"))][1]
+      }
+      selectInput("edsampleID","Choose sample ID Column",choices = choices, selected = selected)
     })
   })
 
   observeEvent(input$EDRun,{
     quietly(label = "running Euclidean Distance",{
       mynotification("calculating Euclidean Distances")
-      rvals$edistance = calcEDistance(data = rvals$selectedData,projection = input$projectionGroup,id = input$edsampleID,attrGroups = rvals$attrGroups,chem = rvals$chem,limit = input$EDlimit, withinGroup = input$EDmethod)
+      rvals$edistance = calcEDistance(data = rvals$selectedData,projection = input$projectionGroup,id = input$edsampleID,attrGroups = rvals$attrGroups,chem = rvals$chem,limit = input$EDlimit, withinGroup = input$EDmethod) %>%
+        dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)),by = dplyr::join_by(!!input$sampleID))
       mynotification("completed calculation")
     })
   })
@@ -104,7 +111,13 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
       if(is.null(rvals$EDTbl_state_length)){
         rvals$EDTbl_state_length = 25
       }
-      DT::datatable(rvals$edistance,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(pageLength = rvals$EDTbl_state_length,lengthMenu = c(10,25,50,100, 500,1000)))
+      DT::datatable(
+        rvals$edistance,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(
+          pageLength = rvals$EDTbl_state_length,
+          lengthMenu = c(10,25,50,100, 500,1000),
+          columnDefs = list(list(visible = F, targets = "rowid"))
+        )
+      )
     })
   })
 
@@ -125,33 +138,10 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
 
   observeEvent(rvals$edNewValue, {
     quietly(label = "changing group",{
-      value = rvals$edNewValue
+      rowid = rvals$membershipProbs$rowid[input$EDTbl_rows_selected]
+      replaceCell(rvals,rowid,rvals$attrGroups,rvals$edNewValue)
       rvals$edNewValue = NULL
-      selRows = input$EDTbl_rows_selected
-      EDval = rvals$edistance[[1]][selRows]
-      nm = names(rvals$edistance)[1]
-      indxSel = which(rvals$selectedData[[nm]] == EDval)
-      if(length(indxSel)!= length(value)){
-        value = value[1]
-      }
-      new = rvals$selectedData %>%
-        dplyr::slice(indxSel) %>%
-        dplyr::mutate(!!as.name(rvals$attrGroups) := value)
-      old = rvals$selectedData %>%
-        dplyr::slice(-indxSel)
-      rvals$selectedData = dplyr::bind_rows(new, old) %>%
-        dplyr::arrange(rowid) %>%
-        dplyr::mutate_at(dplyr::vars(tidyselect::all_of(rvals$attrGroups)),factor)
-      indxED = which(rvals$edistance[[1]] == EDval)
-      rvals$edistance[[rvals$attrGroups]][indxED] = as.character(rvals$selectedData[[rvals$attrGroups]][indxSel])
       DT::replaceData(edProxy, rvals$edistance, resetPaging = FALSE)
-      # # Reapply the selection
-      # if (!is.null(selRows)) {
-      #   rvals$EDTbl_state_selRows = selRows
-      #   edProxy %>% DT::selectRows(selRows)
-      # } else {
-      #   rvals$EDTbl_state_selRows = 1
-      # }
       if(!is.null(input$EDTbl_search)){
         edProxy %>% DT::updateSearch(keywords = list(global = input$EDTbl_search))
       }

@@ -11,6 +11,7 @@
 visualizeassignTab = function() {
   tabPanel(
     title = "Visualize & Assign",
+    id = "visualizetab",
     icon = icon("signal", lib = "glyphicon"),
     tabsetPanel(
       id = "visualize",
@@ -183,6 +184,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
   observeEvent(input$`plotly_selected-A`, {
     req(rvals$plotdf)
     plotlySelect <<- plotly::event_data("plotly_selected")
+    print(plotlySelect)
     if (length(plotlySelect) > 0) {
       rvals$brushSelected = rvals$plotdf %>%
         dplyr::filter(rowid %in% plotlySelect$key)

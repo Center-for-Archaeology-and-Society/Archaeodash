@@ -10,8 +10,8 @@
 exploreTab = function() {
   tabPanel(
     title = "Explore",
+    id = "exploretab",
     icon = icon("transfer", lib = "glyphicon"),
-    id = "explore",
     tabsetPanel(
       type = "pills",
       id = "dataset.impute",
