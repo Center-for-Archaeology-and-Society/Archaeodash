@@ -1,6 +1,6 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 0.2.3
+Version: 0.3
 Authors@R: 
     person("Robert", "Bischoff", , "rbischoff@asu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8708-9041"))
@@ -9,6 +9,9 @@ License: `use_mit_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
+Suggests:
+    testthat,
+    shinytest2
 Imports: 
     cluster,
     cowplot,
