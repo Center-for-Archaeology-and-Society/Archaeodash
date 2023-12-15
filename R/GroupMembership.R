@@ -92,6 +92,7 @@ groupServer = function(input,output,session,rvals){
     }
     if(is.null(rvals$sampleID)){
       selected = choices[1]
+      if(selected == "rowid") selected = choices[2]
     } else {
       selected = rvals$sampleID
     }
@@ -112,9 +113,11 @@ groupServer = function(input,output,session,rvals){
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
     if(is.null(rvals$membershipTbl_state_length)){
-      rvals$membershipTbl_state_length = 10
+      rvals$membershipTbl_state_length = 25
     }
-    DT::datatable(rvals$membershipProbs,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap',options = list(pageLength = rvals$membershipTbl_state_length))
+    DT::datatable(rvals$membershipProbs,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap',options = list(
+      pageLength = rvals$membershipTbl_state_length,
+                                                                                                                               lengthMenu = c(10,25,50,100, 500,1000)))
   })
 
   observeEvent(input$gAssignBestGroup,{
@@ -141,7 +144,7 @@ groupServer = function(input,output,session,rvals){
       if(!is.null(input$membershipTbl_state$length)){
         rvals$membershipTbl_state_length = input$membershipTbl_state$length
       } else {
-        rvals$membershipTbl_state_length = 10
+        rvals$membershipTbl_state_length = 25
       }
       new = rvals$selectedData %>%
         dplyr::slice(selRows) %>%

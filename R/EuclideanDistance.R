@@ -102,9 +102,9 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
     req(rvals$edistance)
     quietly(label = "rendering Euclidean Distance table",{
       if(is.null(rvals$EDTbl_state_length)){
-        rvals$EDTbl_state_length = 10
+        rvals$EDTbl_state_length = 25
       }
-      DT::datatable(rvals$edistance,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(pageLength = rvals$EDTbl_state_length))
+      DT::datatable(rvals$edistance,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(pageLength = rvals$EDTbl_state_length,lengthMenu = c(10,25,50,100, 500,1000)))
     })
   })
 
@@ -158,7 +158,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
       if(!is.null(input$EDTbl_state$length)){
         rvals$EDTbl_state_length = input$EDTbl_state$length
       } else {
-        rvals$EDTbl_state_length = 10
+        rvals$EDTbl_state_length = 25
       }
 
     })
