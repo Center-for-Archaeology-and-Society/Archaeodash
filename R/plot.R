@@ -22,35 +22,10 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   # print(int.set)
   if(xvar == yvar) return(NULL)
   nfac = nlevels(plotdf[[attrGroups]])
-  if(Conf && nfac > 6) mynotification("Too many groups to show ellipses")
-  if(Conf & nfac < 7) ellipse = T else ellipse = F
+  if(nfac > 6) mynotification("Too many groups to show symbols")
 
-  if(ellipse){
-    print("3")
-    gg = ggplot2::ggplot(
-      plotdf,
-      ggplot2::aes(
-        x = !!as.name(xvar),
-        y = !!as.name(yvar),
-        color = !!as.name(attrGroups),
-        shape = !!as.name(attrGroups),
-        key = rowid
-      )
-    ) +
-      ggplot2::geom_point() +
-      ggplot2::scale_color_viridis_d() +
-      ggplot2::stat_ellipse(
-        data = plotdf,
-        ggplot2::aes(
-          x = !!as.name(xvar),
-          y = !!as.name(yvar),
-          color = !!as.name(attrGroups)
-        ),
-        inherit.aes = F,
-        level = int.set,
-        show.legend = F
-      )
-  } else if(nfac < 7) {
+  if(nfac < 7) {
+    print("1")
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -64,6 +39,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       ggplot2::geom_point() +
       ggplot2::scale_color_viridis_d()
   } else {
+    print("2")
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -76,9 +52,23 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       ggplot2::geom_point() +
       ggplot2::scale_color_viridis_d()
   }
-  print("4")
+  if(Conf){
+    print("3")
+    gg = gg +
+      ggplot2::stat_ellipse(
+        data = plotdf,
+        ggplot2::aes(
+          x = !!as.name(xvar),
+          y = !!as.name(yvar),
+          color = !!as.name(attrGroups)
+        ),
+        inherit.aes = F,
+        level = int.set,
+        show.legend = F
+      )
+  }
   # Convert ggplot to plotly1
-  print("4.5")
+  print("4")
   pSymbolsF = function(x) {
     psymbols = c(
       "circle",
@@ -109,7 +99,8 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
     ) %>%
     dplyr::mutate_at(dplyr::vars(colour,shape,name),factor)
   print("6")
-  if(ellipse){
+  if(Conf){
+    print("7")
     gg_data_ellipse <- ggplot2::ggplot_build(gg)$data[[2]] %>%
       dplyr::left_join(
         gg_data %>% dplyr::select(colour, name) %>% dplyr::distinct_all(),
@@ -119,7 +110,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   } else {
     gg_data_ellipse = NULL
   }
-  print("7")
+  print("8")
   # Add scatter plot trace
   ggP <-
     plotly::plot_ly() %>%
@@ -144,8 +135,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
                       ),
                       hoverinfo = 'text'
     )
-  print("8")
+  print("9")
   if(shiny::isTruthy(inherits(gg_data_ellipse,"data.frame"))){
+    print("10")
     ggP = ggP %>%
       plotly::add_trace(
         data = gg_data_ellipse,
@@ -166,14 +158,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
         text = ~ glue::glue("{name}<br>color:{colour}")
       )
   }
-  print("9")
+  print("11")
   ggP = ggP %>%
     plotly::layout(
       xaxis = list(title = xvar),
       yaxis = list(title = yvar),
       dragmode = 'lasso'
     )
-  print("10")
+  print("12")
   ggP
 }
 

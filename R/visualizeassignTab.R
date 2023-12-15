@@ -39,65 +39,70 @@ visualizeassignTab = function() {
           column(
             3,
             offset = 0.5,
-
-            checkboxInput('Conf', 'Confidence Elipse', value =
-                            TRUE),
-            sliderInput(
-              'int.set',
-              'Set Confidence Interval',
-              min = 0.80,
-              max = 0.99,
-              step = 0.01,
-              value = 0.90
-            )
+            checkboxInput('Conf', 'Data Ellipse',
+                          value = TRUE),
+        sliderInput(
+          'int.set',
+          label = bslib::popover(
+            tagList("Choose ellipse level",
+            trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Choose ellipse level",
+            "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
           ),
-          column(
-            3,
-            offset = 0.5,
-            br(),
-            actionButton('Change', 'Change Group Assignment'),
-            textInput('NewGroup', label = 'Enter new group designation')
-          ),
-          column(3,
-                 offset = 0.5,
-                 br())
-        ),
-        uiOutput('brush')
+          min = 0.50,
+          max = 0.99,
+          step = 0.05,
+          value = 0.90
+        )
       ),
-      tabPanel(
-        title = "multiplots",
-        fluidRow(
-          column(3, uiOutput('xvar2UI')),
-          column(3,offset = 1,
-                 uiOutput('yvar2UI')),
-        ),
-        fluidRow(
-          column(2,
-                 radioButtons(
-                   inputId = "interactive",
-                   label = "make plots interactive?",
-                   choices = c(TRUE,FALSE),
-                   selected = FALSE),
-                 actionButton("updateMultiplot", "update")
-                 ),
-          column(
-            2,offset = 1,
-            numericInput(
-              "plotHeight",
-              label = "plot height in pixels",
-              min = 500,
-              max = 2000,
-              value = 900,
-              step = 50
-            )
-          ),
-          column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
-          column(2, offset = 1,actionButton('savePlot', "Save Plot"))
-        ),
-        fluidRow(uiOutput('multiplot'))
-      )
-    )
+      column(
+        3,
+        offset = 0.5,
+        br(),
+        actionButton('Change', 'Change Group Assignment'),
+        textInput('NewGroup', label = 'Enter new group designation')
+      ),
+      column(3,
+             offset = 0.5,
+             br())
+    ),
+    uiOutput('brush')
+  ),
+  tabPanel(
+    title = "multiplots",
+    fluidRow(
+      column(3, uiOutput('xvar2UI')),
+      column(3,offset = 1,
+             uiOutput('yvar2UI')),
+    ),
+    fluidRow(
+      column(2,
+             radioButtons(
+               inputId = "interactive",
+               label = "make plots interactive?",
+               choices = c(TRUE,FALSE),
+               selected = FALSE),
+             actionButton("updateMultiplot", "update")
+      ),
+      column(
+        2,offset = 1,
+        numericInput(
+          "plotHeight",
+          label = "plot height in pixels",
+          min = 500,
+          max = 2000,
+          value = 900,
+          step = 50
+        )
+      ),
+      column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
+      column(2, offset = 1,actionButton('savePlot', "Save Plot"))
+    ),
+    fluidRow(uiOutput('multiplot'))
   )
+  )
+)
 }
 
 #' Visualize Assign Server
@@ -220,7 +225,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
     req(input$yvar %in% names(rvals$plotdf))
     req(rvals$attrGroups)
     quietly(label = "plotting data",{
-     p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
+      p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
     })
     req(p)
     p
@@ -258,11 +263,11 @@ visualizeAssignServer = function(input, output, session, rvals) {
           rvals$multiplot,
         )
       } else {
-      renderPlot(
-        rvals$multiplot,
-                   width = "auto",
-                   height = input$plotHeight
-      )
+        renderPlot(
+          rvals$multiplot,
+          width = "auto",
+          height = input$plotHeight
+        )
       }
     })
 
