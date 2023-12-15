@@ -6,11 +6,11 @@ library(shiny)
 library(bslib)
 
 shinyUI(
-  fluidPage(
+  bslib::page_fluid(
     tags$head(
       tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
     ),
-    theme = shinythemes::shinytheme("sandstone"),
+    theme = bs_theme(bootswatch = "sandstone"),
     windowTitle = "ArchaeoDash - A Dashboard for Archaeological Compositional Analysis",
     shinyjs::useShinyjs(),
     fluid = TRUE,
