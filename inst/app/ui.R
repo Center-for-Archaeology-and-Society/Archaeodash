@@ -18,6 +18,12 @@ shinyUI(
       column(3,
              div(
                class = 'mysidecol',
+               actionButton('loginUI','login'),
+               shinyjs::hidden(actionButton('logoutUI','logout')),
+               uiOutput("userMessage"),
+               br(),
+               hr(),
+               br(),
                h1("Data Manager"),
                datainputTab(),
                saveexportTab(),

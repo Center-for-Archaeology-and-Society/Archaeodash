@@ -6,13 +6,14 @@
 #' @param attrGroups attribute group
 #' @param Conf whether to draw confidence ellipses
 #' @param int.set confidence level
+#' @param theme color theme
 #'
 #' @return plotly object
 #' @export
 #'
 #' @examples
 #' mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
-mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
+mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis"){
   message("main plot")
   i = 1
   # print(head(plotdf))
@@ -26,7 +27,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
   if(nfac > 6) mynotification("Too many groups to show symbols")
 
   if(nfac < 7) {
-  print(i); i = i + 1
+    print(i); i = i + 1
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -37,10 +38,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
         key = rowid
       )
     ) +
-      ggplot2::geom_point() +
-      ggplot2::scale_color_viridis_d()
+      ggplot2::geom_point()
   } else {
-  print(i); i = i + 1
+    print(i); i = i + 1
     gg = ggplot2::ggplot(
       plotdf,
       ggplot2::aes(
@@ -50,11 +50,20 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
         key = rowid
       )
     ) +
-      ggplot2::geom_point() +
+      ggplot2::geom_point()
+  }
+  if(theme == "viridis"){
+    gg = gg +
       ggplot2::scale_color_viridis_d()
+  } else {
+    groups = unique(plotdf[[attrGroups]])
+    colors <- setNames(object = sapply(1:length(groups), function(x) {
+      rgb(runif(1), runif(1), runif(1))
+    }), nm = groups)
+    gg = gg + ggplot2::scale_color_manual(values = colors)
   }
   if(Conf){
-  print(i); i = i + 1
+    print(i); i = i + 1
     gg = gg +
       ggplot2::stat_ellipse(
         data = plotdf,
@@ -69,7 +78,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set){
       )
   }
   # Convert ggplot to plotly1
-print(i); i = i + 1
+  print(i); i = i + 1
   pSymbolsF = function(x) {
     psymbols = c(
       "circle",
@@ -81,11 +90,12 @@ print(i); i = i + 1
     )
     if (length(unique(x)) > length(psymbols))
       psymbols = 'circle'
-    dict = data.frame(x = unique(x), symbol = psymbols[1:length(unique(x))])
+    dict = data.frame(x = unique(x), symbol = psymbols[1:length(unique(x))]) %>%
+      dplyr::mutate(symbol = dplyr::case_when(is.na(symbol)~'circle',TRUE~'symbol'))
     x = data.frame(x = x) %>% dplyr::left_join(dict, by = "x")
     return(x$symbol)
   }
-print(i); i = i + 1
+  print(i); i = i + 1
   # Extract the data used by ggplot
   gg_data <- ggplot2::ggplot_build(gg)$data[[1]] %>%
     dplyr::rename(rowid = key) %>%
@@ -99,19 +109,24 @@ print(i); i = i + 1
       shape = pSymbolsF(shape)
     ) %>%
     dplyr::mutate_at(dplyr::vars(colour,shape,name),factor)
-print(i); i = i + 1
-  if(Conf){
   print(i); i = i + 1
-    gg_data_ellipse <- ggplot2::ggplot_build(gg)$data[[2]] %>%
-      dplyr::left_join(
-        gg_data %>% dplyr::select(colour, name) %>% dplyr::distinct_all(),
-        by = 'colour'
-      ) %>%
-      dplyr::mutate_at(dplyr::vars(colour,name),factor)
+  if(Conf){
+    print(i); i = i + 1
+    gg_data_ellipse <- ggplot2::ggplot_build(gg)$data[[2]]
+    if("colour" %in% names(gg_data_ellipse)){
+      gg_data_ellipse = gg_data_ellipse %>%
+        dplyr::left_join(
+          gg_data %>% dplyr::select(colour, name) %>% dplyr::distinct_all(),
+          by = 'colour'
+        ) %>%
+        dplyr::mutate_at(dplyr::vars(colour,name),factor)
+    } else {
+      gg_data_ellipse = NULL
+    }
   } else {
     gg_data_ellipse = NULL
   }
-print(i); i = i + 1
+  print(i); i = i + 1
   # Add scatter plot trace
   ggP <-
     plotly::plot_ly() %>%
@@ -137,9 +152,9 @@ print(i); i = i + 1
                       ),
                       hoverinfo = 'text'
     )
-print(i); i = i + 1
-  if(shiny::isTruthy(inherits(gg_data_ellipse,"data.frame"))){
   print(i); i = i + 1
+  if(shiny::isTruthy(inherits(gg_data_ellipse,"data.frame"))){
+    print(i); i = i + 1
     ggP = ggP %>%
       plotly::add_trace(
         data = gg_data_ellipse,
@@ -160,14 +175,14 @@ print(i); i = i + 1
         text = ~ glue::glue("{name}<br>color:{colour}")
       )
   }
-print(i); i = i + 1
+  print(i); i = i + 1
   ggP = ggP %>%
     plotly::layout(
       xaxis = list(title = xvar),
       yaxis = list(title = yvar),
       dragmode = 'lasso'
     )
-print(i); i = i + 1
+  print(i); i = i + 1
   ggP
 }
 

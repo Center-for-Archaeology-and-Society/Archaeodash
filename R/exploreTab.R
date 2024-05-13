@@ -15,16 +15,15 @@ exploreTab = function() {
     tabsetPanel(
       type = "pills",
       id = "dataset.impute",
-      tabPanel("Elements", fluidRow(
+      tabPanel("Dataset", fluidRow(
         column(
           3,
           h4(
             "Numbers of samples with missing data by element (pre-imputation)"
           ),
           plotOutput("miss.plot", width = "250px")
-        ), column(9, DT::dataTableOutput("elementsDT"))
+        ), column(9, DT::dataTableOutput("datasetDT"))
       )),
-      tabPanel("Attributes", DT::dataTableOutput("attributesDT")),
       tabPanel(
         "Crosstabs",
         wellPanel(uiOutput("crosstabsUI")),
@@ -61,15 +60,18 @@ exploreTab = function() {
 #' exploreServer(input,output,session,rvals)
 exploreServer = function(input, output, session, rvals) {
   # Render datatable of imputed chemical data
-  output$elementsDT <- DT::renderDataTable({
+  output$datasetDT <- DT::renderDataTable({
     req(rvals$selectedData)
-    quietly(DT::datatable(rvals$selectedData[, rvals$chem], rownames = F))
+    quietly(DT::datatable(rvals$selectedData, rownames = F,editable = TRUE))
   })
 
-  # Render datatable of imputed chemical data
-  output$attributesDT <- DT::renderDataTable({
-    req(rvals$selectedData)
-    quietly(DT::datatable(rvals$selectedData[, rvals$attrs], rownames = F))
+  observeEvent(input$datasetDT_cell_edit, {
+    info <- input$datasetDT_cell_edit
+    str(info)  # Print info to the console for debugging
+    i <- info$row
+    j <- info$col + 1
+    v <- info$value
+    rvals$selectedData[i, j] <- DT::coerceValue(v, rvals$selectedData[i, j])
   })
 
   output$crosstabsUI = renderUI({

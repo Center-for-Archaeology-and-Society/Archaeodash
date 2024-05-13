@@ -8,17 +8,45 @@ library(profvis)
 shinyServer(function(input, output, session) {
 
   ###  create reactive values  ####
-  rvals = reactiveValues(importedData = tibble::tibble(),
-  selectedData = tibble::tibble())
+  # rvals = reactiveValues(importedData = tibble::tibble(),
+  # selectedData = tibble::tibble())
   # for testing
-  # rvals <<- reactiveValues(importedData = tibble::tibble(),
-  # selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing", type = "warning")
-  # input <<- input
-  # session <<- session
+  rvals <<- reactiveValues(importedData = tibble::tibble(),
+  selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing", type = "warning")
+  input <<- input; showNotification("warning: global variable is only for testing", type = "warning")
+  session <<- session; showNotification("warning: global variable is only for testing", type = "warning")
+  # credentials = reactiveValues()
+  credentials <<- reactiveValues(); showNotification("warning: global variable is only for testing", type = "warning")
+
+  con = connect()
+
+  loginUI(input = input)
+
+  loginServer(con, input = input, output = output, session = session, credentials = credentials)
+
+  observeEvent(credentials$res$username, {
+    if(!is.null(credentials$res$username) && !is.na(credentials$res$username)){
+      output$userMessage = renderUI({
+        renderText(paste("Logged in as", credentials$res$username))
+      })
+      shinyjs::hide(id = "loginUI")
+      shinyjs::show(id = "logoutUI")
+    } else {
+      output$userMessage = renderUI({
+        NULL
+      })
+      shinyjs::show(id = "loginUI")
+      shinyjs::hide(id = "logoutUI")
+    }
+  })
+
+  observeEvent(input$logoutUI,{
+    credentials$res = tibble::tibble(username = NA)
+  })
 
   #### Import data ####
 
-  quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals))
+  quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals,con))
 
   ####  Explore ####
   quietly(label = "exploreServer",exploreServer(input,output,session,rvals))
@@ -42,6 +70,6 @@ shinyServer(function(input, output, session) {
   quietly(label = "saveExportServer",saveExportServer(input,output,session,rvals))
 
   #### subsetDataServer ####
-  # subsetDataServer(input,output,session,rvals) # no longer used?
+  subsetDataServer(input,output,session,rvals) # no longer used?
 
 }) # end server

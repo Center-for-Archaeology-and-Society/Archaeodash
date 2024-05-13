@@ -4,7 +4,7 @@
 \alias{dataInputServer}
 \title{Data Input}
 \usage{
-dataInputServer(input, output, session, rvals)
+dataInputServer(input, output, session, rvals, con)
 }
 \arguments{
 \item{input}{shiny input object}

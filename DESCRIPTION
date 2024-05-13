@@ -1,6 +1,6 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 0.4
+Version: 0.5
 Authors@R: 
     person("Robert", "Bischoff", , "rbischoff@asu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8708-9041"))
@@ -8,7 +8,7 @@ Description: Analytical dashboard for analyzing chemical composition of artifact
 License: `use_mit_license()`
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 Suggests:
     testthat,
     shinytest2
@@ -35,6 +35,9 @@ Imports:
     bslib,
     janitor,
     MASS,
-    bsicons
+    bsicons,
+    RMySQL,
+    DBI,
+    sodium
 Depends: 
     data.table

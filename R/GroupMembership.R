@@ -13,6 +13,7 @@ groupTab = function(){
              uiOutput("eligibleGroupUI"),
              uiOutput("sampleIDUI"),
              selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
+             selectInput("dataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
              actionButton("membershipRun","Calculate", class = "mybtn"),
            ),
            mainPanel(
@@ -86,19 +87,15 @@ groupServer = function(input,output,session,rvals){
 
   output$sampleIDUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    if(!is.null(rvals$attrs)){
-      choices = tryCatch(names(rvals$selectedData[,rvals$attrs]),error = function(e) return(NULL))
+    choices = rvals$attrs
+    if(!is.null(rvals$sampleID)){
+      selected = rvals$sampleID
     } else {
-      choices = NULL
-    }
-    if(is.null(rvals$sampleID)){
       if("anid" %in% tolower(choices)){
         selected = choices[which(tolower(choices) == "anid")]
       } else {
-        selected = choices[which(!choices %in% c("rowid","file"))][1]
+        selected = choices[1]
       }
-    } else {
-      selected = rvals$sampleID
     }
     selectInput("sampleID","Choose sample ID Column",choices = choices,selected = selected)
   })
@@ -108,8 +105,14 @@ groupServer = function(input,output,session,rvals){
     mynotification("calculating membership")
     rvals$eligibleGroups = input$eligibleGroups
     rvals$sampleID = input$sampleID
-    rvals$membershipProbs = tryCatch(group.mem.probs(data = rvals$selectedData,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID) %>%
-                                       dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$sampleID)),by = dplyr::join_by("ID" == !!input$sampleID)),error = function(e){
+    if(input$dataset == "elements"){
+      df = rvals$selectedData
+    } else {
+      df = rvals$pcadf
+    }
+    rvals$membershipProbs = tryCatch(group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID) %>%
+                                       dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
+                                       dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),by = dplyr::join_by("ID" == !!input$sampleID)),error = function(e){
                                          mynotification(paste("error calculating membership:",e),type = "error")
                                          return(NULL)
                                        })

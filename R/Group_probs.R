@@ -11,6 +11,10 @@
 #' group.mem.probs(elements,assigned)
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
 
+  if("PC1" %in% names(data)){
+    chem = data %>% dplyr::select(tidyselect::any_of(tidyselect::contains("PC"))) %>% names()
+  }
+
   probsAll = matrix(nrow = nrow(data), ncol = length(eligible))
   colnames(probsAll) = eligible
   rownames(probsAll) = data[[ID]]
@@ -53,10 +57,12 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
 #' getEligible(data,chem,group)
 getEligible = function(data,chem,group){
   nc = length(chem)
+  ng = length(unique(data[[group]]))
+  m = max(nc,ng)
   eligible = data %>%
     dplyr::group_by(dplyr::across(tidyselect::all_of(group))) %>%
     dplyr::count() %>%
-    dplyr::filter(n > (nc + 1)) %>%
+    dplyr::filter(n > (m + 1)) %>%
     dplyr::pull(!!as.name(group)) %>%
     as.character
   return(eligible)

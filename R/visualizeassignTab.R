@@ -66,7 +66,7 @@ visualizeassignTab = function() {
       ),
       column(3,
              offset = 0.5,
-             br())
+             selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'))
     ),
     uiOutput('brush')
   ),
@@ -226,9 +226,9 @@ visualizeAssignServer = function(input, output, session, rvals) {
     req(input$xvar %in% names(rvals$plotdf))
     req(input$yvar %in% names(rvals$plotdf))
     req(rvals$attrGroups)
-    quietly(label = "plotting data",{
-      p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
-    })
+    # quietly(label = "plotting data",{
+      p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set, theme = input$plot_theme)
+    # })
     req(p)
     p
   })
@@ -242,7 +242,7 @@ visualizeAssignServer = function(input, output, session, rvals) {
         if(isTRUE(input$data.src == "linear discriminants")){
           renderTable(rvals$brushSelected)
         } else {
-          renderTable(rvals$brushSelected[,rvals$attrs])
+          renderTable(rvals$brushSelected %>% dplyr::select(tidyselect::any_of(rvals$attrs)))
         }
       }
     })
