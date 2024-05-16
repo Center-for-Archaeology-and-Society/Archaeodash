@@ -12,7 +12,8 @@ RUN  apt-get install -y --no-install-recommends \
 	vim \
 	git \
 	libgl1-mesa-dev \
-	libglu1-mesa-dev
+	libglu1-mesa-dev \
+	libsodium-dev
 
 RUN install2.r --error --skipinstalled \
     cluster \
@@ -40,6 +41,9 @@ RUN install2.r --error --skipinstalled \
     janitor \
     devtools \
     MASS \
-    candisc
+    candisc \
+    RMySQL \
+    DBI \
+    sodium
 
 RUN R -e 'devtools::install_local(".", force = T, dependencies = F)'
