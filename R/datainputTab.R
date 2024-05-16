@@ -9,11 +9,16 @@ datainputTab = function() {
   tagList(
     h3("Choose previously loaded data or upload a new dataset (upload one at a time)"),
     uiOutput('priorDatasets'),
+    uiOutput('confirmPriorUI'),
+    br(),
+    uiOutput('manageDatasets'),
+    hr(),
     fileInput("file1", "Choose File (csv, xlsx or other supported format)",multiple = F),
     uiOutput("attr"),
     uiOutput("subSelect"),
-    uiOutput("chem"),
+    uiOutput("chemUI"),
     uiOutput("actionUI"),
+    hr(),
     uiOutput("resetUI"),
     br(),
     hr(),
@@ -40,11 +45,21 @@ dataInputServer = function(input, output, session, rvals, con) {
   observe({
     shiny::invalidateLater(1000, session)
     tbls = DBI::dbListTables(con)
-    rvals$tbls = tbls[which(stringr::str_detect(tbls,paste0("^",credentials$res$username,"_")))]
+    tbls = tbls[which(stringr::str_detect(tbls,paste0("^",credentials$res$username,"_")))]
+    tbls = tbls[which(!stringr::str_detect(tbls,"_metadata"))]
+    rvals$tbls = tbls
+  })
+
+  output$confirmPriorUI = renderUI({
+    if(isTruthy(credentials$status)){
+      actionButton("confirmPrior","Confirm dataset selection", class = 'mybtn')
+    } else {
+      NULL
+    }
   })
 
   output$priorDatasets = renderUI({
-    if(!is.null(credentials$res$username) && !is.na(credentials$res$username)){
+    if(isTruthy(credentials$status)){
       if(any(stringr::str_detect(rvals$tbls,"_current"))){
         selection = rvals$tbls[which(stringr::str_detect(rvals$tbls,"_current"))]
       } else {
@@ -56,9 +71,18 @@ dataInputServer = function(input, output, session, rvals, con) {
     }
   })
 
-  observeEvent(input$selectedDatasets,{
+  observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
-    print("selectedDatasets")
+
+    null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
+                   "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
+                   "int.set", "eligibleGroups", "sampleID")
+
+    # Loop through the list and set each to NULL
+    for (var in null_vars) {
+      rvals[[var]] <- NULL
+    }
+
     tbls = list()
     for(tbl in input$selectedDatasets){
       tbls[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
@@ -66,8 +90,146 @@ dataInputServer = function(input, output, session, rvals, con) {
     }
     rvals$importedData = do.call(dplyr::bind_rows,tbls) %>%
       dplyr::select(-tidyselect::any_of('rowid')) %>%
+      dplyr::distinct_all() %>%
       tibble::rowid_to_column()
     rvals$selectedData = rvals$importedData
+
+    filenames = paste0(input$selectedDatasets,"_metadata")
+
+    # get metadata
+    tblsmd = list()
+    for(tbl in filenames){
+      if(DBI::dbExistsTable(con,tbl)){
+        tblsmd[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
+          dplyr::mutate_all(as.character)
+      }
+    }
+    if(length(tblsmd) > 0){
+      tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
+        dplyr::distinct_all() %>%
+        dplyr::filter(field == "variable") %>%
+        dplyr::pull(value)
+      rvals$chem = tblsmd
+    }
+
+  })
+
+  output$manageDatasets = renderUI({
+    if(isTruthy(credentials$status)){
+      tagList(
+        h3("Manage datasets"),
+        actionButton("deleteDatasets","Delete selected dataset(s)", class = 'mybtn'),
+        actionButton("mergeDatasets","Merge/rename selected datasets", class = 'mybtn')
+      )
+    } else {
+      NULL
+    }
+  })
+
+  observeEvent(input$deleteDatasets,{
+    req(input$selectedDatasets)
+    showModal(modalDialog(
+      title = "Delete selected datasets",
+      "Are you sure you want to delete the selected datasets?",
+      footer = tagList(
+        actionButton("deleteDatasetsconfirm","Yes"),
+        modalButton("No")
+      )
+    ))
+  })
+
+  observeEvent(input$deleteDatasetsconfirm,{
+    removeModal()
+    req(input$selectedDatasets)
+    print('deleting datasets')
+    for(tbl in input$selectedDatasets){
+      DBI::dbRemoveTable(con,tbl)
+      DBI::dbRemoveTable(con,paste0(tbl,"_metadata"))
+    }
+  })
+
+  observeEvent(input$mergeDatasets,{
+    req(input$selectedDatasets)
+    showModal(modalDialog(
+      title = "Merge selected datasets",
+      "Are you sure you want to merge or rename the selected datasets?",
+      textInput("mergeName","Enter new dataset name (do not include login prefix, e.g.(not 'username_newdataset' but 'newdataset'))"),
+      footer = tagList(
+        actionButton("mergeDatasetsconfirm","Yes"),
+        modalButton("No")
+      )
+    ))
+  })
+
+  observeEvent(input$mergeDatasetsconfirm,{
+    removeModal()
+    req(input$selectedDatasets)
+    req(input$mergeName %>% length() > 0)
+    print("merging datasets")
+    tryCatch({
+      tbls = list()
+      for(tbl in input$selectedDatasets){
+        tbls[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
+          dplyr::mutate_all(as.character)
+      }
+      merged = do.call(dplyr::bind_rows,tbls) %>%
+        dplyr::select(-tidyselect::any_of('rowid')) %>%
+        dplyr::distinct_all() %>%
+        tibble::rowid_to_column()
+
+      filename = paste0(credentials$res$username,"_",input$mergeName)
+
+      # get metadata
+      tblsmd = list()
+      for(tbl in input$selectedDatasets){
+        tblnm = paste0(tbl,"_metadata")
+        dblist = DBI::dbListTables(con)
+        if(tblnm %in% dblist){
+          tblsmd[[tblnm]] = dplyr::tbl(con,tblnm) %>% dplyr::collect() %>%
+            dplyr::mutate_all(as.character)
+        }
+      }
+      if(length(tblsmd) > 0){
+        tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
+          dplyr::distinct_all() %>%
+          dplyr::filter(!field %in% c("created","dataset")) %>%
+          dplyr::bind_rows(tibble::tibble(field = "dataset",value = filename),
+                           tibble::tibble(field = "created",value = as.character(as.Date(Sys.time())))
+          )
+      } else {
+        tblsmd = tibble::tibble(field = "datasetName",value = filename,
+                                field = "created",value = as.character(as.Date(Sys.time())))
+      }
+
+      if(!DBI::dbExistsTable(con,filename)){
+        DBI::dbWriteTable(con,filename,merged, row.names = F)
+        DBI::dbWriteTable(con,paste0(filename,"_metadata"),tblsmd, row.names = F)
+      } else {
+        rvals$mergeFilename = filename
+        rvals$merged = merged
+        rvals$merged_metadata = tblsmd
+        showModal(modalDialog(
+          title = "confirm?",
+          p("Dataset name already exists. Do you want to overwrite this table?"),
+          footer = tagList(
+            actionButton("overwriteDataset","Yes"),
+            modalButton("No")
+          )
+        ))
+      }
+    }, error = function(e){
+      mynotification(paste("Error merging datasets\n",e), type = "error")
+    })
+  })
+
+  observeEvent(input$overwriteDataset,{
+    removeModal()
+    req(rvals$mergeFilename)
+    req(rvals$merged)
+    req(rvals$merged_metadata)
+    DBI::dbWriteTable(conn = con,name = rvals$mergeFilename,value = rvals$merged, row.names = F, overwrite = T)
+    DBI::dbWriteTable(conn = con,name = paste0(rvals$mergeFilename,"_metadata"),value = rvals$merged_metadata, row.names = F, overwrite = T)
+    mynotification("merged datasets")
   })
 
   observeEvent(input$file1, {
@@ -83,21 +245,20 @@ dataInputServer = function(input, output, session, rvals, con) {
         rvals[[var]] <- NULL
       }
 
-      rvals$impute.method = input$impute.method
-      rvals$transform.method = input$transform.method
       # print(dput(input$file1))
 
-      rvals$importedData = dataLoader(filename = input$file1$datapath)
-      if(!is.null(credentials$res$username) && !is.na(credentials$res$username)){
+      rvals$data = dataLoader(filename = input$file1$datapath)
+      if(isTruthy(credentials$status)){
         dataLoaderUI()
       } else {
+        rvals$importedData = rvals$data
         rvals$selectedData = rvals$importedData
       }
 
     }
   })
 
-  dataLoaderServer(data = rvals$importedData,input,output,session, credentials = credentials, con = con)
+  dataLoaderServer(rvals = rvals,input,output,session, credentials = credentials, con = con)
 
   # Render multi-select lookup for choosing attribute columns
   output$attr <- renderUI({
@@ -172,16 +333,23 @@ dataInputServer = function(input, output, session, rvals, con) {
   })
 
   # Render multi-select lookup for choosing chemical concentration columns
-  output$chem <- renderUI({
+  output$chemUI <- renderUI({
     req(nrow(rvals$importedData) > 0)
     print("chem")
+    print("existing rvals$chem:")
+    print(rvals$chem)
     df <- rvals$importedData
     dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
                                janitor::remove_empty("cols"))
     # Remove non-numeric columns from default selection
     nums1 <- names(dfNum)
     quietly(label = "chem",{
-      selected = nums1[which(nums1 != 'rowid')]
+      all = nums1[which(nums1 != 'rowid')]
+      if(is.null(rvals$chem)){
+        selected = all
+      } else {
+        selected = rvals$chem
+      }
       choices = nums1[which(nums1 != 'rowid')]
       selectInput(
         "chem",
@@ -264,7 +432,7 @@ dataInputServer = function(input, output, session, rvals, con) {
     quietly(label = "resetUI",{
       tagList(
         actionButton("resetElements", "Reset elements to original", class = "mybtn"),
-        actionButton("reset", "Reset to last file import", class = "mybtn"),
+        # actionButton("saveTbl", "Save data to new table", class = "mybtn"),
         actionButton("resetClear", "Clear workspace", class = "mybtn"),
 
       )
@@ -276,25 +444,26 @@ dataInputServer = function(input, output, session, rvals, con) {
     rvals$selectedData[,rvals$chem] = rvals$importedData[,rvals$chem]
   })
 
-  observeEvent(input$reset,{
-    print("reset")
-    showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All changes will be lost"),footer = tagList(actionButton("confirmReset","confirm"),modalButton("cancel")),easyClose = T))
-  })
+  # observeEvent(input$saveTbl,{
+  #   print("saveTbl")
+  #   if(isTruthy(credentials$status)){
+  #     newtbl = rvals$selectedData %>%
+  #       dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub) %>%
+  #       dplyr::select(-tidyselect::any_of(input$chem))
+  #     newtblchems = rvals$importedData %>%
+  #       dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub) %>%
+  #       dplyr::select(tidyselect::any_of(input$chem))
+  #     newtbl = dplyr::bind_cols(newtbl,newtblchems)
+  #     rvals$importedData = newtbl
+  #     dataLoaderUI()
+  #   } else {
+  #     mynotification("Must be logged in to save table", type = "warning")
+  #   }
+  # })
 
   observeEvent(input$resetClear,{
     print("resetClear")
     showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All data will be lost"),footer = tagList(actionButton("confirmResetClear","confirm"),modalButton("cancel")),easyClose = T))
-  })
-
-  observeEvent(input$confirmReset,{
-    print("confirmReset")
-    removeModal()
-    rvals$chem = NULL
-    rvals$attrGroups = NULL
-    rvals$attr = NULL
-    rvals$attrs = NULL
-    rvals$attrGroupsSub = NULL
-    rvals$selectedData = rvals$importedData
   })
 
   observeEvent(input$confirmResetClear,{
@@ -332,14 +501,14 @@ dataInputServer = function(input, output, session, rvals, con) {
     # print(input$attr)
 
     rvals$selectedData =
-        tryCatch(rvals$importedData %>%
-          dplyr::select(
-            tidyselect::any_of(rvals$attrGroups),
-            tidyselect::any_of(rvals$chem),
-            tidyselect::any_of(rvals$attr)
-          ) %>%
-          dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
-          dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)),error = function(e) mynotification(e))
+      tryCatch(rvals$importedData %>%
+                 dplyr::select(
+                   tidyselect::any_of(rvals$attrGroups),
+                   tidyselect::any_of(rvals$chem),
+                   tidyselect::any_of(rvals$attr)
+                 ) %>%
+                 dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
+                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)),error = function(e) mynotification(e))
     message("data subsetted")
 
     # imputation
@@ -388,7 +557,7 @@ dataInputServer = function(input, output, session, rvals, con) {
             dplyr::mutate(transformation = rvals$transform.method)
           mynotification('transformed data')
         })
-    }
+      }
     })
 
     if(isTRUE(is.null(input$attrGroupsSub))){
@@ -410,13 +579,15 @@ dataInputServer = function(input, output, session, rvals, con) {
       if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
     })
 
-    # save current table to database
-    if(!is.null(credentials$res$username) && !is.na(credentials$res$username)){
-      message("saving data to database")
-      DBI::dbWriteTable(con,paste0(credentials$res$username,"_current"),rvals$selectedData,overwrite = TRUE, row.names = F)
-    }
+    # update current table
+    updateCurrent(rvals,
+                  con,
+                  credentials,
+                  input,
+                  output,
+                  session)
     mynotification("updated",duration = 3)
-    })
+  })
 
   observeEvent(rvals$selectedData,{
     req(nrow(rvals$importedData) > 0)

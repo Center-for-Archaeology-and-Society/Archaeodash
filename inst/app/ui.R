@@ -24,7 +24,7 @@ shinyUI(
                br(),
                hr(),
                br(),
-               h1("Data Manager"),
+               h2("Data Manager"),
                datainputTab(),
                saveexportTab(),
                br()

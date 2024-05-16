@@ -24,7 +24,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   # print(int.set)
   if(xvar == yvar) return(NULL)
   nfac = nlevels(plotdf[[attrGroups]])
-  if(nfac > 6) mynotification("Too many groups to show symbols")
+  if(nfac > 6) mynotification("Too many groups to show symbols", type = "warning")
 
   if(nfac < 7) {
     print(i); i = i + 1
@@ -91,7 +91,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
     if (length(unique(x)) > length(psymbols))
       psymbols = 'circle'
     dict = data.frame(x = unique(x), symbol = psymbols[1:length(unique(x))]) %>%
-      dplyr::mutate(symbol = dplyr::case_when(is.na(symbol)~'circle',TRUE~'symbol'))
+      dplyr::mutate(symbol = dplyr::case_when(is.na(symbol)~'circle',TRUE~symbol))
     x = data.frame(x = x) %>% dplyr::left_join(dict, by = "x")
     return(x$symbol)
   }

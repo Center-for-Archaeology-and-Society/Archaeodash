@@ -11,7 +11,6 @@ saveexportTab = function() {
   div(class = "exportSection",
       br(),
       "Export selected data",
-      uiOutput("exportFileUI"),
       radioButtons(
         inputId = "dataType",
         label = "Results type",
@@ -44,13 +43,6 @@ saveExportServer = function(input, output, session, rvals) {
   #   shinyjs::show(id = "exportSection")
   # })
 
-  output$exportFileUI = renderUI({
-    req(rvals$selectedData)
-    selectInput(inputId = 'fileDownload',
-                label = "choose file to download",
-                choices = unique(rvals$importedData$file),multiple = T)
-  })
-
   output$Save <- downloadHandler(
     filename = function() {
       ifelse(
@@ -68,10 +60,6 @@ saveExportServer = function(input, output, session, rvals) {
         data = rvals$membershipProbs
       } else {
         data = rvals$selectedData
-      }
-      if(!is.null(input$fileDownload)){
-        data = data %>%
-          dplyr::filter(file %in% input$fileDownload)
       }
       rio::export(data,file)
   }

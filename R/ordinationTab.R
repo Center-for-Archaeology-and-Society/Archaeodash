@@ -8,20 +8,24 @@
 #' ordinationTab()
 ordinationTab = function(){
   tabPanel(title = "Ordination", id = "ordinationtab",icon = icon("equalizer", lib = "glyphicon"),
-           fluidPage(
-             fluidRow(column(6,
-                             h1("PCA Results"))),
-             fluidRow(
-               column(6, plotly::plotlyOutput("pca.plot")),
-               column(6, plotly::plotlyOutput("pca.el.plot"))),
-             fluidRow(
-               column(6, plotly::plotlyOutput("eigen.plot")),
-             column(6,tableOutput("contribTbl"))),
-             fluidRow(column(6,
-                             h1("LDA Results"))),
-             fluidRow(column(6,
-                             plotly::plotlyOutput("lda.plot")))
-           ) # end fluidPage Ordination
+             tabsetPanel(id = "ordination", type = "pills",
+                         tabPanel("PCA",
+                                  fluidRow(column(6,
+                                                  uiOutput('pcaheader'))),
+                                  fluidRow(
+                                    column(6, plotly::plotlyOutput("pca.plot")),
+                                    column(6, plotly::plotlyOutput("pca.el.plot"))),
+                                  fluidRow(
+                                    column(6, plotly::plotlyOutput("eigen.plot")),
+                                    column(6,tableOutput("contribTbl")))
+                         ), # end tabPanel PCA
+                         tabPanel("LDA",
+                                  fluidRow(column(6,
+                                                  uiOutput('ldaheader'))),
+                                  fluidRow(column(6,
+                                                  plotly::plotlyOutput("lda.plot")))
+                         ) # end tabPanel LDA
+             ) # end tabsetPanel
   )
 }
 
@@ -39,6 +43,24 @@ ordinationTab = function(){
 #' ordinationServer(input,output,session,rvals)
 ordinationServer = function(input,output,session,rvals){
 
+  output$pcaheader = renderUI({
+    # invalidateLater(1000)
+    if(isTruthy(rvals$pcadf)){
+      h2("Principal Component Analysis")
+    } else {
+      h2("Please run PCA first")
+    }
+  })
+
+  output$ldaheader = renderUI({
+    # invalidateLater(1000)
+    if(isTruthy(rvals$pcadf)){
+      h2("Linear Discriminant Analysis")
+    } else {
+      h2("Please run LDA first")
+    }
+  })
+
   observeEvent(rvals$runPCA, {
     req(rvals$runPCA)
     req(rvals$selectedData)
@@ -46,7 +68,7 @@ ordinationServer = function(input,output,session,rvals){
     quietly(label = "running PCA",{
       if(isTRUE(rvals$runPCA)){
         rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
-        rvals$pcadf = dplyr::bind_cols(rvals$selectedData[,rvals$attrs],rvals$pca$x)
+        rvals$pcadf = dplyr::bind_cols(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),rvals$pca$x)
         rvals$runPCA = F
       }
     })

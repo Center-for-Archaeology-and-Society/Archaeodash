@@ -4,17 +4,11 @@
 \alias{dataLoaderUI}
 \title{dataLoaderUI}
 \usage{
-dataLoaderUI(data)
-}
-\arguments{
-\item{data}{imported data}
-}
-\value{
-data
+dataLoaderUI()
 }
 \description{
 dataLoaderUI
 }
 \examples{
-dataLoaderUI(data)
+dataLoaderUI()
 }

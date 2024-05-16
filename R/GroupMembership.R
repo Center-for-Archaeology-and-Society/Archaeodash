@@ -58,7 +58,7 @@ groupTab = function(){
 #'
 #' @examples
 #' groupServer(input,output,session,rvals)
-groupServer = function(input,output,session,rvals){
+groupServer = function(input,output,session,rvals, credentials, con){
 
   ##### UI Outputs for membership groups ####
 
@@ -161,7 +161,7 @@ groupServer = function(input,output,session,rvals){
         rvals$membershipTbl_state_length = 25
       }
       rowid = rvals$membershipProbs$rowid[input$membershipTbl_rows_selected]
-      replaceCell(rvals,rowid,rvals$attrGroups,rvals$gNewValue)
+      replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$gNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
       rvals$gNewValue = NULL
     })
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))

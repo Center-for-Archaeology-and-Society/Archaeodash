@@ -71,7 +71,15 @@ exploreServer = function(input, output, session, rvals) {
     i <- info$row
     j <- info$col + 1
     v <- info$value
+    rvals$selectedData = rvals$selectedData %>%
+      dplyr::mutate_if(is.factor, as.character)
+    rvals$importedData = rvals$importedData %>%
+      dplyr::mutate_if(is.factor, as.character)
     rvals$selectedData[i, j] <- DT::coerceValue(v, rvals$selectedData[i, j])
+    rowid = rvals$selectedData$rowid[i]
+    rvals$importedData[rowid, j] <- DT::coerceValue(v, rvals$importedData[rowid, j])
+    rvals$selectedData = rvals$selectedData %>%
+      dplyr::mutate_if(is.character, as.factor)
   })
 
   output$crosstabsUI = renderUI({

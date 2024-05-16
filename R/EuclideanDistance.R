@@ -61,7 +61,7 @@ euclideanDistanceTab = function() {
 #'
 #' @examples
 #' euclideanDistanceSrvr(input,output,session,rvals)
-euclideanDistanceSrvr = function(input,output,session,rvals) {
+euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 
   output$projectionGroupUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
@@ -90,9 +90,9 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
       if("anid" %in% tolower(choices)){
         selected = choices[which(tolower(choices) == "anid")]
       } else {
-        selected = choices[which(!choices %in% c("rowid","file"))][1]
+        selected = choices[which(!choices %in% c("rowid"))][1]
       }
-      selectInput("edsampleID","Choose sample ID Column",choices = choices, selected = selected)
+      selectInput("edsampleID","Choose sample ID Column",choices = choices, selected = selected[1])
     })
   })
 
@@ -139,7 +139,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals) {
   observeEvent(rvals$edNewValue, {
     quietly(label = "changing group",{
       rowid = rvals$membershipProbs$rowid[input$EDTbl_rows_selected]
-      replaceCell(rvals,rowid,rvals$attrGroups,rvals$edNewValue)
+      replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$edNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
       rvals$edNewValue = NULL
       DT::replaceData(edProxy, rvals$edistance, resetPaging = FALSE)
       if(!is.null(input$EDTbl_search)){

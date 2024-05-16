@@ -4,7 +4,7 @@
 \alias{mainPlot}
 \title{Main plotting function}
 \usage{
-mainPlot(plotdf, xvar, yvar, attrGroups, Conf, int.set)
+mainPlot(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis")
 }
 \arguments{
 \item{plotdf}{data frame for plotting}
@@ -18,6 +18,8 @@ mainPlot(plotdf, xvar, yvar, attrGroups, Conf, int.set)
 \item{Conf}{whether to draw confidence ellipses}
 
 \item{int.set}{confidence level}
+
+\item{theme}{color theme}
 }
 \value{
 plotly object

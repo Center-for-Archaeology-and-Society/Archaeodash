@@ -55,16 +55,16 @@ shinyServer(function(input, output, session) {
   quietly(label = "ordinationServer",ordinationServer(input,output,session,rvals))
 
   ####   Cluster  ####
-  quietly(label = "clusterServer",clusterServer(input,output,session,rvals))
+  quietly(label = "clusterServer",clusterServer(input,output,session,rvals, credentials, con))
 
   ####   Group Membership  ####
-  quietly(label = "groupServer",groupServer(input,output,session,rvals))
+  quietly(label = "groupServer",groupServer(input,output,session,rvals, credentials, con))
 
   ####   Euclidean Distance  ####
-  quietly(label = "euclideanDistanceSrvr",euclideanDistanceSrvr(input,output,session,rvals))
+  quietly(label = "euclideanDistanceSrvr",euclideanDistanceSrvr(input,output,session,rvals, credentials, con))
 
   ####   Visualize & Assign  ####
-  quietly(label = "visualizeAssignServer",visualizeAssignServer(input,output,session,rvals))
+  quietly(label = "visualizeAssignServer",visualizeAssignServer(input,output,session,rvals, credentials, con))
 
   ####   Save & Export  ####
   quietly(label = "saveExportServer",saveExportServer(input,output,session,rvals))

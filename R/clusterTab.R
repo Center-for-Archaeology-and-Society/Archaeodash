@@ -44,7 +44,7 @@ clusterTab = function(){
 #'
 #' @examples
 #' clusterServer(input,output,session,rvals)
-clusterServer = function(input,output,session,rvals){
+clusterServer = function(input,output,session,rvals, credentials, con){
 
   # Render button to run clustering algorithm
   output$cluster.button <- renderUI({
@@ -68,7 +68,7 @@ clusterServer = function(input,output,session,rvals){
   # Render WSS and Silhouette graphs for optimal number of clusters for each method
 
   observeEvent(input$cluster.button, {
-    req(rvals$selectedData[,rvals$chem])
+    req(rvals$chem)
     try({
       if(input$cluster.column.text == "") clusterName = "cluster" else clusterName = input$cluster.column.text
       if (input$cluster.parent == "nClust") {
@@ -186,7 +186,7 @@ clusterServer = function(input,output,session,rvals){
 
   # Render UI options for cluster analysis
   output$cluster.options <- renderUI({
-    req(rvals$selectedData[,rvals$chem])
+    req(rvals$chem)
     # Output of options if HCA chosen
     if (input$cluster.parent == "hca") {
       cluster_input_selections <- list(
@@ -330,7 +330,7 @@ clusterServer = function(input,output,session,rvals){
   # Assign cluster assignments based on cluster solution
 
   observeEvent(input$cluster.assign.button,{
-    req(rvals$selectedData)
+    req(rvals$chem)
     req(rvals$clusterDT)
     quietly({
     nms = rvals$clusterDT %>% names()

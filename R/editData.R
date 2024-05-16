@@ -10,7 +10,7 @@
 #'
 #' @examples
 #' replaceCell(rvals,rowid,col,value)
-replaceCell = function(rvals, rowid, col, value) {
+replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,session) {
   for(df in c("importedData","selectedData","membershipProbs","edistance","pcadf","LDAdf")){
     if(isTRUE(is.null(rvals[[df]]))) next
     if (df == "membershipProbs"){
@@ -29,5 +29,10 @@ replaceCell = function(rvals, rowid, col, value) {
     }
   }
   rvals$attrGroupsSub = levels(rvals$selectedData[[col]])
-  return(rvals)
+  updateCurrent(rvals,
+                con,
+                credentials,
+                input,
+                output,
+                session)
 }
