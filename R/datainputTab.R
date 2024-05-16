@@ -40,7 +40,7 @@ datainputTab = function() {
 #'
 #' @examples
 #' dataInputServer(input, output, session, rvals)
-dataInputServer = function(input, output, session, rvals, con) {
+dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observe({
     shiny::invalidateLater(1000, session)

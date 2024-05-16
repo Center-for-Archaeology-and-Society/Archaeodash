@@ -18,7 +18,7 @@ shinyServer(function(input, output, session) {
   credentials = reactiveValues()
   # credentials <<- reactiveValues(); showNotification("warning: global variable is only for testing", type = "warning")
 
-  con = tryCatch(connect(),function(e) {
+  con = tryCatch(connect(),error = function(e) {
     mynotification("unable to connect to database", type = "error")
     NULL
     })
@@ -49,10 +49,10 @@ shinyServer(function(input, output, session) {
 
   #### Import data ####
 
-  quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals,con))
+  quietly(label = "dataInputServer",dataInputServer(input,output,session,rvals,con, credentials))
 
   ####  Explore ####
-  quietly(label = "exploreServer",exploreServer(input,output,session,rvals))
+  quietly(label = "exploreServer",exploreServer(input,output,session,rvals,con,credentials))
 
   ####   Ordination   ####
   quietly(label = "ordinationServer",ordinationServer(input,output,session,rvals))

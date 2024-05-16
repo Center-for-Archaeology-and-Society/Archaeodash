@@ -58,7 +58,7 @@ exploreTab = function() {
 #'
 #' @examples
 #' exploreServer(input,output,session,rvals)
-exploreServer = function(input, output, session, rvals) {
+exploreServer = function(input, output, session, rvals, con, credentials) {
   # Render datatable of imputed chemical data
   output$datasetDT <- DT::renderDataTable({
     req(rvals$selectedData)
@@ -77,7 +77,9 @@ exploreServer = function(input, output, session, rvals) {
       dplyr::mutate_if(is.factor, as.character)
     rvals$selectedData[i, j] <- DT::coerceValue(v, rvals$selectedData[i, j])
     rowid = rvals$selectedData$rowid[i]
-    rvals$importedData[rowid, j] <- DT::coerceValue(v, rvals$importedData[rowid, j])
+    # print(rowid)
+    col = names(rvals$selectedData)[j]
+    rvals$importedData[rowid, col] <- DT::coerceValue(v, rvals$importedData[rowid, col])
     rvals$selectedData = rvals$selectedData %>%
       dplyr::mutate_if(is.character, as.factor)
   })
