@@ -45,6 +45,7 @@ RUN install2.r --error --skipinstalled \
     RMySQL \
     DBI \
     sodium \
-    bsicons
+    bsicons \
+    markdown
 
 RUN R -e 'devtools::install_local(".", force = T, dependencies = F)'
