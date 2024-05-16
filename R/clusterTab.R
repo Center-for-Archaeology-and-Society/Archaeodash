@@ -48,19 +48,21 @@ clusterServer = function(input,output,session,rvals, credentials, con){
 
   # Render button to run clustering algorithm
   output$cluster.button <- renderUI({
-    req(input$file1)
+    req(rvals$selectedData)
     actionButton("cluster.button", "Run")
   })
 
   # Render button to run clustering algorithm
   output$cluster.assign.button <- renderUI({
-    req(input$file1)
+    req(rvals$selectedData)
+    req(input$cluster.parent != "nClust")
     actionButton("cluster.assign.button", "Record cluster assignments")
   })
 
   # Text input for name of cluster solution assignment column name
   output$cluster.column.text <- renderUI({
-    req(input$file1)
+    req(rvals$selectedData)
+    req(input$cluster.parent != "nClust")
     textInput("cluster.column.text",
               "Input column name for cluster solution")
   })

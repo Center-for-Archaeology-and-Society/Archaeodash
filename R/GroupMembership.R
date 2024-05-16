@@ -88,6 +88,8 @@ groupServer = function(input,output,session,rvals, credentials, con){
   output$sampleIDUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
     choices = rvals$attrs
+    choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
+    choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
     if(!is.null(rvals$sampleID)){
       selected = rvals$sampleID
     } else {
@@ -134,8 +136,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
       style = 'bootstrap',
       options = list(
         pageLength = rvals$membershipTbl_state_length,
-        lengthMenu = c(10,25,50,100, 500,1000),
-        columnDefs = list(list(visible = F, targets = "rowid"))
+        lengthMenu = c(10,25,50,100, 500,1000)
       )
     )
   })

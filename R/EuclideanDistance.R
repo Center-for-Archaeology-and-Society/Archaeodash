@@ -75,22 +75,25 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       "projectionGroup",
       "Select groups to project",
       choices = choices,
+      selected = choices,
       multiple = T
     )
   })
 
   output$EDsampleIDUI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    req(rvals$chem)
     quietly(label = "rendering sample ID UI",{
       if(!is.null(rvals$attrs)){
-        choices = tryCatch(names(rvals$selectedData[,rvals$attrs]),error = function(e) return(NULL))
+        choices = tryCatch(names(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem))),error = function(e) return(NULL))
       } else {
         choices = NULL
       }
+      choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
+      choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
       if("anid" %in% tolower(choices)){
         selected = choices[which(tolower(choices) == "anid")]
       } else {
-        selected = choices[which(!choices %in% c("rowid"))][1]
+        selected = choices[1]
       }
       selectInput("edsampleID","Choose sample ID Column",choices = choices, selected = selected[1])
     })
@@ -100,7 +103,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     quietly(label = "running Euclidean Distance",{
       mynotification("calculating Euclidean Distances")
       rvals$edistance = calcEDistance(data = rvals$selectedData,projection = input$projectionGroup,id = input$edsampleID,attrGroups = rvals$attrGroups,chem = rvals$chem,limit = input$EDlimit, withinGroup = input$EDmethod) %>%
-        dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)),by = dplyr::join_by(!!input$sampleID))
+        dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)) %>% dplyr::mutate_all(as.character),by = input$edsampleID)
       mynotification("completed calculation")
     })
   })
@@ -112,10 +115,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         rvals$EDTbl_state_length = 25
       }
       DT::datatable(
-        rvals$edistance,filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(
+        rvals$edistance %>%
+          dplyr::mutate_at(dplyr::vars(distance),as.numeric) %>%
+          dplyr::mutate_at(dplyr::vars(distance),round,1) %>%
+          dplyr::arrange(!!as.name(input$edsampleID),distance),filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(
           pageLength = rvals$EDTbl_state_length,
-          lengthMenu = c(10,25,50,100, 500,1000),
-          columnDefs = list(list(visible = F, targets = "rowid"))
+          lengthMenu = c(10,25,50,100, 500,1000)
         )
       )
     })
@@ -195,7 +200,7 @@ calcEDistance = function(data,projection,id,attrGroups,chem,limit,withinGroup){
     m = data[,chem] %>% as.matrix()
     rownames(m) = data[[id]]
     d = dist(m,method = "euclidean")
-    result = as.data.frame(as.matrix(d)) %>%
+    result = tibble::as_tibble(as.matrix(d)) %>%
       dplyr::select(tidyselect::any_of(projections)) %>%
       tibble::rownames_to_column("match") %>%
       tidyr::pivot_longer(-match, names_to = "observation", values_to = "distance") %>%

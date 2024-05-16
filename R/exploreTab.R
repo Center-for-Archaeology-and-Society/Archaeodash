@@ -114,6 +114,7 @@ exploreServer = function(input, output, session, rvals) {
   output$crosstabsDT = DT::renderDT({
     req(input$crosstab1)
     quietly({
+      suppressWarnings({
       if (input$crosstab3 == "count") {
         dt = rvals$selectedData %>%
           dplyr::group_by(dplyr::across(tidyselect::all_of(
@@ -121,16 +122,17 @@ exploreServer = function(input, output, session, rvals) {
           ))) %>%
           dplyr::summarize(count = dplyr::n(), .groups = "drop")
       } else {
-        suppressWarnings({
+
           dt = rvals$selectedData %>%
+            dplyr::mutate_at(dplyr::vars(tidyselect::all_of(input$crosstab2),as.numeric)) %>%
             dplyr::group_by(dplyr::across(tidyselect::all_of(input$crosstab1))) %>%
             dplyr::summarize(dplyr::across(
               .names = paste0("result-", input$crosstab2),
               .cols = tidyselect::all_of(input$crosstab2),
               .fns = list(!!rlang::sym(input$crosstab3))
             ))
-        })
       }
+      })
       dt
     })
   })

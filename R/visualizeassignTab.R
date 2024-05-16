@@ -244,7 +244,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     req(input$xvar2)
     quietly(label = "multiplot",{
 
-      rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
+      rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
     })
 
     output$multiplot = renderUI({

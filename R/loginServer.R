@@ -73,7 +73,30 @@ loginServer = function(con, input = input, output = output, session = session, c
     }
   })
 
-  observeEvent(input$register, {
+  observeEvent(input$register,{
+    removeModal()
+    showModal(modalDialog(
+      title = "Confirmation",
+      HTML(" <h3>Notice of Communication Consent</h3>
+    <p>
+        By registering for an account, you consent to receive emails from us regarding:
+    </p>
+    <ul>
+        <li><strong>Account Updates:</strong> Information and notifications about your account activity, security updates, and changes to your account settings.</li>
+        <li><strong>App Updates:</strong> Announcements about new features, improvements, and changes to our application.</li>
+        <li><strong>Changes in Terms:</strong> Important updates and modifications to our terms of service, privacy policy, and other legal agreements.</li>
+    </ul>
+    <p>
+        Your consent is necessary to ensure you are kept informed about important aspects of your account and the services we provide. You may manage your email preferences or unsubscribe from certain communications at any time through your account settings.
+    </p>"),
+           footer = tagList(
+             modalButton("Cancel"),
+             actionButton("registerConfirm", "I Agree")
+             )
+    ))
+  })
+
+  observeEvent(input$registerConfirm, {
     removeModal()
     username <- tolower(isolate(input$username))
     password <- isolate(input$password)

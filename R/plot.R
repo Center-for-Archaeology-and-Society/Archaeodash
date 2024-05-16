@@ -200,7 +200,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
 #'
 #' @examples
 #' multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
-multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = F){
+multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = F,theme){
   message("multiplot")
   pdf1 = selectedData %>%
     dplyr::select(rowid,tidyselect::all_of(c(attrGroups,xvar))) %>%
@@ -218,14 +218,16 @@ multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = 
       color = !!as.name(attrGroups),
       key = rowid
     )) +
-    ggplot2::geom_point(size = ptsize) +
+    ggplot2::geom_point(size = ptsize, alpha = .66) +
     ggplot2::ylab("") +
     ggplot2::theme_bw(base_size = 14,) +
-    ggplot2::scale_color_viridis_d() +
     ggplot2::theme(
       strip.background = ggplot2::element_rect(fill = '#404040'),
       strip.text = ggplot2::element_text(color = "white")
     )
+  if(theme == "viridis"){
+    p = p + ggplot2::scale_color_viridis_d()
+  }
   if(length(xvar) > 1 || ((length(xvar) == 1 & length(yvar) == 1))){
     p = p +
       ggplot2::facet_grid(rows = dplyr::vars(yvar), cols = dplyr::vars(xvar), scales = 'free',switch = 'both') +

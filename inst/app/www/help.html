@@ -1,0 +1,177 @@
+
+<div id="TOC">
+<ul>
+<li><a href="#about" id="toc-about">About</a></li>
+<li><a href="#registration" id="toc-registration">Registration</a></li>
+<li><a href="#login" id="toc-login">Login</a></li>
+<li><a href="#import-data" id="toc-import-data">Import Data</a></li>
+<li><a href="#data-manager" id="toc-data-manager">Data Manager</a></li>
+<li><a href="#save-data" id="toc-save-data">Save Data</a></li>
+<li><a href="#explore" id="toc-explore">Explore</a>
+<ul>
+<li><a href="#dataset" id="toc-dataset">DATASET</a></li>
+<li><a href="#crosstabs" id="toc-crosstabs">CROSSTABS</a></li>
+<li><a href="#univariate-plots" id="toc-univariate-plots">UNIVARIATE
+PLOTS</a></li>
+<li><a href="#compositional-plot-profile"
+id="toc-compositional-plot-profile">COMPOSITIONAL PLOT PROFILE</a></li>
+</ul></li>
+<li><a href="#ordination" id="toc-ordination">ORDINATION</a>
+<ul>
+<li><a href="#pca" id="toc-pca">PCA</a></li>
+<li><a href="#lda" id="toc-lda">LDA</a></li>
+</ul></li>
+<li><a href="#cluster" id="toc-cluster">CLUSTER</a></li>
+<li><a href="#group-membership" id="toc-group-membership">GROUP
+MEMBERSHIP</a></li>
+<li><a href="#euclidean-distance" id="toc-euclidean-distance">EUCLIDEAN
+DISTANCE</a></li>
+<li><a href="#visualize-assign" id="toc-visualize-assign">VISUALIZE
+&amp; ASSIGN</a></li>
+</ul>
+</div>
+
+<div id="about" class="section level2">
+<h2>About</h2>
+<p>ArchaeoDash was developed in R Shiny to facilitate the analysis of
+elemental data (e.g., portable X-ray fluorescence–PXRF, Neutron
+Activation Analysis–NAA). It has features for data manipulation,
+visualization, clustering, ordination (e.g., PCA, LDA), assessment of
+group membership and more.</p>
+<p>This app was originally developed by Matthew Peeples and Andrew Upton
+and has been extensively redesigned by Robert Bischoff in consultation
+with Jeffrey Ferguson.</p>
+<p>We recommend creating an account to prevent loss of data, otherwise
+if the app times out, reloads, or has an error then the current progress
+will be lost. Uploaded data will be stored in a secure database and you
+retain all rights to your data. You must be logged in to access your
+data. No guarantees are made regarding the persistence of data storage.
+Please back up your data regularly.</p>
+</div>
+<div id="registration" class="section level2">
+<h2>Registration</h2>
+<p>To register, click the <em>LOGIN</em> button on the left sidebar.
+Check the checkbox by <em>Register as a new user</em>. Fill out the
+information. There are no password requirements other than not being
+left empty. You must agree to the notice to complete registration. Once
+you are registered you will be automatically logged in. If you forget
+your password or username, email <a
+href="mailto:rbischoff@asu.edu">rbischoff@asu.edu</a>.</p>
+</div>
+<div id="login" class="section level2">
+<h2>Login</h2>
+<p>To login click the <em>LOGIN</em> button and enter your username and
+password.</p>
+</div>
+<div id="import-data" class="section level2">
+<h2>Import Data</h2>
+<p>Click the <em>BROWSE</em> button to upload data. CSV and XLSX are the
+preferred data formats, but all types supported by the R Rio package can
+be uploaded. If you are logged in, then all uploaded data will be stored
+in the database, and the data will be available to select from the
+<em>Choose dataset(s)</em> drop-down list. You will be asked to choose a
+dataset name. One will be auto-populated from the filename of the
+upload. It may be shortened if the name is over 50 characters. If you
+are not logged in then the data will be stored in temporary memory and
+will not be saved. Only one dataset can be used at a time if the user is
+not logged in. If logged in, you can select multiple datasets from the
+drop-down list. Press <em>CONFIRM DATASETS SELECTION</em> to load all
+datasets selected from the drop-down.</p>
+</div>
+<div id="data-manager" class="section level2">
+<h2>Data Manager</h2>
+<p>Selected datasets can be deleted in the <em>Manage datasets</em>
+section and also merged or renamed. For example, you may select three
+datasets from the dataset drop-down and merge them under a new or
+existing name.</p>
+<p>Select the column that will be used for categorization under the
+heading <em>Select descriptive/group column.</em></p>
+<p>Choose any groups you wish to include/exclude in the next
+drop-down.</p>
+<p>Choose any columns containing elmeent concentrations next. Only
+columns containing numeric data will be available to select as an
+element concentration.</p>
+<p><em>Imputation Method</em> controls how missing values can be
+inferred. The underlying Mice package in R has specific requirements
+which may cause this to fail. Missing values will then be converted to
+zeroes.</p>
+<p><em>Select Transformation</em> controls how the element
+concentrations are modified. Click the <em>RESET ELEMENTS TO
+ORIGINAL</em> button to undo a transformation or imputation.</p>
+<p><em>PRESS TO CONFIRM SELECTIONS</em> must be pressed prior to most
+operations. Data will not be modified until this is pressed. This will
+create a new dataset called <em>{username}_current.</em> If you wish to
+save this modified dataset as is then select the current dataset from
+the dataset drop-down list and press <em>MERGE/RENAME SELECTED
+DATASETS.</em></p>
+<p>If you wish to remove all data from your temporary workspace then
+press <em>CLEAR WORKSPACE.</em></p>
+<p>The <em>ADD NEW COLUMN</em> button can be used to create new
+columns.</p>
+</div>
+<div id="save-data" class="section level2">
+<h2>Save Data</h2>
+<p>Data can be exported after making any modifications to the data and
+pressing <em>PRESS TO CONFIRM SELECTIONS</em> button. At the bottom of
+the <em>Data Manager</em> sidebar is an export section. Choose the type
+of data you wish to export, enter the filename including the extension,
+and press <em>CLICK HERE TO SAVE FILE</em>.</p>
+</div>
+<div id="explore" class="section level2">
+<h2>Explore</h2>
+<p>This tab has options for exploring the selected data.</p>
+<div id="dataset" class="section level3">
+<h3>DATASET</h3>
+<p>This tab contains a plot displaying the number of missing or zero
+values for each element column as well as a view of the entire selected
+dataset. Data can be edited here by double clicking a cell and then
+clicking off the cell when the data has been changed. Extensive data
+modification should be done in a spreadsheet editor such as Excel and
+then uploaded to ArchaeoDash.</p>
+</div>
+<div id="crosstabs" class="section level3">
+<h3>CROSSTABS</h3>
+<p>Choose the columns you wish to group data by in column 1 and column2.
+Select the same column in both drop-down lists if you want to view
+results by only one column. Then select the type of display in the last
+drop-down. No result or an error may be returned if the data is not the
+correct type.</p>
+</div>
+<div id="univariate-plots" class="section level3">
+<h3>UNIVARIATE PLOTS</h3>
+<p>This tab shows histograms of the element data.</p>
+</div>
+<div id="compositional-plot-profile" class="section level3">
+<h3>COMPOSITIONAL PLOT PROFILE</h3>
+<p>This line plot shows the variation in element concentrations across
+the dataset.</p>
+</div>
+</div>
+<div id="ordination" class="section level2">
+<h2>ORDINATION</h2>
+<div id="pca" class="section level3">
+<h3>PCA</h3>
+<p>This tab shows information related to the PCA analysis.</p>
+</div>
+<div id="lda" class="section level3">
+<h3>LDA</h3>
+<p>This tab shows information related to the LDA analysis. Note: LDA
+analysis requires three or more groups for results to be displayed.</p>
+</div>
+</div>
+<div id="cluster" class="section level2">
+<h2>CLUSTER</h2>
+<p>This section will be updated soon.</p>
+</div>
+<div id="group-membership" class="section level2">
+<h2>GROUP MEMBERSHIP</h2>
+<p>This section will be updated soon.</p>
+</div>
+<div id="euclidean-distance" class="section level2">
+<h2>EUCLIDEAN DISTANCE</h2>
+<p>This section will be updated soon.</p>
+</div>
+<div id="visualize-assign" class="section level2">
+<h2>VISUALIZE &amp; ASSIGN</h2>
+<p>This section will be updated soon.</p>
+</div>

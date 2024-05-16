@@ -42,7 +42,8 @@ shinyUI(
                  clusterTab(),
                  groupTab(),
                  euclideanDistanceTab(),
-                 visualizeassignTab()
+                 visualizeassignTab(),
+                 infoTabUI()
                ) # end navbar
              ) # end div
       ) # end column
