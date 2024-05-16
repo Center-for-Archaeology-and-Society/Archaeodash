@@ -1,3 +1,10 @@
+#' infoTabUI
+#'
+#' @return UI
+#' @export
+#'
+#' @examples
+#' infoTabUI()
 infoTabUI = function() {
   navbarMenu("Info",
              tabPanel("Help", value = "help",

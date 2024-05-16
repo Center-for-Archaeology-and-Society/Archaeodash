@@ -4,7 +4,7 @@
 \alias{euclideanDistanceSrvr}
 \title{Euclidean Distance Server}
 \usage{
-euclideanDistanceSrvr(input, output, session, rvals)
+euclideanDistanceSrvr(input, output, session, rvals, credentials, con)
 }
 \arguments{
 \item{input}{Shiny input object}

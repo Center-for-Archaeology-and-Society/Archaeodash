@@ -4,7 +4,7 @@
 \alias{groupServer}
 \title{Group Membership Server}
 \usage{
-groupServer(input, output, session, rvals)
+groupServer(input, output, session, rvals, credentials, con)
 }
 \arguments{
 \item{input}{Shiny input object}

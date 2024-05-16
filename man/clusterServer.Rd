@@ -4,7 +4,7 @@
 \alias{clusterServer}
 \title{Cluster Server}
 \usage{
-clusterServer(input, output, session, rvals)
+clusterServer(input, output, session, rvals, credentials, con)
 }
 \arguments{
 \item{input}{shiny input object}

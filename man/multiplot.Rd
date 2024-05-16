@@ -4,7 +4,7 @@
 \alias{multiplot}
 \title{Multiplot function}
 \usage{
-multiplot(selectedData, attrGroups, xvar, yvar, ptsize, interactive = F)
+multiplot(selectedData, attrGroups, xvar, yvar, ptsize, interactive = F, theme)
 }
 \arguments{
 \item{selectedData}{data frame for plotting}

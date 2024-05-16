@@ -4,16 +4,16 @@
 \alias{replaceCell}
 \title{Replace values}
 \usage{
-replaceCell(rvals, rowid, col, value)
+replaceCell(rowid, col, value, rvals, con, credentials, input, output, session)
 }
 \arguments{
-\item{rvals}{reactive values object}
-
 \item{rowid}{rowid of value to change}
 
 \item{col}{column of value to change}
 
 \item{value}{new value}
+
+\item{rvals}{reactive values object}
 }
 \value{
 reactive values object

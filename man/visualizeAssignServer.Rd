@@ -4,7 +4,7 @@
 \alias{visualizeAssignServer}
 \title{Visualize Assign Server}
 \usage{
-visualizeAssignServer(input, output, session, rvals)
+visualizeAssignServer(input, output, session, rvals, credentials, con)
 }
 \arguments{
 \item{input}{shiny input object}

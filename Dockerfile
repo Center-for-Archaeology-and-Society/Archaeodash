@@ -44,6 +44,7 @@ RUN install2.r --error --skipinstalled \
     candisc \
     RMySQL \
     DBI \
-    sodium
+    sodium \
+    bsicons
 
 RUN R -e 'devtools::install_local(".", force = T, dependencies = F)'
