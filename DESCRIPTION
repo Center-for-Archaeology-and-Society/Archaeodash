@@ -38,6 +38,9 @@ Imports:
     bsicons,
     RMySQL,
     DBI,
-    sodium
+    sodium,
+    bsicons,
+    markdown
+    
 Depends: 
     data.table

@@ -1,5 +1,0 @@
-host = "10.126.24.122"
-db = "archaeodash"
-user = "admin1"
-pwd = "rkeyodash"
-port = '3306'
