@@ -41,6 +41,5 @@ Imports:
     sodium,
     bsicons,
     markdown
-    
 Depends: 
     data.table
