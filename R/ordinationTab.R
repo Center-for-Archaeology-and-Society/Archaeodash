@@ -19,6 +19,11 @@ ordinationTab = function(){
                                     column(6, plotly::plotlyOutput("eigen.plot")),
                                     column(6,tableOutput("contribTbl")))
                          ), # end tabPanel PCA
+                         tabPanel("UMAP",                                  fluidRow(column(6,
+                                                                                           uiOutput('umapheader'))),
+                                  fluidRow(column(6,
+                                                  plotly::plotlyOutput("umap.plot")))
+                                  ),
                          tabPanel("LDA",
                                   fluidRow(column(6,
                                                   uiOutput('ldaheader'))),
@@ -49,6 +54,15 @@ ordinationServer = function(input,output,session,rvals){
       h2("Principal Component Analysis")
     } else {
       h2("Please run PCA first")
+    }
+  })
+
+  output$umapheader = renderUI({
+    # invalidateLater(1000)
+    if(isTruthy(rvals$umapdf)){
+      h2("Uniform Manifold Approximation and Projection (UMAP)")
+    } else {
+      h2("Please run UMAP first")
     }
   })
 
@@ -84,6 +98,23 @@ ordinationServer = function(input,output,session,rvals){
         rvals$LDAdf = lda$LDAdf
         rvals$LDAmod = lda$mod
         rvals$runLDA = F
+      }
+    })
+  })
+
+  observeEvent(rvals$runUMAP, {
+    req(rvals$runUMAP)
+    req(rvals$selectedData)
+    message("running UMAP")
+    quietly(label = 'running UMAP',{
+      if(isTRUE(rvals$runUMAP)){
+        umap = tryCatch(umap::umap(rvals$selectedData %>% dplyr::select(tidyselect::any_of(rvals$chem))),error = function(e){
+          mynotification(paste("UMAP failed", "UMAP failed to run. Please check your data and try again.\n",e))
+          return(NULL)
+        } )
+        rvals$umapdf = dplyr::bind_cols(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),umap$layout %>%
+          as.data.frame())
+        rvals$runUMAP = F
       }
     })
   })
@@ -146,6 +177,20 @@ ordinationServer = function(input,output,session,rvals){
     quietly(label = 'LDA plot',{
       pdf(file = NULL)
       plotly::ggplotly(plotLDAvectors(rvals$LDAmod))
+    })
+  })
+
+  # Render UMAP plot
+  output$umap.plot <- plotly::renderPlotly({
+    req(rvals$umapdf)
+    message("rendering UMAP plot")
+    quietly(label = 'UMAP plot',{
+      g = ggplot2::ggplot(rvals$umapdf,ggplot2::aes(x = V1, y = V2, color = !!as.name(rvals$attrGroups))) +
+        ggplot2::geom_point() +
+        ggplot2::stat_ellipse() +
+        ggplot2::theme_minimal() +
+        ggplot2::labs(title = "UMAP")
+      plotly::ggplotly(p = g)
     })
   })
 }

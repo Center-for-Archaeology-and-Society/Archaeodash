@@ -46,6 +46,7 @@ RUN install2.r --error --skipinstalled \
     DBI \
     sodium \
     bsicons \
-    markdown
+    markdown \
+    umap
 
 RUN R -e 'devtools::install_local(".", force = T, dependencies = F)'

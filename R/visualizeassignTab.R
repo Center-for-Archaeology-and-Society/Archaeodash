@@ -31,7 +31,7 @@ visualizeassignTab = function() {
               'data.src',
               'Choose data type',
               # choices = c('elements', 'principal components'),
-              choices = c('elements', 'principal components','linear discriminants'),
+              choices = c('elements', 'principal components','UMAP','linear discriminants'),
               selected = 'elements'
             ),
             uiOutput('xvarUI'),
@@ -144,6 +144,13 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$LDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
+      } else if (input$data.src == 'UMAP') {
+        validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
+        rvals$plotdf = tryCatch(rvals$umapdf,error = function(e) {
+          mynotification("No UMAP results",type = "warning")
+          return(tibble::tibble())
+        })
+        rvals$plotVars = c("V1","V2")
       } else {
         req(nrow(rvals$selectedData) > 0)
         rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {

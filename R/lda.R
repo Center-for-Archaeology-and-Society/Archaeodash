@@ -12,7 +12,7 @@
 getLDA = function(df = rvals$selectedData,
                   chem = rvals$chem,
                   attrGroups = rvals$attrGroups) {
-  mdl = as.formula(glue::glue("{attrGroups} ~ ."))
+  mdl = as.formula(glue::glue("`{attrGroups}` ~ ."))
   mdl_lda = tryCatch(
     MASS::lda(mdl, data = df[, c(attrGroups, chem)]),
     error = function(e) {

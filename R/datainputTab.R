@@ -372,6 +372,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         uiOutput("transform.options"),
         br(),
         checkboxInput("runPCA","check to run PCA", value = F),
+        checkboxInput("runUMAP","check to run UMAP", value = F),
         checkboxInput("runLDA","check to run LDA", value = F),
         actionButton("action", "Press to confirm selections", class = "mybtn")
       )
@@ -508,7 +509,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                    tidyselect::any_of(rvals$attr)
                  ) %>%
                  dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
-                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)),error = function(e) mynotification(e))
+                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)) %>%
+                 dplyr::mutate_at(dplyr::vars(rvals$chem),tidyr::replace_na,0),error = function(e) mynotification(e))
     message("data subsetted")
 
     # imputation
@@ -575,7 +577,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     try({
       rvals$runPCA = input$runPCA
       rvals$runLDA = input$runLDA
+      rvals$runUMAP = input$runUMAP
       if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
+      if(isTRUE(rvals$runUMAP)) mynotification("Ran UMAP")
       if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
     })
 
