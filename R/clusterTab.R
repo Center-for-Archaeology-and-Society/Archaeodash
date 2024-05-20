@@ -19,9 +19,9 @@ clusterTab = function(){
                             selected = "nClust"),
                uiOutput("cluster.options"),
                uiOutput("cluster.column.text"),
-               uiOutput("cluster.button"),
+               uiOutput("cluster.buttonUI"),
                br(),
-               uiOutput("cluster.assign.button")
+               uiOutput("cluster.assign.buttonUI")
              ), # end sidebarPanel
 
              mainPanel(
@@ -47,13 +47,13 @@ clusterTab = function(){
 clusterServer = function(input,output,session,rvals, credentials, con){
 
   # Render button to run clustering algorithm
-  output$cluster.button <- renderUI({
+  output$cluster.buttonUI <- renderUI({
     req(rvals$selectedData)
     actionButton("cluster.button", "Run")
   })
 
   # Render button to run clustering algorithm
-  output$cluster.assign.button <- renderUI({
+  output$cluster.assign.buttonUI <- renderUI({
     req(rvals$selectedData)
     req(input$cluster.parent != "nClust")
     actionButton("cluster.assign.button", "Record cluster assignments")
@@ -72,7 +72,7 @@ clusterServer = function(input,output,session,rvals, credentials, con){
   observeEvent(input$cluster.button, {
     req(rvals$chem)
     try({
-      if(input$cluster.column.text == "") clusterName = "cluster" else clusterName = input$cluster.column.text
+      if(isTruthy(input$cluster.column.text == "")) clusterName = "cluster" else clusterName = input$cluster.column.text
       if (input$cluster.parent == "nClust") {
         kmeans_wss <-
           factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "wss") +
@@ -342,7 +342,14 @@ clusterServer = function(input,output,session,rvals, credentials, con){
       dplyr::bind_cols(rvals$clusterDT %>%
                          dplyr::select(-Sample) %>%
                          dplyr::mutate_at(dplyr::vars(nms),factor))
-    })
+    rvals$importedData =
+      rvals$importedData %>%
+      dplyr::bind_cols(rvals$clusterDT %>%
+                         dplyr::select(-Sample) %>%
+                         dplyr::mutate_at(dplyr::vars(nms),factor))
+    updateCurrent(rvals,con,credentials,input,output,session)
+  })
+
     showNotification("assigned cluster")
   })
 

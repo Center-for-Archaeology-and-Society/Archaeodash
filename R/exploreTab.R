@@ -82,6 +82,7 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
     rvals$importedData[rowid, col] <- DT::coerceValue(v, rvals$importedData[rowid, col])
     rvals$selectedData = rvals$selectedData %>%
       dplyr::mutate_if(is.character, as.factor)
+    updateCurrent(rvals,con,credentials,input,output,session)
   })
 
   output$crosstabsUI = renderUI({

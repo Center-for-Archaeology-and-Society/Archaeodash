@@ -10,7 +10,8 @@
 #' @examples
 #' group.mem.probs(elements,assigned)
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
-
+  probsAlldf = NULL
+  tryCatch({
   if("PC1" %in% names(data)){
     chem = data %>% dplyr::select(tidyselect::any_of(tidyselect::contains("PC"))) %>% names()
   }
@@ -38,7 +39,9 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
     tibble::as_tibble() %>%
     dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1) %>%
     dplyr::mutate_if(is.numeric,sprintf,fmt = "%05.2f")
-
+  }, error = function(e){
+    mynotification(glue::glue("unable to return group membership probabilities: {e}"), type = "error")
+  })
   return(probsAlldf)
 }
 

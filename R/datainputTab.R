@@ -622,6 +622,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dplyr::select(-tidyselect::any_of(newCol)) %>%
         dplyr::mutate(!!as.name(newCol) := factor(as.character(val)))
     })
+    rvals$selectedData = quietly(label = "addNewCol2",{
+      rvals$selectedData %>%
+        dplyr::select(-tidyselect::any_of(newCol)) %>%
+        dplyr::mutate(!!as.name(newCol) := factor(as.character(val)))
+    })
+    updateCurrent(rvals,con,credentials,input,output,session)
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
     rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))

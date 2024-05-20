@@ -143,7 +143,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 
   observeEvent(rvals$edNewValue, {
     quietly(label = "changing group",{
-      rowid = rvals$membershipProbs$rowid[input$EDTbl_rows_selected]
+      print("rows selected")
+      print(input$EDTbl_rows_selected)
+      print(head(rvals$edistance))
+      rowid = rvals$edistance$rowid[input$EDTbl_rows_selected]
+      print("rowid")
+      print(rowid)
       replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$edNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
       rvals$edNewValue = NULL
       DT::replaceData(edProxy, rvals$edistance, resetPaging = FALSE)

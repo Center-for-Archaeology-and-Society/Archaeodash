@@ -64,20 +64,23 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$grpSizeUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    tbl = table(rvals$selectedData[[rvals$attrGroups]]) %>%
-      as.data.frame() %>%
-      setNames(c("Group","Count"))
+    tbl = NULL
+    quietly(label = "render group size",{
+      tbl = table(rvals$selectedData[[rvals$attrGroups]]) %>%
+        as.data.frame() %>%
+        setNames(c("Group","Count"))
+    })
     DT::renderDataTable(tbl)
   })
 
   output$eligibleGroupUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    if(!is.null(rvals$attrs)){
+    if(isTruthy(!is.null(rvals$attrs))){
       eligible = tryCatch(getEligible(rvals$selectedData, chem = rvals$chem, group = rvals$attrGroups),error = function(e) return(NULL))
     } else {
       eligible = NULL
     }
-    if(is.null(rvals$eligibleGroups)){
+    if(isTruthy(is.null(rvals$eligibleGroups))){
       selected = eligible
     } else {
       selected = rvals$eligibleGroups
@@ -90,10 +93,10 @@ groupServer = function(input,output,session,rvals, credentials, con){
     choices = rvals$attrs
     choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
     choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
-    if(!is.null(rvals$sampleID)){
+    if(isTruthy(!is.null(rvals$sampleID))){
       selected = rvals$sampleID
     } else {
-      if("anid" %in% tolower(choices)){
+      if(isTruthy("anid" %in% tolower(choices))){
         selected = choices[which(tolower(choices) == "anid")]
       } else {
         selected = choices[1]
@@ -107,25 +110,36 @@ groupServer = function(input,output,session,rvals, credentials, con){
     mynotification("calculating membership")
     rvals$eligibleGroups = input$eligibleGroups
     rvals$sampleID = input$sampleID
-    if(input$dataset == "elements"){
+    if(isTruthy(input$dataset == "elements")){
       df = rvals$selectedData
     } else {
+      req(rvals$pcadf)
       df = rvals$pcadf
     }
-    rvals$membershipProbs = tryCatch(group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID) %>%
-                                       dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
-                                       dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),by = dplyr::join_by("ID" == !!input$sampleID)),error = function(e){
-                                         mynotification(paste("error calculating membership:",e),type = "error")
-                                         return(NULL)
-                                       })
-    if(!is.null(rvals$membershipProbs)){
-      mynotification("completed calculation")
+    rvals$membershipProbs = group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+    if (inherits(rvals$membershipProbs,"data.frame")){
+      rvals$membershipProbs = rvals$membershipProbs %>%
+        dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
+        dplyr::left_join(
+          rvals$selectedData %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
+          by = dplyr::join_by("ID" == !!input$sampleID)
+        )
+      if(isTruthy(!"rowid" %in% names(rvals$membershipProbs))){
+        rvals$membershipProbs = rvals$membershipProbs %>%
+          dplyr::mutate(rowid = as.character(as.integer(ID)))
+      }
+      if(isTruthy(!is.null(rvals$membershipProbs))){
+        mynotification("completed calculation")
+      }
+    } else {
+      mynotification("error calculating membership", type = "error")
     }
+
   })
 
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
-    if(is.null(rvals$membershipTbl_state_length)){
+    if(isTruthy(is.null(rvals$membershipTbl_state_length))){
       rvals$membershipTbl_state_length = 25
     }
     DT::datatable(
@@ -155,27 +169,29 @@ groupServer = function(input,output,session,rvals, credentials, con){
   })
 
   observeEvent(rvals$gNewValue, {
+    message("updating group")
     quietly(label = "updating group",{
-      if(!is.null(input$membershipTbl_state$length)){
+      if(isTruthy(!is.null(input$membershipTbl_state$length))){
         rvals$membershipTbl_state_length = input$membershipTbl_state$length
       } else {
         rvals$membershipTbl_state_length = 25
       }
+      print("getting rowid")
       rowid = rvals$membershipProbs$rowid[input$membershipTbl_rows_selected]
-      replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$gNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
+      print(rowid)
+      if(isTruthy(rowid %in% as.character(rvals$importedData$rowid))){
+        print('replacing cell')
+        replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$gNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
+      } else {
+        mynotification("rowid not found in imported data",type = "error")
+      }
       rvals$gNewValue = NULL
+      print('end')
     })
-    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
-    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
-    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
-    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
-    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
   })
 
   observeEvent(input$gNewGroup,{
-    if(stringr::str_detect(input$gNewGroup,"[a-zA-z]|[0-9]")){
+    if(isTruthy(stringr::str_detect(input$gNewGroup,"[a-zA-z]|[0-9]"))){
       shinyjs::enable("gChangeGroup")
     } else {
       shinyjs::disable("gChangeGroup")
