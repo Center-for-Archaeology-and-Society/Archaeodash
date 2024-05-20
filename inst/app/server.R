@@ -11,7 +11,7 @@ shinyServer(function(input, output, session) {
   rvals = reactiveValues(importedData = tibble::tibble(),
   selectedData = tibble::tibble())
   credentials = reactiveValues()
-  for testing
+  # for testing
   # rvals <<- reactiveValues(importedData = tibble::tibble(),
   # selectedData = tibble::tibble()); showNotification("warning: global variable is only for testing", type = "warning")
   # input <<- input; showNotification("warning: global variable is only for testing", type = "warning")
