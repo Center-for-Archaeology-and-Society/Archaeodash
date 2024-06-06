@@ -4,7 +4,7 @@
 \alias{exploreServer}
 \title{Explore Server}
 \usage{
-exploreServer(input, output, session, rvals)
+exploreServer(input, output, session, rvals, con, credentials)
 }
 \arguments{
 \item{input}{shiny input object}

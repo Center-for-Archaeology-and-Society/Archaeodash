@@ -314,7 +314,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     print("subselect")
     quietly(label = "subselect",{
       df <- rvals$importedData
-      items.all = quietly(label = 'items.all',df %>% dplyr::select(tidyselect::any_of(input$attrGroups)) %>% dplyr::pull() %>% unique %>% sort)
+      items.all = quietly(label = 'items.all',df %>%
+                            dplyr::select(tidyselect::any_of(input$attrGroups)) %>% dplyr::pull() %>% unique %>% sort)
       print("subSelect")
       if(isTRUE(is.null(rvals[['attrGroupsSub']])))
         selection = items.all else
@@ -571,8 +572,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
 
     message("dropping factor levels")
-    rvals$selectedData = rvals$selectedData %>%
-      dplyr::mutate_at(dplyr::vars(input$attrGroups), droplevels)
+    rvals$selectedData = quietly(rvals$selectedData %>%
+      dplyr::mutate_at(dplyr::vars(input$attrGroups), as.character) %>%
+      dplyr::mutate_at(dplyr::vars(input$attrGroups),factor))
 
     try({
       rvals$runPCA = input$runPCA

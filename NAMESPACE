@@ -2,6 +2,7 @@
 
 export("%>%")
 export(calcEDistance)
+export(calculate_mahalanobis_distance)
 export(chooseDFServer)
 export(chooseDFUI)
 export(clusterServer)

@@ -11,7 +11,9 @@ dataLoader = function(filename){
   data = rio::import(filename, setclass = 'tibble') %>%
     dplyr::mutate_all(as.character) %>%
     janitor::clean_names(case = 'none') %>%
-    dplyr::mutate_all(as.character)
+    dplyr::mutate_all(as.character) %>%
+    dplyr::select(-tidyselect::any_of("rowid")) %>%
+    tibble::rowid_to_column()
   return(data)
 }
 

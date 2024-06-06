@@ -8,35 +8,37 @@
 #' @examples
 #' f = sum(1 + 'a')
 #' quietly(f())
-quietly <- function(.expr,label = NULL) {
-  result = function(...) {
+quietly <- function(.expr, label = NULL) {
+  result <- function(...) {
+    last_warning <- NULL
     res <- tryCatch(
       {
-        result <- eval(expr = substitute(.expr), envir = parent.frame())
-        list(result = result, error = NULL, warnings = NULL)
+        result <- withCallingHandlers(
+          expr = eval(substitute(.expr), envir = parent.frame()),
+          warning = function(w) {
+            last_warning <<- w
+            invokeRestart("muffleWarning")
+          }
+        )
+        list(result = result, error = NULL, warnings = last_warning)
       },
       error = function(e) {
         list(result = NULL, error = e, warnings = NULL)
-      },
-      warning = function(w) {
-        list(result = NULL, error = NULL, warnings = w)
       }
     )
 
     if (!is.null(res$error)) {
-      mynotification(paste(label,res$error$message), duration = 10, type = "error")
+      mynotification(paste(label, res$error$message), duration = 10, type = "error")
       return(NULL)
     }
 
-    if (!is.null(res$warnings) && length(res$warnings) > 0) {
-      lapply(unique(res$warnings), function(w) {
-        mynotification(paste(label,w$message), duration = 10, type = "warning")
-      })
+    if (!is.null(res$warnings)) {
+      mynotification(paste(label, res$warnings$message), duration = 10, type = "warning")
     }
 
     return(res$result)
   }
-  return(result(.expr))
+  result()
 }
 
 #' custom notification
