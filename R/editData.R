@@ -13,7 +13,7 @@
 replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,session) {
   message("replacing data")
   tryCatch({
-  for(df in c("importedData","selectedData","membershipProbs","edistance","pcadf","LDAdf")){
+  for(df in c("importedData","selectedData","membershipProbs","edistance","pcadf","LDAdf","umapdf")){
     message(glue::glue("checking if {df} exists"))
     if (df == "membershipProbs"){
       colnm = "GroupVal"

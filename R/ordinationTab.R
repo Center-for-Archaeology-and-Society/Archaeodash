@@ -19,11 +19,6 @@ ordinationTab = function(){
                                     column(6, plotly::plotlyOutput("eigen.plot")),
                                     column(6,tableOutput("contribTbl")))
                          ), # end tabPanel PCA
-                         tabPanel("UMAP",                                  fluidRow(column(6,
-                                                                                           uiOutput('umapheader'))),
-                                  fluidRow(column(6,
-                                                  plotly::plotlyOutput("umap.plot")))
-                                  ),
                          tabPanel("LDA",
                                   fluidRow(column(6,
                                                   uiOutput('ldaheader'))),
@@ -75,46 +70,46 @@ ordinationServer = function(input,output,session,rvals){
     }
   })
 
-  observeEvent(rvals$runPCA, {
-    req(rvals$runPCA)
+  observeEvent(rvals$runPCAx, {
+    req(rvals$runPCAx)
     req(rvals$selectedData)
     message("running PCA")
     quietly(label = "running PCA",{
-      if(isTRUE(rvals$runPCA)){
+      if(isTRUE(rvals$runPCAx)){
         rvals$pca = prcomp(rvals$selectedData[,rvals$chem])
         rvals$pcadf = dplyr::bind_cols(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),rvals$pca$x)
-        rvals$runPCA = F
+        rvals$runPCAx = F
       }
     })
   })
 
-  observeEvent(rvals$runLDA, {
-    req(rvals$runLDA)
+  observeEvent(rvals$runLDAx, {
+    req(rvals$runLDAx)
     req(rvals$selectedData)
     message("running LDA")
     quietly(label = 'running LDA',{
-      if(isTRUE(rvals$runLDA)){
+      if(isTRUE(rvals$runLDAx)){
         lda = tryCatch(getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(LDAdf = tibble::tibble(), mod = NULL)))
         rvals$LDAdf = lda$LDAdf
         rvals$LDAmod = lda$mod
-        rvals$runLDA = F
+        rvals$runLDAx = F
       }
     })
   })
 
-  observeEvent(rvals$runUMAP, {
-    req(rvals$runUMAP)
+  observeEvent(rvals$runUMAPx, {
+    req(rvals$runUMAPx)
     req(rvals$selectedData)
     message("running UMAP")
     quietly(label = 'running UMAP',{
-      if(isTRUE(rvals$runUMAP)){
+      if(isTRUE(rvals$runUMAPx)){
         umap = tryCatch(umap::umap(rvals$selectedData %>% dplyr::select(tidyselect::any_of(rvals$chem))),error = function(e){
           mynotification(paste("UMAP failed", "UMAP failed to run. Please check your data and try again.\n",e))
           return(NULL)
         } )
         rvals$umapdf = dplyr::bind_cols(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),umap$layout %>%
           as.data.frame())
-        rvals$runUMAP = F
+        rvals$runUMAPx = F
       }
     })
   })
@@ -177,20 +172,6 @@ ordinationServer = function(input,output,session,rvals){
     quietly(label = 'LDA plot',{
       pdf(file = NULL)
       plotly::ggplotly(plotLDAvectors(rvals$LDAmod))
-    })
-  })
-
-  # Render UMAP plot
-  output$umap.plot <- plotly::renderPlotly({
-    req(rvals$umapdf)
-    message("rendering UMAP plot")
-    quietly(label = 'UMAP plot',{
-      g = ggplot2::ggplot(rvals$umapdf,ggplot2::aes(x = V1, y = V2, color = !!as.name(rvals$attrGroups))) +
-        ggplot2::geom_point() +
-        ggplot2::stat_ellipse() +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(title = "UMAP")
-      plotly::ggplotly(p = g)
     })
   })
 }

@@ -7,13 +7,13 @@
 #' datainputTab()
 datainputTab = function() {
   tagList(
-    h3("Choose previously loaded data or upload a new dataset (upload one at a time)"),
+    h3("Upload Data"),
+    fileInput("file1", "Choose File (csv, xlsx or other supported format)",multiple = F),
     uiOutput('priorDatasets'),
     uiOutput('confirmPriorUI'),
     br(),
     uiOutput('manageDatasets'),
     hr(),
-    fileInput("file1", "Choose File (csv, xlsx or other supported format)",multiple = F),
     uiOutput("attr"),
     uiOutput("subSelect"),
     uiOutput("chemUI"),
@@ -484,6 +484,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
     rvals$attrs = unique(c(rvals$attr,rvals$attrGroups,"imputation","transformation"))
+    rvals$runPCA = input$runPCA
+    rvals$runLDA = input$runLDA
+    rvals$runUMAP = input$runUMAP
     rvals$attrGroupsSub = input$attrGroupsSub
     rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
     rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
@@ -577,12 +580,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       dplyr::mutate_at(dplyr::vars(input$attrGroups),factor))
 
     try({
-      rvals$runPCA = input$runPCA
-      rvals$runLDA = input$runLDA
-      rvals$runUMAP = input$runUMAP
-      if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
-      if(isTRUE(rvals$runUMAP)) mynotification("Ran UMAP")
-      if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
+      rvals$runPCAx = input$runPCA
+      rvals$runLDAx = input$runLDA
+      rvals$runUMAPx = input$runUMAP
+      # if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
+      # if(isTRUE(rvals$runUMAP)) mynotification("Ran UMAP")
+      # if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
     })
 
     # update current table
