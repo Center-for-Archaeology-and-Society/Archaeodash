@@ -519,13 +519,14 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
     # imputation
     quietly(label = 'impute',{
-      if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$importedData) > 0) {
+      if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0) {
         message("imputing")
-        transformed = rvals$importedData[, rvals$chem] %>%
-          dplyr::mutate_all(dplyr::na_if,y = "0")
-        transformed = tryCatch(mice::complete(mice::mice(transformed, method = rvals$impute.method)),error = function(e){
+        transformed = rvals$selectedData[, rvals$chem] %>%
+          dplyr::mutate_all(dplyr::na_if,y = 0)
+        transformed = tryCatch(mice::complete(mice::mice(transformed, method = rvals$impute.method)),
+                               error = function(e){
           mynotification(e)
-          return(rvals$importedData[,rvals$chem])
+          return(rvals$selectedData[,rvals$chem])
         })
         if(is.data.frame(transformed)){
           rvals$selectedData[,rvals$chem] = transformed
@@ -545,7 +546,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       if(rvals$transform.method != "none"){
         message("transforming")
         suppressWarnings({
-          transformed = rvals$importedData[, rvals$chem ]  %>%
+          transformed = rvals$selectedData[, rvals$chem ]  %>%
             dplyr::mutate_all(quietly(as.numeric))
           if (rvals$transform.method == 'zscale') {
             transformed = zScale(transformed)
