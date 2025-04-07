@@ -1,0 +1,13 @@
+---
+title: "Welcome to Archaeodash"
+format: 
+  html:
+    include-after-body:
+      file: cookie-consent.html
+---
+
+# Welcome
+
+This is the **Archaeodash** dashboard.
+
+

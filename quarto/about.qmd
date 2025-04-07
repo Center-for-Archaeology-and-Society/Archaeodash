@@ -1,0 +1,16 @@
+---
+title: "About"
+format: html
+---
+
+# About Archaeodash
+
+This app is under development by Robert Bischoff, Matthew Peeples, and Jeffrey Ferguson. It is designed to facilitate the analysis of elemental data (e.g., portable X-ray fluorescence--PXRF, Neutron Activation Analysis--NAA). It has features for data manipulation, visualization, clustering, ordination (e.g., PCA, LDA), assessment of group membership and more. Andrew Upton contributed to the initial development.
+
+This dashboard is powered by:
+
+- Quarto for static HTML
+
+- Plumber for the API backend
+
+- R for the logic

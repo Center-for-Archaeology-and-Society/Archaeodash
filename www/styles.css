@@ -1,0 +1,17 @@
+.mysidecol {
+  padding: 10px;
+  background-color: #9dd4b9;
+}
+
+.mymainpanel {
+    padding: 10px;
+}
+
+body {
+  font-family: 'Lexend Deca', sans-serif;
+}
+
+.mybtn {
+  max-width: 100% !important;
+  margin: 10px !important;
+}

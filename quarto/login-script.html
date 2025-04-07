@@ -1,0 +1,28 @@
+<script>
+const API_BASE = "http://localhost:8000/archaeodash-api";
+
+async function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch(`${API_BASE}/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await res.json();
+  const status = document.getElementById("status");
+
+  if (res.ok) {
+    status.textContent = "✅ Login successful!";
+    localStorage.setItem("auth_token", data.token);
+    // Optional redirect after login:
+    // window.location.href = "/index.html";
+  } else {
+    status.textContent = "❌ " + (data.message || "Login failed");
+  }
+}
+</script>

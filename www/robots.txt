@@ -1,0 +1,1 @@
+Sitemap: /app/Archaeodash/sitemap.xml

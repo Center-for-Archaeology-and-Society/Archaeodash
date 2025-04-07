@@ -1,0 +1,212 @@
+[
+  {
+    "objectID": "terms.html",
+    "href": "terms.html",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "Welcome to ArchaeoDash. By accessing or using our application, you agree to comply with and be bound by the following terms and conditions. Please review them carefully. If you do not agree to these terms, you should not use this application.\n\n\n\n\n\nTo use certain features of ArchaeoDash, you must register for an account. To register, click the LOGIN button on the left sidebar, check the checkbox by Register as a new user, and fill out the information. You must agree to the notice to complete registration. If you forget your password or username, email rbischoff@asu.edu.\n\n\n\n\nUploaded data will be stored in a secure database and you retain all rights to your data. You must be logged in to access your data. No guarantees are made regarding the persistence of data storage. Please back up your data regularly.\n\n\n\nArchaeoDash is provided “as is” and “as available” without any warranties of any kind. We do not guarantee that the application will be uninterrupted or error-free.\n\n\n\nWe reserve the right to modify these terms at any time. Any changes will be posted on this page, and your continued use of the application constitutes acceptance of the modified terms."
+  },
+  {
+    "objectID": "terms.html#introduction",
+    "href": "terms.html#introduction",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "Welcome to ArchaeoDash. By accessing or using our application, you agree to comply with and be bound by the following terms and conditions. Please review them carefully. If you do not agree to these terms, you should not use this application."
+  },
+  {
+    "objectID": "terms.html#user-accounts",
+    "href": "terms.html#user-accounts",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "To use certain features of ArchaeoDash, you must register for an account. To register, click the LOGIN button on the left sidebar, check the checkbox by Register as a new user, and fill out the information. You must agree to the notice to complete registration. If you forget your password or username, email rbischoff@asu.edu."
+  },
+  {
+    "objectID": "terms.html#data-security-and-privacy",
+    "href": "terms.html#data-security-and-privacy",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "Uploaded data will be stored in a secure database and you retain all rights to your data. You must be logged in to access your data. No guarantees are made regarding the persistence of data storage. Please back up your data regularly."
+  },
+  {
+    "objectID": "terms.html#limitation-of-liability",
+    "href": "terms.html#limitation-of-liability",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "ArchaeoDash is provided “as is” and “as available” without any warranties of any kind. We do not guarantee that the application will be uninterrupted or error-free."
+  },
+  {
+    "objectID": "terms.html#changes-to-the-terms",
+    "href": "terms.html#changes-to-the-terms",
+    "title": "Terms and Conditions",
+    "section": "",
+    "text": "We reserve the right to modify these terms at any time. Any changes will be posted on this page, and your continued use of the application constitutes acceptance of the modified terms."
+  },
+  {
+    "objectID": "login.html",
+    "href": "login.html",
+    "title": "Login to Archaeodash",
+    "section": "",
+    "text": "Login to Archaeodash\n\nUsername: \nPassword: \n\nLogin"
+  },
+  {
+    "objectID": "help.html",
+    "href": "help.html",
+    "title": "Archaeodash",
+    "section": "",
+    "text": "ArchaeoDash was developed in R Shiny to facilitate the analysis of elemental data (e.g., portable X-ray fluorescence–PXRF, Neutron Activation Analysis–NAA). It has features for data manipulation, visualization, clustering, ordination (e.g., PCA, LDA), assessment of group membership and more.\nThis app was originally developed by Matthew Peeples and Andrew Upton and has been extensively redesigned by Robert Bischoff in consultation with Jeffrey Ferguson.\nWe recommend creating an account to prevent loss of data, otherwise if the app times out, reloads, or has an error then the current progress will be lost. Uploaded data will be stored in a secure database and you retain all rights to your data. You must be logged in to access your data. No guarantees are made regarding the persistence of data storage. Please back up your data regularly."
+  },
+  {
+    "objectID": "help.html#about",
+    "href": "help.html#about",
+    "title": "Archaeodash",
+    "section": "",
+    "text": "ArchaeoDash was developed in R Shiny to facilitate the analysis of elemental data (e.g., portable X-ray fluorescence–PXRF, Neutron Activation Analysis–NAA). It has features for data manipulation, visualization, clustering, ordination (e.g., PCA, LDA), assessment of group membership and more.\nThis app was originally developed by Matthew Peeples and Andrew Upton and has been extensively redesigned by Robert Bischoff in consultation with Jeffrey Ferguson.\nWe recommend creating an account to prevent loss of data, otherwise if the app times out, reloads, or has an error then the current progress will be lost. Uploaded data will be stored in a secure database and you retain all rights to your data. You must be logged in to access your data. No guarantees are made regarding the persistence of data storage. Please back up your data regularly."
+  },
+  {
+    "objectID": "help.html#registration",
+    "href": "help.html#registration",
+    "title": "Archaeodash",
+    "section": "Registration",
+    "text": "Registration\nTo register, click the LOGIN button on the left sidebar. Check the checkbox by Register as a new user. Fill out the information. There are no password requirements other than not being left empty. You must agree to the notice to complete registration. Once you are registered you will be automatically logged in. If you forget your password or username, email rbischoff@asu.edu."
+  },
+  {
+    "objectID": "help.html#login",
+    "href": "help.html#login",
+    "title": "Archaeodash",
+    "section": "Login",
+    "text": "Login\nTo login click the LOGIN button and enter your username and password."
+  },
+  {
+    "objectID": "help.html#import-data",
+    "href": "help.html#import-data",
+    "title": "Archaeodash",
+    "section": "Import Data",
+    "text": "Import Data\nClick the BROWSE button to upload data. CSV and XLSX are the preferred data formats, but all types supported by the R Rio package can be uploaded. If you are logged in, then all uploaded data will be stored in the database, and the data will be available to select from the Choose dataset(s) drop-down list. You will be asked to choose a dataset name. One will be auto-populated from the filename of the upload. It may be shortened if the name is over 50 characters. If you are not logged in then the data will be stored in temporary memory and will not be saved. Only one dataset can be used at a time if the user is not logged in. If logged in, you can select multiple datasets from the drop-down list. Press CONFIRM DATASETS SELECTION to load all datasets selected from the drop-down."
+  },
+  {
+    "objectID": "help.html#data-manager",
+    "href": "help.html#data-manager",
+    "title": "Archaeodash",
+    "section": "Data Manager",
+    "text": "Data Manager\nSelected datasets can be deleted in the Manage datasets section and also merged or renamed. For example, you may select three datasets from the dataset drop-down and merge them under a new or existing name.\nSelect the column that will be used for categorization under the heading Select descriptive/group column.\nChoose any groups you wish to include/exclude in the next drop-down.\nChoose any columns containing elmeent concentrations next. Only columns containing numeric data will be available to select as an element concentration.\nImputation Method controls how missing values can be inferred. The underlying Mice package in R has specific requirements which may cause this to fail. Missing values will then be converted to zeroes.\nSelect Transformation controls how the element concentrations are modified. Click the RESET ELEMENTS TO ORIGINAL button to undo a transformation or imputation.\nPRESS TO CONFIRM SELECTIONS must be pressed prior to most operations. Data will not be modified until this is pressed. This will create a new dataset called {username}_current. If you wish to save this modified dataset as is then select the current dataset from the dataset drop-down list and press MERGE/RENAME SELECTED DATASETS.\nIf you wish to remove all data from your temporary workspace then press CLEAR WORKSPACE.\nThe ADD NEW COLUMN button can be used to create new columns."
+  },
+  {
+    "objectID": "help.html#save-data",
+    "href": "help.html#save-data",
+    "title": "Archaeodash",
+    "section": "Save Data",
+    "text": "Save Data\nData can be exported after making any modifications to the data and pressing PRESS TO CONFIRM SELECTIONS button. At the bottom of the Data Manager sidebar is an export section. Choose the type of data you wish to export, enter the filename including the extension, and press CLICK HERE TO SAVE FILE."
+  },
+  {
+    "objectID": "help.html#explore",
+    "href": "help.html#explore",
+    "title": "Archaeodash",
+    "section": "Explore",
+    "text": "Explore\nThis tab has options for exploring the selected data.\n\nDATASET\nThis tab contains a plot displaying the number of missing or zero values for each element column as well as a view of the entire selected dataset. Data can be edited here by double clicking a cell and then clicking off the cell when the data has been changed. Extensive data modification should be done in a spreadsheet editor such as Excel and then uploaded to ArchaeoDash.\n\n\nCROSSTABS\nChoose the columns you wish to group data by in column 1 and column2. Select the same column in both drop-down lists if you want to view results by only one column. Then select the type of display in the last drop-down. No result or an error may be returned if the data is not the correct type.\n\n\nUNIVARIATE PLOTS\nThis tab shows histograms of the element data.\n\n\nCOMPOSITIONAL PLOT PROFILE\nThis line plot shows the variation in element concentrations across the dataset."
+  },
+  {
+    "objectID": "help.html#ordination",
+    "href": "help.html#ordination",
+    "title": "Archaeodash",
+    "section": "ORDINATION",
+    "text": "ORDINATION\n\nPCA\nThis tab shows information related to the PCA analysis.\n\n\nLDA\nThis tab shows information related to the LDA analysis. Note: LDA analysis requires three or more groups for results to be displayed."
+  },
+  {
+    "objectID": "help.html#cluster",
+    "href": "help.html#cluster",
+    "title": "Archaeodash",
+    "section": "CLUSTER",
+    "text": "CLUSTER\nThis section will be updated soon."
+  },
+  {
+    "objectID": "help.html#group-membership",
+    "href": "help.html#group-membership",
+    "title": "Archaeodash",
+    "section": "GROUP MEMBERSHIP",
+    "text": "GROUP MEMBERSHIP\nThis section will be updated soon."
+  },
+  {
+    "objectID": "help.html#euclidean-distance",
+    "href": "help.html#euclidean-distance",
+    "title": "Archaeodash",
+    "section": "EUCLIDEAN DISTANCE",
+    "text": "EUCLIDEAN DISTANCE\nThis section will be updated soon."
+  },
+  {
+    "objectID": "help.html#visualize-assign",
+    "href": "help.html#visualize-assign",
+    "title": "Archaeodash",
+    "section": "VISUALIZE & ASSIGN",
+    "text": "VISUALIZE & ASSIGN\nThis section will be updated soon."
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About Archaeodash\nThis app is under development by Robert Bischoff, Matthew Peeples, and Jeffrey Ferguson. It is designed to facilitate the analysis of elemental data (e.g., portable X-ray fluorescence–PXRF, Neutron Activation Analysis–NAA). It has features for data manipulation, visualization, clustering, ordination (e.g., PCA, LDA), assessment of group membership and more. Andrew Upton contributed to the initial development.\nThis dashboard is powered by:\n\nQuarto for static HTML\nPlumber for the API backend\nR for the logic"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Welcome to Archaeodash",
+    "section": "",
+    "text": "Welcome\nThis is the Archaeodash dashboard."
+  },
+  {
+    "objectID": "privacy.html",
+    "href": "privacy.html",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "ArchaeoDash is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information.\n\n\n\n\n\nWhen you register for an account, we collect personal information such as your username and email address.\n\n\n\nWhen you upload data to ArchaeoDash, the data is stored in our secure database. You retain all rights to your data.\n\n\n\n\n\n\nYour account information is used to manage your access to the application and to contact you if necessary.\n\n\n\nUploaded data is used within the application to provide analysis and visualization features. We do not share your data with third parties.\n\n\n\n\nWe implement a variety of security measures to maintain the safety of your personal information and uploaded data. However, no method of transmission over the Internet or method of electronic storage is 100% secure.\n\n\n\nWe retain your data as long as your account is active or as needed to provide you services. If you wish to delete your account or request that we no longer use your data, please contact us at rbischoff@asu.edu.\n\n\n\nWe may update this Privacy Policy from time to time. Any changes will be posted on this page. Your continued use of the application after any changes constitutes your acceptance of the new Privacy Policy.\n\n\n\nIf you have any questions about this Privacy Policy, please contact us at rbischoff@asu.edu."
+  },
+  {
+    "objectID": "privacy.html#introduction",
+    "href": "privacy.html#introduction",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "ArchaeoDash is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and protect your information."
+  },
+  {
+    "objectID": "privacy.html#information-collection",
+    "href": "privacy.html#information-collection",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "When you register for an account, we collect personal information such as your username and email address.\n\n\n\nWhen you upload data to ArchaeoDash, the data is stored in our secure database. You retain all rights to your data."
+  },
+  {
+    "objectID": "privacy.html#use-of-information",
+    "href": "privacy.html#use-of-information",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "Your account information is used to manage your access to the application and to contact you if necessary.\n\n\n\nUploaded data is used within the application to provide analysis and visualization features. We do not share your data with third parties."
+  },
+  {
+    "objectID": "privacy.html#data-security",
+    "href": "privacy.html#data-security",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "We implement a variety of security measures to maintain the safety of your personal information and uploaded data. However, no method of transmission over the Internet or method of electronic storage is 100% secure."
+  },
+  {
+    "objectID": "privacy.html#data-retention",
+    "href": "privacy.html#data-retention",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "We retain your data as long as your account is active or as needed to provide you services. If you wish to delete your account or request that we no longer use your data, please contact us at rbischoff@asu.edu."
+  },
+  {
+    "objectID": "privacy.html#changes-to-the-privacy-policy",
+    "href": "privacy.html#changes-to-the-privacy-policy",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "We may update this Privacy Policy from time to time. Any changes will be posted on this page. Your continued use of the application after any changes constitutes your acceptance of the new Privacy Policy."
+  },
+  {
+    "objectID": "privacy.html#contact-us",
+    "href": "privacy.html#contact-us",
+    "title": "Privacy Policy",
+    "section": "",
+    "text": "If you have any questions about this Privacy Policy, please contact us at rbischoff@asu.edu."
+  }
+]

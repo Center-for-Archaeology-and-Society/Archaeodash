@@ -1,0 +1,28 @@
+project:
+  type: website
+  output-dir: ../www   # so the HTML output goes to the plumber static dir
+
+website:
+  title: "Archaeodash"
+  site-url: "/app/Archaeodash"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: about.qmd
+        text: About
+      - href: help.qmd
+        text: Help
+      - href: terms.qmd
+        text: Terms
+      - href: privacy.qmd
+        text: Privacy
+    right:
+      - href: login.qmd
+        text: Login
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    css: styles.css

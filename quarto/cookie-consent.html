@@ -1,0 +1,23 @@
+window.addEventListener("DOMContentLoaded", () => {
+    if (!localStorage.getItem("cookiesAccepted")) {
+      const banner = document.createElement("div")
+      banner.style.position = "fixed"
+      banner.style.bottom = "0"
+      banner.style.left = "0"
+      banner.style.right = "0"
+      banner.style.backgroundColor = "#eee"
+      banner.style.padding = "1em"
+      banner.style.textAlign = "center"
+      banner.style.zIndex = "1000"
+      banner.innerHTML = `
+        We use cookies to enhance your experience. By continuing, you agree to our
+        <a href="/app/Archaeodash/privacy">Privacy Policy</a>.
+        <button id="acceptCookies" style="margin-left:1em;">Accept</button>
+      `
+      document.body.appendChild(banner)
+      document.getElementById("acceptCookies").onclick = () => {
+        localStorage.setItem("cookiesAccepted", "true")
+        banner.remove()
+      }
+    }
+})

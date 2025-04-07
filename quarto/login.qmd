@@ -1,0 +1,22 @@
+---
+format: 
+  html:
+    include-after-body:
+      file: login-script.html
+---
+
+# Login to Archaeodash
+
+<div id="login-box">
+<label for="username">Username:</label><br>
+<input type="text" id="username"><br><br>
+
+<label for="password">Password:</label><br>
+<input type="password" id="password"><br><br>
+
+<button onclick="login()">Login</button>
+
+<p id="status"></p>
+</div>
+
+
