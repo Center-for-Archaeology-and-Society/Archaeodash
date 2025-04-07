@@ -43,11 +43,15 @@ datainputTab = function() {
 dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observe({
-    shiny::invalidateLater(1000, session)
+    if(is.null(con)){
+      shiny::invalidateLater(1000, session)
+      rvals$tbls = NULL
+    } else {
     tbls = DBI::dbListTables(con)
     tbls = tbls[which(stringr::str_detect(tbls,paste0("^",credentials$res$username,"_")))]
     tbls = tbls[which(!stringr::str_detect(tbls,"_metadata"))]
     rvals$tbls = tbls
+    }
   })
 
   output$confirmPriorUI = renderUI({

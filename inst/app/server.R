@@ -19,7 +19,7 @@ shinyServer(function(input, output, session) {
   # credentials <<- reactiveValues(); showNotification("warning: global variable is only for testing", type = "warning")
 
   con = tryCatch(connect(),error = function(e) {
-    mynotification("unable to connect to database", type = "error")
+    mynotification("unable to connect to database", type = "warning")
     NULL
     })
 
