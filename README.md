@@ -17,4 +17,4 @@ library(ArchaeoDash)
 runArchaeoDash()
 ```
 
-Use the INAA_test.csv dataset for testing which is located in inst/app, or, if accessing from the installed package
+Use the INAA_test.csv dataset for testing which is located in inst/app, or, if accessing from the installed package, then it is in the app folder.
