@@ -41,6 +41,7 @@ Imports:
     sodium,
     bsicons,
     markdown,
-    umap
+    umap,
+    profvis
 Depends: 
     data.table
