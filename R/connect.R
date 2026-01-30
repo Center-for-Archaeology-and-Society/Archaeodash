@@ -19,6 +19,11 @@ connect = function(db = Sys.getenv("db"), host = Sys.getenv('host'), user = Sys.
                        user = user,
                        password = pwd,
                        port = port
+  # connect.args = list(
+  #   connect.timeout = 1,  # seconds
+  #   read.timeout = 1,
+  #   write.timeout = 1
+  # )
   )
   }, error = function(e){
     message("Error connecting to database")

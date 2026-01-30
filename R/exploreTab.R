@@ -151,11 +151,11 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # Render missing data plot
   output$miss.plot <- renderPlot({
     validate(need(isTRUE(inherits(
-      rvals[['selectedData']], "data.frame"
+      rvals[['importedData']], "data.frame"
     )), ""))
-    req(rvals[['selectedData']])
+    req(rvals[['importedData']])
     req(rvals$chem)
-    plot_missing(data = rvals$selectedData[, rvals$chem])
+    plot_missing(data = rvals$importedData[, rvals$chem])
   })
 
   # Render UI for univariate displays

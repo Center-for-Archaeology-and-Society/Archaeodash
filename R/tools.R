@@ -6,7 +6,7 @@
 #' @export
 #'
 #' @examples
-#' f = sum(1 + 'a')
+#' f <- sum(1 + "a")
 #' quietly(f())
 quietly <- function(.expr, label = NULL) {
   result <- function(...) {
@@ -51,12 +51,12 @@ quietly <- function(.expr, label = NULL) {
 #'
 #' @examples
 #' mynotification("hello world")
-mynotification <- function(message, type = c("default", "message", "warning", "error", "success"), duration = 5) {
+mynotification <- function(message, type = c("default", "message", "warning", "error", "success"), duration = 5, closeButton = FALSE) {
   type <- match.arg(type)
-  if(type %in% c("warning", "error")) {
+  if (type %in% c("warning", "error")) {
     warning(message)
   } else {
     message(message)
   }
-  try(showNotification(message, type = type, duration = duration),silent = T)
+  try(showNotification(message, type = type, duration = duration, closeButton = closeButton), silent = T)
 }

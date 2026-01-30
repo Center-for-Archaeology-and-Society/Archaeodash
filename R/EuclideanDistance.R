@@ -204,9 +204,12 @@ calcEDistance = function(data,projection,id,attrGroups,chem,limit,withinGroup){
       dplyr::pull(!!as.name(id))
     m = data[,chem] %>% as.matrix()
     rownames(m) = data[[id]]
-    d = dist(m,method = "euclidean")
+    # d = dist(m,method = "euclidean")
+    d = rmse_pairwise(m)
+    colnames(d) = rownames(m) = data[[id]]
     result = tibble::as_tibble(as.matrix(d)) %>%
       dplyr::select(tidyselect::any_of(projections)) %>%
+      
       tibble::rownames_to_column("match") %>%
       tidyr::pivot_longer(-match, names_to = "observation", values_to = "distance") %>%
       dplyr::filter(match != observation) %>%

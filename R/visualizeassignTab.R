@@ -1,6 +1,3 @@
-
-
-
 #' UI elements for visualization and group reassignment
 #'
 #' @return UI
@@ -8,7 +5,7 @@
 #'
 #' @examples
 #' visualizeassignTab()
-visualizeassignTab = function() {
+visualizeassignTab <- function() {
   tabPanel(
     title = "Visualize & Assign",
     id = "visualizetab",
@@ -21,32 +18,36 @@ visualizeassignTab = function() {
         fluidRow(
           column(
             9,
-            plotly::plotlyOutput('plot', width = '100%', height = '600px')
+            plotly::plotlyOutput("plot", width = "100%", height = "600px")
           )
         ),
         fluidRow(
           column(
             2,
             selectInput(
-              'data.src',
-              'Choose data type',
+              "data.src",
+              "Choose data type",
               # choices = c('elements', 'principal components'),
-              choices = c('elements', 'principal components','UMAP','linear discriminants'),
-              selected = 'elements'
+              choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+              selected = "elements"
             ),
-            uiOutput('xvarUI'),
-            uiOutput('yvarUI'),
+            uiOutput("xvarUI"),
+            uiOutput("yvarUI"),
           ),
           column(
             3,
             offset = 0.5,
-            checkboxInput('Conf', 'Data Ellipse',
-                          value = TRUE),
+            checkboxInput("pointlabel", "Label Points",
+              value = FALSE
+            ),
+            checkboxInput("Conf", "Data Ellipse",
+              value = TRUE
+            ),
             sliderInput(
-              'int.set',
+              "int.set",
               label = bslib::popover(
                 tagList("Choose ellipse level",
-                        trigger = bsicons::bs_icon("info-circle", title = "Help")
+                  trigger = bsicons::bs_icon("info-circle", title = "Help")
                 ),
                 title = "Choose ellipse level",
                 "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
@@ -61,33 +62,39 @@ visualizeassignTab = function() {
             3,
             offset = 0.5,
             br(),
-            actionButton('Change', 'Change Group Assignment'),
-            textInput('NewGroup', label = 'Enter new group designation')
+            actionButton("Change", "Change Group Assignment"),
+            textInput("NewGroup", label = "Enter new group designation")
           ),
           column(3,
-                 offset = 0.5,
-                 selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'))
+            offset = 0.5,
+            selectInput("plot_theme", "Choose plot theme", choices = c("viridis", "default"), selected = "viridis")
+          )
         ),
-        uiOutput('brush')
+        uiOutput("brush")
       ),
       tabPanel(
         title = "multiplots",
         fluidRow(
-          column(3, uiOutput('xvar2UI')),
-          column(3,offset = 1,
-                 uiOutput('yvar2UI')),
+          column(3, uiOutput("xvar2UI")),
+          column(3,
+            offset = 1,
+            uiOutput("yvar2UI")
+          ),
         ),
         fluidRow(
-          column(2,
-                 radioButtons(
-                   inputId = "interactive",
-                   label = "make plots interactive?",
-                   choices = c(TRUE,FALSE),
-                   selected = FALSE),
-                 actionButton("updateMultiplot", "update")
+          column(
+            2,
+            radioButtons(
+              inputId = "interactive",
+              label = "make plots interactive?",
+              choices = c(TRUE, FALSE),
+              selected = FALSE
+            ),
+            actionButton("updateMultiplot", "update")
           ),
           column(
-            2,offset = 1,
+            2,
+            offset = 1,
             numericInput(
               "plotHeight",
               label = "plot height in pixels",
@@ -97,10 +104,10 @@ visualizeassignTab = function() {
               step = 50
             )
           ),
-          column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
-          column(2, offset = 1,actionButton('savePlot', "Save Plot"))
+          column(3, offset = 1, sliderInput("ptsize", "plot point size", min = .1, max = 10, value = 2, step = .1, )),
+          column(2, offset = 1, actionButton("savePlot", "Save Plot"))
         ),
-        fluidRow(uiOutput('multiplot'))
+        fluidRow(uiOutput("multiplot"))
       )
     )
   )
@@ -117,71 +124,75 @@ visualizeassignTab = function() {
 #' @export
 #'
 #' @examples
-#' visualizeAssignServer(input,output,session,rvals)
-visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
+#' visualizeAssignServer(input, output, session, rvals)
+visualizeAssignServer <- function(input, output, session, rvals, credentials, con) {
+  observeEvent(
+    {
+      rvals$selectedData
+      input$data.src
+      rvals$pcadf
+      rvals$attrGroups
+    },
+    {
+      req(nrow(rvals$selectedData) > 0)
+      req(input$data.src)
+      req(rvals$attrGroups)
+      quietly(label = "get plotdf", {
+        if (input$data.src == "principal components") {
+          validate(need(nrow(rvals$pcadf) > 0, "No PCA results"))
+          rvals$plotdf <- tryCatch(rvals$pcadf, error = function(e) {
+            mynotification("No PCA results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- rvals$pca$x %>% colnames()
+        } else if (input$data.src == "linear discriminants") {
+          validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
+          rvals$plotdf <- tryCatch(rvals$LDAdf, error = function(e) {
+            mynotification("No LDA results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- rvals$LDAdf %>%
+            colnames() %>%
+            .[which(!. %in% rvals$attrs)]
+        } else if (input$data.src == "UMAP") {
+          validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
+          rvals$plotdf <- tryCatch(rvals$umapdf, error = function(e) {
+            mynotification("No UMAP results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- c("V1", "V2")
+        } else {
+          req(nrow(rvals$selectedData) > 0)
+          rvals$plotdf <- tryCatch(rvals$selectedData, error = function(e) {
+            mynotification("No data", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- rvals$chem
+        }
+      })
+    }
+  )
 
-  observeEvent({
-    rvals$selectedData
-    input$data.src
-    rvals$pcadf
-    rvals$attrGroups
-  },{
-    req(nrow(rvals$selectedData) > 0)
-    req(input$data.src)
-    req(rvals$attrGroups)
-    quietly(label = "get plotdf",{
-      if (input$data.src == 'principal components') {
-        validate(need(nrow(rvals$pcadf) > 0, "No PCA results"))
-        rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
-          mynotification("No PCA results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = rvals$pca$x %>% colnames()
-      } else if (input$data.src == 'linear discriminants') {
-        validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
-        rvals$plotdf = tryCatch(rvals$LDAdf,error = function(e) {
-          mynotification("No LDA results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = rvals$LDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
-      } else if (input$data.src == 'UMAP') {
-        validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
-        rvals$plotdf = tryCatch(rvals$umapdf,error = function(e) {
-          mynotification("No UMAP results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = c("V1","V2")
-      } else {
-        req(nrow(rvals$selectedData) > 0)
-        rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
-          mynotification("No data",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = rvals$chem
-      }
-    })
-  })
-
-  output$xvarUI = renderUI({
+  output$xvarUI <- renderUI({
     req(rvals$plotVars)
-    selectInput('xvar', 'X', rvals$plotVars, selected = rvals$plotVars[1])
+    selectInput("xvar", "X", rvals$plotVars, selected = rvals$plotVars[1])
   })
 
-  output$yvarUI = renderUI({
+  output$yvarUI <- renderUI({
     req(rvals$plotVars)
-    selectInput('yvar', 'y', rvals$plotVars, selected = rvals$plotVars[2])
+    selectInput("yvar", "y", rvals$plotVars, selected = rvals$plotVars[2])
   })
 
-  output$xvar2UI = renderUI({
+  output$xvar2UI <- renderUI({
     req(rvals$chem)
-    selectInput('xvar2', 'X', rvals$chem, multiple = T)
+    selectInput("xvar2", "X", rvals$chem, multiple = T)
   })
 
-  output$yvar2UI = renderUI({
+  output$yvar2UI <- renderUI({
     req(rvals$chem)
     selectInput(
-      'yvar2',
-      'Y',
+      "yvar2",
+      "Y",
       choices = rvals$chem,
       multiple = T,
       selected = rvals$chem
@@ -193,7 +204,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     plotlySelect <<- plotly::event_data("plotly_selected")
     print(plotlySelect)
     if (length(plotlySelect) > 0) {
-      rvals$brushSelected = rvals$plotdf %>%
+      rvals$brushSelected <- rvals$plotdf %>%
         dplyr::filter(rowid %in% plotlySelect$key)
     }
   })
@@ -202,46 +213,47 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     req(rvals$brushSelected)
     req(rvals$plotdf)
     req(rvals$selectedData)
-    quietly(label = "change group assignment",{
+    quietly(label = "change group assignment", {
+      rowid <- rvals$brushSelected$rowid
+      replaceCell(rowid = rowid, col = rvals$attrGroups, value = input$NewGroup, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
 
-      rowid = rvals$brushSelected$rowid
-      replaceCell(rowid = rowid,col = rvals$attrGroups,value = input$NewGroup, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
-
-      rvals$brushSelected = rvals$plotdf %>%
+      rvals$brushSelected <- rvals$plotdf %>%
         dplyr::filter(rowid %in% plotlySelect$key)
-
     })
-    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set")
-    for(i in inputList){
-      rvals[[i]] = tryCatch(input[[i]],error = function(e)return(NULL))
+    inputList <- c("xvar", "yvar", "xvar2", "yvar2", "data.src", "Conf", "int.set", "pointLabel")
+    for (i in inputList) {
+      rvals[[i]] <- tryCatch(input[[i]], error = function(e) {
+        return(NULL)
+      })
     }
   })
 
   # plot
   output$plot <- plotly::renderPlotly({
-    validate(need(inherits(rvals$plotdf,"data.frame"),"Waiting for plot data"))
+    validate(need(inherits(rvals$plotdf, "data.frame"), "Waiting for plot data"))
     req(nrow(rvals$plotdf) > 0)
     req(input$xvar %in% names(rvals$plotdf))
     req(input$yvar %in% names(rvals$plotdf))
     req(rvals$attrGroups)
+    print(input$pointlabel)
     # quietly(label = "plotting data",{
-    p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set, theme = input$plot_theme)
+    p <- mainPlot(plotdf = rvals$plotdf, xvar = input$xvar, yvar = input$yvar, attrGroups = rvals$attrGroups, labelPoints = input$pointLabel, pointLabel = input$anid, Conf = input$Conf, int.set = input$int.set, theme = input$plot_theme)
     # })
     req(p)
     p
   })
 
-  observeEvent(rvals$brushSelected,{
-  output$brush <- renderUI({
-    req(rvals$brushSelected)
-    quietly(label = "brush UI",{
-      if (is.null(rvals$brushSelected)) {
-        p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
-      } else {
-        renderTable(rvals$brushSelected)
-      }
+  observeEvent(rvals$brushSelected, {
+    output$brush <- renderUI({
+      req(rvals$brushSelected)
+      quietly(label = "brush UI", {
+        if (is.null(rvals$brushSelected)) {
+          p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
+        } else {
+          renderTable(rvals$brushSelected)
+        }
+      })
     })
-  })
   })
 
   #### multiplots ####
@@ -249,14 +261,13 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   observeEvent(input$updateMultiplot, {
     req(nrow(rvals$selectedData) > 0)
     req(input$xvar2)
-    quietly(label = "multiplot",{
-
-      rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
+    quietly(label = "multiplot", {
+      rvals$multiplot <- multiplot(selectedData = rvals$selectedData, attrGroups = rvals$attrGroups, xvar = input$xvar2, yvar = input$yvar2, ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
     })
 
-    output$multiplot = renderUI({
+    output$multiplot <- renderUI({
       req(rvals$multiplot)
-      if(input$interactive){
+      if (input$interactive) {
         plotly::renderPlotly(
           rvals$multiplot,
         )
@@ -301,5 +312,4 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       )
     }
   )
-
 }

@@ -1,10 +1,10 @@
-.mysidecol {
+#mysidecol {
   padding: 10px;
-  background-color: #9dd4b9;
+  background-color: #9dd4b9 !important;
 }
 
 .mymainpanel {
-    padding: 10px;
+  padding: 10px;
 }
 
 body {
@@ -14,4 +14,9 @@ body {
 .mybtn {
   max-width: 100% !important;
   margin: 10px !important;
+}
+
+.navbar-default {
+  background-color: #4a9c81;
+  border-color: #4a9c81;
 }
