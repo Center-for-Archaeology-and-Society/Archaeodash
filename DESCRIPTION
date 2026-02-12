@@ -12,6 +12,7 @@ RoxygenNote: 7.3.1
 Suggests:
     testthat,
     shinytest2
+Config/testthat/edition: 3
 Imports: 
     cluster,
     cowplot,

@@ -1,0 +1,31 @@
+name: R Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  testthat:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::devtools
+            any::testthat
+          needs: check
+
+      - name: Install package
+        run: Rscript -e "devtools::install('.', upgrade='never', quiet=TRUE)"
+        shell: bash
+
+      - name: Run tests
+        run: Rscript -e "testthat::test_local(reporter='summary')"
+        shell: bash
