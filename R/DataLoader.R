@@ -1,22 +1,3 @@
-#' dataLoader
-#'
-#' @param filename
-#'
-#' @return data
-#' @export
-#'
-#' @examples
-#' dataLoader("data.csv")
-dataLoader = function(filename){
-  data = rio::import(filename, setclass = 'tibble') %>%
-    dplyr::mutate_all(as.character) %>%
-    janitor::clean_names(case = 'none') %>%
-    dplyr::mutate_all(as.character) %>%
-    dplyr::select(-tidyselect::any_of("rowid")) %>%
-    tibble::rowid_to_column()
-  return(data)
-}
-
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -24,14 +5,14 @@ dataLoader = function(filename){
 #'
 #' @examples
 #' dataLoaderUI()
-dataLoaderUI = function(){
+dataLoaderUI <- function() {
   showModal(modalDialog(
     title = "Data Loader",
     uiOutput("datasetNameUI"),
     div(textOutput("notification"), style = "color: red; font-size: 16px; padding = 10px;"),
     uiOutput("columnsUI"),
     uiOutput("loadchemUI"),
-    footer = tagList(modalButton("cancel"), actionButton("loadData","load data")),
+    footer = tagList(modalButton("cancel"), actionButton("loadData", "load data")),
     easyClose = F
   ))
 }
@@ -46,71 +27,97 @@ dataLoaderUI = function(){
 #' @export
 #'
 #' @examples
-#' dataLoaderServer(input,output,session, credentials, con)
-dataLoaderServer = function(rvals, input,output,session, credentials, con){
+#' dataLoaderServer(input, output, session, credentials, con)
+dataLoaderServer <- function(input, output, session, rvals, db) {
+  temp_upload <- reactiveVal()
 
-  output$datasetNameUI = renderUI({
-    #mysql table names have a 64 character limit
-    n = nchar(credentials$res$username) + 11
-    fn = input$file1$name %>% tools::file_path_sans_ext() %>% stringr::str_sub(1,64 - n)
-    if(isTruthy(length(fn) > 0)){
-      textInput("datasetName","Enter a name for the dataset", value = fn)
-    } else {
-      textInput("datasetName","Enter a name for the dataset")
-    }
+  observeEvent(input$process_data, {
+    req(input$file1)
+
+    # Load raw data (Assumes first column is a Sample Name/ID)
+    raw_df <- rio::import(input$file_upload$datapath) %>%
+      mutate_all(as.character)
+
+    temp_upload(raw_df)
+
+    showModal(modalDialog(
+      title = "Configure Dataset",
+      p("Select the column that contains sample labels (e.g., ANID):"),
+      selectInput("sample_label_col", "Available Columns:",
+        choices = names(raw_df),
+        selected = names(raw_df)[1],
+        multiple = F
+      ),
+      p("Select the columns that contain element concentrations:"),
+      checkboxGroupInput("selected_cols", "Available Columns:",
+        choices = names(raw_df),
+        selected = names(raw_df)
+      ), # Default to all but first col
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_save", "Confirm & Save", class = "btn-success")
+      )
+    ))
   })
 
-  output$notification = renderText({
-    req(input$datasetName)
-    tblList = DBI::dbListTables(con)
-    datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
-      janitor::make_clean_names()
-    if(isTruthy(datasetname %in% tblList) && input$datasetName %>% length() > 0){
-      "This dataset already exists. Please choose a different name."
-    } else if(input$datasetName %>% length() == 0){
-      "Please enter a name for the dataset."
-    } else {
-      NULL
-    }
-  })
+  observeEvent(input$confirm_save, {
+    removeModal()
+    # Generate unique IDs for this batch
+    batch_ds_uuid <- UUIDgenerate()
+    new_uuids <- replicate(nrow(temp_upload()), UUIDgenerate())
 
-  output$columnsUI = renderUI({
-    choices = names(rvals$data)
-    selectInput('loadcolumns',"Choose which columns should be included", choices = choices, selected = choices, multiple = T)
-  })
+    # --- TABLE 1: Dataset Mapping ---
+    new_datasets <- data.frame(
+      sample_uuid = new_uuids,
+      dataset_uuid = batch_ds_uuid,
+      dataset_label = input$dataset_name
+    )
 
+    # --- TABLE 2: Labels (e.g., Original Name from file) ---
+    main_label <- temp_upload() %>%
+      select(any_of(input$sample_label_col)) %>%
+      mutate_all(as.character) %>%
+      pull()
+    main_label <- data.frame(
+      sample_uuid = new_uuids,
+      label_type = "main",
+      label = main_label
+    )
 
-  output$loadchemUI = renderUI({
-    choices = names(rvals$data)
-    dfNum = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
-                               janitor::remove_empty("cols"))
-    selected = names(dfNum)
-    selectInput('loadchem',"Choose which columns are elements/predictor variables", choices = choices, selected = selected, multiple = T)
-  })
+    new_labels <- temp_upload() %>%
+      select(-any_of(input$selected_cols)) %>%
+      mutate_all(as.character) %>%
+      mutate(sample_uuid = new_uuids, .before = 0) %>%
+      pivot_longer(
+        cols = -sample_uuid,
+        names_to = "label_type",
+        values_to = "label"
+      )
 
-  observeEvent(input$loadData,{
-    tryCatch({
-      datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
-        janitor::make_clean_names()
-      if(nchar(datasetname) > 53){
-        mynotification("Error: datasetname is too long. Please try again.", type = "error")
-      } else {
-        removeModal()
-        data_metadata = tibble::tibble(
-          field = c("datasetName","created", rep("variable",length(input$loadchem))),
-          value = c(input$datasetName,as.character(as.Date(Sys.time())),input$loadchem)
-        )
-        tblList = DBI::dbListTables(con)
-        if(isTruthy(datasetname %in% tblList) || input$datasetName %>% length() == 0){
-          mynotification("This dataset already exists. Please choose a different name.", type = "error")
-        } else {
-          DBI::dbWriteTable(conn = con, name = datasetname, value = rvals$data %>% dplyr::select(tidyselect::all_of(c(input$loadcolumns,input$loadchem))), row.names = F)
-          DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
-          mynotification("Data Loaded")
-        }
-      }
-    }, error = function(e){
-      mynotification(paste("An error occurred. Please try again. Error:\n",e), type = "error")
-    })
+    new_labels <- rbind(main_label, new_labels)
+
+    data.frame(
+      sample_uuid = new_uuids,
+      label_type = "Original_Name",
+      label = temp_upload() %>% select(-any_of(input$selected_cols))
+    )
+
+    # --- TABLE 3: Measurements (Pivoting Wide to Long) ---
+    # We exclude the first column (the ID) and pivot the elements
+    new_measurements <- temp_upload() %>%
+      select(any_of(input$selected_cols)) %>%
+      mutate_all(as.numeric) %>%
+      mutate(sample_uuid = new_uuids, before = 0) %>%
+      pivot_longer(
+        cols = -sample_uuid,
+        names_to = "measurement_label",
+        values_to = "value"
+      ) %>%
+      mutate(measurement_type = "original")
+
+    # Update the "Database" by appending new records
+    db$datasets <- rbind(db$datasets, new_datasets)
+    db$labels <- rbind(db$labels, new_labels)
+    db$measurements <- rbind(db$measurements, new_measurements)
   })
 }
