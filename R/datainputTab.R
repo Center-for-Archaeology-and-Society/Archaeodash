@@ -13,6 +13,7 @@ datainputTab = function() {
     uiOutput('confirmPriorUI'),
     br(),
     uiOutput('manageDatasets'),
+    uiOutput("transformationStoreUI"),
     uiOutput('newCol'),
     br(),
     hr(),
@@ -43,6 +44,28 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
   available_group_values <- shiny::reactiveVal(character())
   active_group_column <- shiny::reactiveVal(NULL)
+  transformation_loading_active <- shiny::reactiveVal(FALSE)
+
+  show_transformation_loading <- function() {
+    transformation_loading_active(TRUE)
+    showModal(modalDialog(
+      title = NULL,
+      footer = NULL,
+      easyClose = FALSE,
+      tags$div(
+        class = "transformation-loading-wrap",
+        tags$div(class = "transformation-loading-spinner"),
+        tags$div(class = "transformation-loading-text", "Updating transformation...")
+      )
+    ))
+  }
+
+  hide_transformation_loading <- function() {
+    if (isTRUE(transformation_loading_active())) {
+      removeModal()
+      transformation_loading_active(FALSE)
+    }
+  }
 
   update_group_selector <- function(selected_values) {
     selected_values <- as.character(selected_values)
@@ -78,6 +101,100 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
   }
 
+  reset_transformation_store <- function() {
+    rvals$transformations <- list()
+    rvals$activeTransformation <- NULL
+    try(updateSelectInput(session, "activeTransformation", choices = character(), selected = character()), silent = TRUE)
+  }
+
+  load_persisted_transformations <- function() {
+    if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
+    if (is.null(rvals$currentDatasetKey) || !nzchar(rvals$currentDatasetKey)) return(invisible(NULL))
+    username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+    if (!nzchar(username)) return(invisible(NULL))
+
+    persisted <- tryCatch(
+      load_transformations_db(
+        con = con,
+        username = username,
+        dataset_key = rvals$currentDatasetKey
+      ),
+      error = function(e) {
+        mynotification(paste("Unable to load persisted transformations:", e$message), type = "warning")
+        list()
+      }
+    )
+    if (length(persisted) > 0) {
+      rvals$transformations <- persisted
+      if (is.null(rvals$activeTransformation) || !(rvals$activeTransformation %in% names(persisted))) {
+        rvals$activeTransformation <- names(persisted)[[1]]
+      }
+      refresh_transformation_selector(selected_name = rvals$activeTransformation)
+    }
+    invisible(NULL)
+  }
+
+  refresh_transformation_selector <- function(selected_name = rvals$activeTransformation) {
+    choices <- names(rvals$transformations)
+    if (length(choices) == 0) {
+      choices <- character()
+      selected_name <- character()
+    } else if (is.null(selected_name) || !(selected_name %in% choices)) {
+      selected_name <- choices[[1]]
+    }
+    try(updateSelectInput(session, "activeTransformation", choices = choices, selected = selected_name), silent = TRUE)
+  }
+
+  compute_ordinations <- function(run_pca = FALSE, run_umap = FALSE, run_lda = FALSE) {
+    rvals$pca <- NULL
+    rvals$pcadf <- tibble::tibble()
+    rvals$umapdf <- tibble::tibble()
+    rvals$LDAdf <- tibble::tibble()
+    rvals$LDAmod <- NULL
+
+    if (isTRUE(run_pca) && nrow(rvals$selectedData) > 0) {
+      quietly(label = "compute PCA", {
+        rvals$pca <- tryCatch(stats::prcomp(rvals$selectedData[, rvals$chem]), error = function(e) NULL)
+        if (!is.null(rvals$pca)) {
+          rvals$pcadf <- dplyr::bind_cols(
+            rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),
+            as.data.frame(rvals$pca$x)
+          )
+        }
+      })
+    }
+
+    if (isTRUE(run_umap) && nrow(rvals$selectedData) > 0) {
+      quietly(label = "compute UMAP", {
+        if (app_require_packages("umap", feature = "UMAP")) {
+          umap_result <- tryCatch(
+            umap::umap(rvals$selectedData %>% dplyr::select(tidyselect::any_of(rvals$chem))),
+            error = function(e) NULL
+          )
+          if (!is.null(umap_result)) {
+            rvals$umapdf <- dplyr::bind_cols(
+              rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),
+              umap_result$layout %>% as.data.frame()
+            )
+          }
+        }
+      })
+    }
+
+    if (isTRUE(run_lda) && nrow(rvals$selectedData) > 0) {
+      quietly(label = "compute LDA", {
+        if (app_require_packages("MASS", feature = "Linear Discriminant Analysis")) {
+          lda_result <- tryCatch(
+            getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),
+            error = function(e) list(LDAdf = tibble::tibble(), mod = NULL)
+          )
+          rvals$LDAdf <- lda_result$LDAdf
+          rvals$LDAmod <- lda_result$mod
+        }
+      })
+    }
+  }
+
 
   observe({
     if(is.null(con)){
@@ -87,6 +204,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     tbls = DBI::dbListTables(con)
     tbls = tbls[which(stringr::str_detect(tbls,paste0("^",credentials$res$username,"_")))]
     tbls = tbls[which(!stringr::str_detect(tbls,"_metadata"))]
+    tbls = tbls[which(!stringr::str_detect(tbls,"_tx_"))]
+    tbls = tbls[which(!stringr::str_detect(tbls,"_transformations$"))]
     rvals$tbls = tbls
     }
   })
@@ -114,6 +233,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
+    reset_transformation_store()
+    rvals$currentDatasetKey <- build_dataset_key(input$selectedDatasets)
 
     null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                    "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
@@ -154,6 +275,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
     }
 
+    load_persisted_transformations()
+
   })
 
   output$manageDatasets = renderUI({
@@ -184,7 +307,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     removeModal()
     req(input$selectedDatasets)
     print('deleting datasets')
+    username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
     for(tbl in input$selectedDatasets){
+      if (nzchar(username)) {
+        dataset_key <- build_dataset_key(tbl)
+        try(delete_transformations_for_dataset_db(con, username, dataset_key), silent = TRUE)
+      }
       DBI::dbRemoveTable(con,tbl)
       DBI::dbRemoveTable(con,paste0(tbl,"_metadata"))
     }
@@ -278,6 +406,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(input$file1)
     print("importing file")
     if (!is.null(input$file1)) {
+      reset_transformation_store()
       null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                      "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
                      "int.set", "eligibleGroups", "sampleID")
@@ -293,6 +422,90 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       dataLoaderUI()
 
     }
+  })
+
+  output$transformationStoreUI = renderUI({
+    req(nrow(rvals$importedData) > 0)
+    choices <- names(rvals$transformations)
+    if (length(choices) == 0) return(NULL)
+    if (is.null(rvals$activeTransformation) || !(rvals$activeTransformation %in% choices)) {
+      rvals$activeTransformation <- choices[[1]]
+    }
+    tagList(
+      h3("Transformations"),
+      selectInput(
+        "activeTransformation",
+        "Select transformation",
+        choices = choices,
+        selected = rvals$activeTransformation
+      ),
+      actionButton("deleteTransformation", "Delete", class = "mybtn")
+    )
+  })
+
+  load_transformation <- function(name) {
+    req(name)
+    req(length(rvals$transformations) > 0)
+    snapshot <- rvals$transformations[[name]]
+    req(!is.null(snapshot))
+    applyTransformationSnapshot(rvals, snapshot)
+    # Ensure metadata always comes from canonical imported data.
+    rvals$selectedData <- refreshNonElementMetadata(rvals$selectedData, rvals$importedData, rvals$chem)
+    rvals$pcadf <- refreshNonElementMetadata(rvals$pcadf, rvals$importedData, rvals$chem)
+    rvals$umapdf <- refreshNonElementMetadata(rvals$umapdf, rvals$importedData, rvals$chem)
+    rvals$LDAdf <- refreshNonElementMetadata(rvals$LDAdf, rvals$importedData, rvals$chem)
+    if (isTRUE(snapshot$runPCA) && (is.null(rvals$pca) || !inherits(rvals$pca, "prcomp"))) {
+      rvals$pca <- tryCatch(stats::prcomp(rvals$selectedData[, rvals$chem]), error = function(e) NULL)
+      if (is.null(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+        rvals$pcadf <- tryCatch(
+          dplyr::bind_cols(
+            rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),
+            as.data.frame(rvals$pca$x)
+          ),
+          error = function(e) tibble::tibble()
+        )
+      }
+    }
+    if (isTRUE(snapshot$runLDA) && is.null(rvals$LDAmod)) {
+      lda_result <- tryCatch(
+        getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),
+        error = function(e) list(LDAdf = tibble::tibble(), mod = NULL)
+      )
+      if (nrow(rvals$LDAdf) == 0) {
+        rvals$LDAdf <- lda_result$LDAdf
+      }
+      rvals$LDAmod <- lda_result$mod
+    }
+    refresh_transformation_selector(selected_name = name)
+    mynotification(paste0("loaded transformation: ", name))
+  }
+
+  observeEvent(input$activeTransformation, {
+    if (is.null(input$activeTransformation) || !nzchar(input$activeTransformation)) return(NULL)
+    if (identical(rvals$activeTransformation, input$activeTransformation)) return(NULL)
+    load_transformation(input$activeTransformation)
+  })
+
+  observeEvent(input$deleteTransformation, {
+    req(input$activeTransformation)
+    if (is.null(rvals$transformations[[input$activeTransformation]])) return(NULL)
+    if (isTruthy(credentials$status) && !is.null(con) && !is.null(rvals$currentDatasetKey) && nzchar(rvals$currentDatasetKey)) {
+      username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+      if (nzchar(username)) {
+        try(delete_transformation_db(
+          con = con,
+          username = username,
+          dataset_key = rvals$currentDatasetKey,
+          transformation_name = input$activeTransformation
+        ), silent = TRUE)
+      }
+    }
+    rvals$transformations[[input$activeTransformation]] <- NULL
+    if (identical(rvals$activeTransformation, input$activeTransformation)) {
+      rvals$activeTransformation <- NULL
+    }
+    refresh_transformation_selector()
+    mynotification(paste0("deleted transformation: ", input$activeTransformation))
   })
 
   dataLoaderServer(rvals = rvals,input,output,session, credentials = credentials, con = con)
@@ -613,12 +826,22 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     session$reload()
   })
 
-  # create subset data frame
-  observeEvent(input$action, {
+  run_confirmed_transformation <- function(transformation_name) {
     print("action")
     req(nrow(rvals$importedData) > 0)
     req(input$attr)
     req(input$chem)
+
+    if (isTRUE(is.null(input$attrGroupsSub)) || length(input$attrGroupsSub) == 0) {
+      mynotification("Cannot proceed without any groups selected", type = "error")
+      return(NULL)
+    }
+
+    transformation_name <- trimws(transformation_name)
+    if (!nzchar(transformation_name)) {
+      transformation_name <- defaultTransformationName()
+    }
+
     rvals$chem = input$chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
@@ -638,12 +861,6 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$impute.method = input$impute.method
 
     message("subsetting data")
-
-    # print(rvals$chem)
-    # print(rvals$importedData)
-    # print(input$attrGroups)
-    # print(input$attr)
-
     rvals$selectedData =
       tryCatch(rvals$importedData %>%
                  dplyr::select(
@@ -659,15 +876,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       rvals$selectedData = rvals$selectedData %>%
         dplyr::mutate_at(dplyr::vars(rvals$chem), tidyr::replace_na, 0)
     }
-    message("data subsetted")
 
-    # imputation
     quietly(label = 'impute',{
       if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0) {
         if (!app_require_packages("mice", feature = "Imputation")) {
           return(NULL)
         }
-        message("imputing")
         transformed = rvals$selectedData[, rvals$chem] %>%
           dplyr::mutate_all(quietly(as.numeric))
         if(isTRUE(rvals$loadZeroAsNA)){
@@ -680,78 +894,109 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         }
         transformed = tryCatch(mice::complete(mice::mice(transformed, method = rvals$impute.method)),
                                error = function(e){
-          mynotification(e)
-          return(rvals$selectedData[,rvals$chem])
-        })
+                                 mynotification(e)
+                                 return(rvals$selectedData[,rvals$chem])
+                               })
         if(is.data.frame(transformed)){
           rvals$selectedData[,rvals$chem] = transformed
           rvals$selectedData = rvals$selectedData %>%
             dplyr::mutate(imputation = rvals$impute.method)
-        } else {
-          mynotification("imputation failed")
         }
-        mynotification("imputed data")
       }
     })
 
     rvals$chem = rvals$chem[which(rvals$chem %in% colnames(rvals$selectedData))]
 
-    # Transforming data
     quietly(label = "transform",{
       if(rvals$transform.method != "none"){
-        message("transforming")
         suppressWarnings({
           transformed = rvals$selectedData[, rvals$chem ]  %>%
             dplyr::mutate_all(quietly(as.numeric))
-          if (rvals$transform.method == 'zscale') {
+          if (rvals$transform.method == 'zScore') {
             transformed = zScale(transformed)
           } else if (rvals$transform.method %in% c("log10", "log")) {
             transformed = transformed  %>%
               dplyr::mutate_all(rvals$transform.method) %>%
               dplyr::mutate_all(round, digits = 3)
           }
-          # get rid of infinite values
           transformed = transformed %>%
             dplyr::mutate_all(list(function(c)
               dplyr::case_when(!is.finite(c) ~ 0, TRUE ~ c)))
           rvals$selectedData[, rvals$chem] = transformed
           rvals$selectedData = rvals$selectedData %>%
             dplyr::mutate(transformation = rvals$transform.method)
-          mynotification('transformed data')
         })
       }
     })
 
-    if(isTRUE(is.null(input$attrGroupsSub))){
-      mynotification("Cannot proceed without any groups selected",type = "error")
-    } else {
-      message("filtering")
-      quietly(label = "keep",{rvals$selectedData = rvals$selectedData %>%
-        dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub)})
-    }
+    quietly(label = "keep",{rvals$selectedData = rvals$selectedData %>%
+      dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub)})
 
-    message("dropping factor levels")
     rvals$selectedData = quietly(rvals$selectedData %>%
       dplyr::mutate_at(dplyr::vars(input$attrGroups), as.character) %>%
       dplyr::mutate_at(dplyr::vars(input$attrGroups),factor))
 
-    try({
-      rvals$runPCAx = input$runPCA
-      rvals$runLDAx = input$runLDA
-      rvals$runUMAPx = input$runUMAP
-      # if(isTRUE(rvals$runPCA)) mynotification("Ran PCA")
-      # if(isTRUE(rvals$runUMAP)) mynotification("Ran UMAP")
-      # if(isTRUE(rvals$runLDA)) mynotification("Ran LDA")
-    })
+    compute_ordinations(
+      run_pca = isTRUE(input$runPCA),
+      run_umap = isTRUE(input$runUMAP),
+      run_lda = isTRUE(input$runLDA)
+    )
+    rvals$runPCAx = FALSE
+    rvals$runLDAx = FALSE
+    rvals$runUMAPx = FALSE
 
-    # update current table
     updateCurrent(rvals,
                   con,
                   credentials,
                   input,
                   output,
                   session)
-    mynotification("updated",duration = 3)
+
+    snapshot <- buildTransformationSnapshot(rvals = rvals, name = transformation_name)
+    snapshot$selectedData <- refreshNonElementMetadata(snapshot$selectedData, rvals$importedData, snapshot$chem)
+    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, rvals$importedData, snapshot$chem)
+    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, rvals$importedData, snapshot$chem)
+    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, rvals$importedData, snapshot$chem)
+    rvals$transformations[[transformation_name]] <- snapshot
+    rvals$activeTransformation <- transformation_name
+    if (isTruthy(credentials$status) && !is.null(con)) {
+      username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+      if (nzchar(username) && !is.null(rvals$currentDatasetKey) && nzchar(rvals$currentDatasetKey)) {
+        try(
+          persist_transformation_db(
+            con = con,
+            username = username,
+            dataset_key = rvals$currentDatasetKey,
+            snapshot = snapshot
+          ),
+          silent = TRUE
+        )
+      }
+    }
+    refresh_transformation_selector(selected_name = transformation_name)
+    mynotification(paste0("updated: ", transformation_name), duration = 3)
+  }
+
+  observeEvent(input$action, {
+    req(nrow(rvals$importedData) > 0)
+    suggested_name <- defaultTransformationName()
+    showModal(modalDialog(
+      title = "Save Transformation",
+      textInput("transformationName", "Transformation name", value = suggested_name),
+      p("If the name already exists, it will be overwritten."),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirmTransformationAction", "Apply & Save")
+      )
+    ))
+  })
+
+  observeEvent(input$confirmTransformationAction, {
+    transformation_name <- tryCatch(input$transformationName, error = function(e) "")
+    removeModal()
+    show_transformation_loading()
+    on.exit(hide_transformation_loading(), add = TRUE)
+    run_confirmed_transformation(transformation_name = transformation_name)
   })
 
   observeEvent(rvals$selectedData,{

@@ -99,11 +99,26 @@ zeroes.</p>
 concentrations are modified. Click the <em>RESET ELEMENTS TO
 ORIGINAL</em> button to undo a transformation or imputation.</p>
 <p><em>PRESS TO CONFIRM SELECTIONS</em> must be pressed prior to most
-operations. Data will not be modified until this is pressed. This will
-create a new dataset called <em>{username}_current.</em> If you wish to
-save this modified dataset as is then select the current dataset from
-the dataset drop-down list and press <em>MERGE/RENAME SELECTED
-DATASETS.</em></p>
+operations. Data will not be modified until this is pressed. You will
+be prompted to name the transformation. If no custom name is used, a
+default timestamp name is assigned. Reusing an existing name will
+overwrite that transformation.</p>
+<p>If you are logged in, saved transformations are stored persistently
+for the selected dataset(s). Each saved transformation can include:</p>
+<ul>
+<li>transformed raw data</li>
+<li>PCA results (if selected)</li>
+<li>UMAP results (if selected)</li>
+<li>LDA results (if selected)</li>
+</ul>
+<p>Use the <em>Transformations</em> section in Data Manager to load or
+delete saved transformations. This allows quick switching between
+analytical versions (for example, different group filters) without
+rebuilding each workflow.</p>
+<p>The app still creates/updates the <em>{username}_current</em> dataset
+after confirming selections. If you wish to save this modified dataset
+as a standalone dataset, select it from the dataset drop-down list and
+press <em>MERGE/RENAME SELECTED DATASETS.</em></p>
 <p>If you wish to remove all data from your temporary workspace then
 press <em>CLEAR WORKSPACE.</em></p>
 <p>The <em>ADD NEW COLUMN</em> button can be used to create new

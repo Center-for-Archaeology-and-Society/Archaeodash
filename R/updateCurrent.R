@@ -38,9 +38,28 @@ updateCurrent = function(rvals,
       )
       print(2)
 
+      safe_chr <- function(x) {
+        if (is.null(x) || length(x) == 0 || is.na(x[[1]])) "" else as.character(x[[1]])
+      }
+      static_fields <- c(
+        "datasetName",
+        "created",
+        "attrGroup",
+        "transformationName",
+        "transformationMethod",
+        "imputationMethod"
+      )
+      static_values <- c(
+        "current",
+        as.character(as.Date(Sys.time())),
+        safe_chr(rvals$attrGroups),
+        safe_chr(rvals$activeTransformation),
+        safe_chr(rvals$transform.method),
+        safe_chr(rvals$impute.method)
+      )
       data_metadata = tibble::tibble(
-        field = c("datasetName", "created", rep("variable", length(rvals$chem))),
-        value = c("current", as.character(as.Date(Sys.time())), rvals$chem)
+        field = c(static_fields, rep("variable", length(rvals$chem))),
+        value = c(static_values, rvals$chem)
       )
 print(3)
       DBI::dbWriteTable(

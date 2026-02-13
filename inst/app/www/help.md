@@ -41,7 +41,18 @@ Choose any columns containing elmeent concentrations next. Only columns containi
 
 *Select Transformation* controls how the element concentrations are modified. Click the *RESET ELEMENTS TO ORIGINAL* button to undo a transformation or imputation.
 
-*PRESS TO CONFIRM SELECTIONS* must be pressed prior to most operations. Data will not be modified until this is pressed. This will create a new dataset called *{username}\_current.* If you wish to save this modified dataset as is then select the current dataset from the dataset drop-down list and press *MERGE/RENAME SELECTED DATASETS.*
+*PRESS TO CONFIRM SELECTIONS* must be pressed prior to most operations. Data will not be modified until this is pressed. You will be prompted to name the transformation. If no custom name is used, a default timestamp name is assigned. Reusing an existing name will overwrite that transformation.
+
+If you are logged in, saved transformations are stored persistently for the selected dataset(s). Each saved transformation can include:
+
+- transformed raw data
+- PCA results (if selected)
+- UMAP results (if selected)
+- LDA results (if selected)
+
+Use the *Transformations* section in Data Manager to load or delete saved transformations. This allows quick switching between analytical versions (for example, different group filters) without rebuilding each workflow.
+
+The app still creates/updates the *{username}\_current* dataset after confirming selections. If you wish to save this modified dataset as a standalone dataset, select it from the dataset drop-down list and press *MERGE/RENAME SELECTED DATASETS.*
 
 If you wish to remove all data from your temporary workspace then press *CLEAR WORKSPACE.*
 

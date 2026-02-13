@@ -210,8 +210,10 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         }
         DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
         DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
+        rvals$currentDatasetKey <- build_dataset_key(datasetname)
         mynotification("Data Loaded")
       } else {
+        rvals$currentDatasetKey <- build_dataset_key(paste0("local_upload_", format(Sys.time(), "%Y%m%d_%H%M%S")))
         mynotification("Data loaded locally")
       }
       removeModal()

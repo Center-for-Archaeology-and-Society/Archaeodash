@@ -14,6 +14,10 @@ When you register for an account, we collect personal information such as your u
 
 When you upload data to ArchaeoDash, the data is stored in our secure database. You retain all rights to your data.
 
+### **Saved Transformations**
+
+If you are logged in, named transformations you save from the Data Manager (including transformed element data and optional PCA/UMAP/LDA result tables) are stored in the database under your account and linked to the selected dataset(s).
+
 ### **Cookies**
 
 If you accept cookies, ArchaeoDash stores a local login cookie on your device so you can remain signed in for up to 30 days. This cookie stores your username for session restoration and is not used for advertising. You can decline cookies or log out at any time to clear the stored login cookie.
@@ -26,7 +30,7 @@ Your account information is used to manage your access to the application and to
 
 ### **Data Usage**
 
-Uploaded data is used within the application to provide analysis and visualization features. We do not share your data with third parties.
+Uploaded data and saved transformations are used within the application to provide analysis and visualization features and to restore your saved analytical states. We do not share your data with third parties.
 
 ## **Data Security**
 

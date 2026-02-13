@@ -44,6 +44,11 @@ replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,
   }
     print("updating current")
   rvals$attrGroupsSub = levels(rvals$selectedData[[col]])
+  rvals$transformations <- refreshTransformationMetadata(
+    transformations = rvals$transformations,
+    imported_data = rvals$importedData,
+    chem = rvals$chem
+  )
   updateCurrent(rvals,
                 con,
                 credentials,

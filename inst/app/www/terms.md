@@ -14,6 +14,10 @@ To use certain features of ArchaeoDash, you must register for an account. To reg
 
 Uploaded data will be stored in a secure database and you retain all rights to your data. You must be logged in to access your data. No guarantees are made regarding the persistence of data storage. Please back up your data regularly.
 
+## **Saved Transformations**
+
+When logged in, you may save named transformations from the Data Manager. Saved transformations are stored as account-linked data products (including transformed element data and optional PCA/UMAP/LDA result tables) so they can be reloaded later. You are responsible for naming, organizing, and backing up these transformations.
+
 ## **Limitation of Liability**
 
 ArchaeoDash is provided "as is" and "as available" without any warranties of any kind. We do not guarantee that the application will be uninterrupted or error-free.

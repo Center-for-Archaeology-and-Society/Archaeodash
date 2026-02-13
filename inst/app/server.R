@@ -12,6 +12,9 @@ shinyServer(function(input, output, session) {
   ###  create reactive values  ####
   rvals = reactiveValues(importedData = tibble::tibble(),
   selectedData = tibble::tibble())
+  rvals$transformations <- list()
+  rvals$activeTransformation <- NULL
+  rvals$currentDatasetKey <- NULL
   credentials = reactiveValues()
   # for testing
   # rvals <<- reactiveValues(importedData = tibble::tibble(),

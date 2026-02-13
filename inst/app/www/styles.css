@@ -61,3 +61,30 @@ body {
 .membership-table-scroll-box table.dataTable.no-footer {
   border-bottom: none !important;
 }
+
+.transformation-loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+}
+
+.transformation-loading-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #d8d8d8;
+  border-top-color: #2f7f5f;
+  border-radius: 50%;
+  animation: transformation-spinner-rotate 0.8s linear infinite;
+}
+
+.transformation-loading-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@keyframes transformation-spinner-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
