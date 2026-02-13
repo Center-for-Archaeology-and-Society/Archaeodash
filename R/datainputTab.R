@@ -252,12 +252,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       # print(dput(input$file1))
 
       rvals$data = dataLoader(filename = input$file1$datapath)
-      if(isTruthy(credentials$status)){
-        dataLoaderUI()
-      } else {
-        rvals$importedData = rvals$data
-        rvals$selectedData = rvals$importedData
-      }
+      dataLoaderUI()
 
     }
   })
@@ -517,8 +512,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                    tidyselect::any_of(rvals$attr)
                  ) %>%
                  dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
-                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)) %>%
-                 dplyr::mutate_at(dplyr::vars(rvals$chem),tidyr::replace_na,0),error = function(e) mynotification(e))
+                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)),
+               error = function(e) mynotification(e))
+
+    if(isTRUE(rvals$loadNAAsZero)){
+      rvals$selectedData = rvals$selectedData %>%
+        dplyr::mutate_at(dplyr::vars(rvals$chem), tidyr::replace_na, 0)
+    }
     message("data subsetted")
 
     # imputation
@@ -526,7 +526,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0) {
         message("imputing")
         transformed = rvals$selectedData[, rvals$chem] %>%
-          dplyr::mutate_all(dplyr::na_if,y = 0)
+          dplyr::mutate_all(quietly(as.numeric))
+        if(isTRUE(rvals$loadZeroAsNA)){
+          transformed = transformed %>%
+            dplyr::mutate_all(dplyr::na_if, y = 0)
+        }
+        if(isTRUE(rvals$loadNegativeAsNA)){
+          transformed = transformed %>%
+            dplyr::mutate_all(~ dplyr::if_else(. < 0, NA_real_, .))
+        }
         transformed = tryCatch(mice::complete(mice::mice(transformed, method = rvals$impute.method)),
                                error = function(e){
           mynotification(e)
