@@ -18,7 +18,7 @@ exploreTab = function() {
       tabPanel("Dataset", fluidRow(
         column(
           3,
-          h4(
+          h5(
             "Numbers of samples with missing data by element (pre-imputation)"
           ),
           plotOutput("miss.plot", width = "250px")
@@ -192,11 +192,13 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # Render missing data plot
   output$miss.plot <- renderPlot({
     validate(need(isTRUE(inherits(
-      rvals[['selectedData']], "data.frame"
+      rvals[['importedData']], "data.frame"
     )), ""))
-    req(rvals[['selectedData']])
-    req(rvals$chem)
-    plot_missing(data = rvals$selectedData[, rvals$chem])
+    req(rvals[['importedData']])
+    chem_for_plot = if (!is.null(rvals$initialChem)) rvals$initialChem else rvals$chem
+    chem_for_plot = chem_for_plot[chem_for_plot %in% names(rvals$importedData)]
+    validate(need(length(chem_for_plot) > 0, "No element columns available for missing-data plot."))
+    plot_missing(data = rvals$importedData[, chem_for_plot, drop = FALSE])
   })
 
   # Render UI for univariate displays

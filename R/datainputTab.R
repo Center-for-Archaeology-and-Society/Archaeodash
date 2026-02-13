@@ -114,6 +114,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dplyr::filter(field == "variable") %>%
         dplyr::pull(value)
       rvals$chem = tblsmd
+      rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
     }
 
   })

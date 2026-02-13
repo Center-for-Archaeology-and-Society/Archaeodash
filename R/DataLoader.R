@@ -130,6 +130,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       rvals$importedData = data_loaded
       rvals$selectedData = data_loaded
       rvals$chem = intersect(input$loadchem, names(data_loaded))
+      rvals$initialChem = rvals$chem
       rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
       rvals$loadNegativeAsNA = isTRUE(input$loadNegativeAsNA)
       rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
