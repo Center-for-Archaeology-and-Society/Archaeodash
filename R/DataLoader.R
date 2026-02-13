@@ -17,6 +17,25 @@ dataLoader = function(filename){
   return(data)
 }
 
+# Common INAA element columns derived from inst/app/INAA_test.csv.
+common_inaa_elements <- c(
+  "as", "la", "lu", "nd", "sm", "u", "yb", "ce", "co", "cr", "cs",
+  "eu", "fe", "hf", "ni", "rb", "sb", "sc", "sr", "ta", "tb", "th",
+  "zn", "zr", "al", "ba", "ca", "dy", "k", "mn", "na", "ti", "v"
+)
+
+default_chem_columns <- function(column_names) {
+  normalized_names <- tolower(column_names)
+  matched_common <- column_names[normalized_names %in% common_inaa_elements]
+
+  if (length(matched_common) > 0) {
+    return(matched_common)
+  }
+
+  excluded_defaults <- c("rowid", "anid")
+  column_names[!normalized_names %in% excluded_defaults]
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -93,8 +112,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
     choices = names(rvals$data)
     numeric_columns_df = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
                                             janitor::remove_empty("cols"))
-    excluded_defaults = c("rowid", "anid")
-    selected = names(numeric_columns_df)[!tolower(names(numeric_columns_df)) %in% excluded_defaults]
+    selected = default_chem_columns(names(numeric_columns_df))
     selectInput('loadchem',"Choose which columns are elements/predictor variables", choices = choices, selected = selected, multiple = T)
   })
 

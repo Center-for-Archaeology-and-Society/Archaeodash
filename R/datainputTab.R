@@ -13,6 +13,8 @@ datainputTab = function() {
     uiOutput('confirmPriorUI'),
     br(),
     uiOutput('manageDatasets'),
+    uiOutput('newCol'),
+    br(),
     hr(),
     uiOutput("attr"),
     uiOutput("subSelect"),
@@ -20,9 +22,6 @@ datainputTab = function() {
     uiOutput("actionUI"),
     hr(),
     uiOutput("resetUI"),
-    br(),
-    hr(),
-    uiOutput('newCol'),
     br(),
     hr()
   )
