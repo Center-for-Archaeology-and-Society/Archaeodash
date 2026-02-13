@@ -142,6 +142,15 @@ groupServer = function(input,output,session,rvals, credentials, con){
           selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
           by = dplyr::join_by("ID" == !!input$sampleID)
         )
+      rvals$membershipProbs <- rvals$membershipProbs %>%
+        dplyr::mutate(
+          ProjectionIncluded = dplyr::if_else(
+            GroupVal %in% input$eligibleGroups,
+            "yes",
+            "no"
+          ),
+          .after = "InGroup"
+        )
       if(isTruthy(!"rowid" %in% names(rvals$membershipProbs))){
         rvals$membershipProbs = rvals$membershipProbs %>%
           dplyr::mutate(rowid = as.character(as.integer(ID)))
@@ -157,20 +166,30 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
-    if(isTruthy(is.null(rvals$membershipTbl_state_length))){
-      rvals$membershipTbl_state_length = 25
-    }
+    hide_by_default <- which(names(rvals$membershipProbs) %in% c("Group", "rowid", "BestValue"))
+    projection_cols <- which(names(rvals$membershipProbs) %in% input$eligibleGroups)
+    hide_targets <- sort(unique(c(hide_by_default, projection_cols)))
+
     DT::datatable(
       rvals$membershipProbs,
       filter = "top",
       rownames = F,
       selection = 'multiple',
-      style = 'bootstrap',
+      style = 'default',
+      class = "compact membership-plain-table nowrap",
+      extensions = c("Buttons"),
       options = list(
+        dom = "Brt",
+        buttons = list("colvis"),
+        autoWidth = TRUE,
         scrollY = "420px",
         scrollCollapse = TRUE,
         scrollX = TRUE,
-        paging = FALSE
+        paging = FALSE,
+        columnDefs = list(
+          list(visible = FALSE, targets = hide_targets - 1),
+          list(width = "78px", targets = "_all")
+        )
       )
     )
   })

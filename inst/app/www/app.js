@@ -67,6 +67,40 @@
     }, 200);
   }
 
+  function closeColvisCollection() {
+    var collections = document.querySelectorAll("div.dt-button-collection");
+    for (var i = 0; i < collections.length; i += 1) {
+      collections[i].style.display = "none";
+      collections[i].classList.remove("show");
+    }
+    var backgrounds = document.querySelectorAll("div.dt-button-background");
+    for (var j = 0; j < backgrounds.length; j += 1) {
+      if (backgrounds[j] && backgrounds[j].parentNode) {
+        backgrounds[j].parentNode.removeChild(backgrounds[j]);
+      }
+    }
+  }
+
+  function bindColvisCloseBehavior() {
+    document.addEventListener(
+      "click",
+      function (e) {
+        var clickedInsideMenu = e.target.closest("div.dt-button-collection");
+        var clickedColvisButton = e.target.closest("button.buttons-colvis, a.buttons-colvis");
+        if (!clickedInsideMenu && !clickedColvisButton) {
+          closeColvisCollection();
+        }
+      },
+      true
+    );
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        closeColvisCollection();
+      }
+    });
+  }
+
   function init() {
     try {
       var toggleBtn = document.getElementById("toggleSidebar");
@@ -132,6 +166,7 @@
         });
       }
 
+      bindColvisCloseBehavior();
       registerMessageHandler(30);
     } catch (err) {
       if (window.console && console.error) {

@@ -48,3 +48,16 @@ body {
   background-color: #fff;
   padding: 8px;
 }
+
+.membership-table-scroll-box table.dataTable.compact thead th,
+.membership-table-scroll-box table.dataTable.compact tbody td {
+  border: none !important;
+  font-size: 11px !important;
+  line-height: 1.1;
+  padding: 2px 4px !important;
+  background: #fff !important;
+}
+
+.membership-table-scroll-box table.dataTable.no-footer {
+  border-bottom: none !important;
+}
