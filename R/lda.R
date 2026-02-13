@@ -12,6 +12,9 @@
 getLDA = function(df = rvals$selectedData,
                   chem = rvals$chem,
                   attrGroups = rvals$attrGroups) {
+  if (!app_require_packages("MASS", feature = "Linear Discriminant Analysis")) {
+    return(NULL)
+  }
   mdl = as.formula(glue::glue("`{attrGroups}` ~ ."))
   mdl_lda = tryCatch(
     MASS::lda(mdl, data = df[, c(attrGroups, chem)]),

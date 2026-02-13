@@ -139,6 +139,9 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
 
       if(isTruthy(credentials$status) && !is.null(con)){
+        if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
+          return(NULL)
+        }
         datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
           janitor::make_clean_names()
         if(nchar(datasetname) > 53){

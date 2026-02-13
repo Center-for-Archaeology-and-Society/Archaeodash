@@ -13,6 +13,10 @@
 #' @examples
 #' connect(db,host,user,pwd,port)
 connect = function(db = Sys.getenv("db"), host = Sys.getenv('host'), user = Sys.getenv('user'), pwd = Sys.getenv('pwd'),port = as.integer(Sys.getenv("port"))){
+  if (!app_require_packages(c("DBI", "RMySQL"), feature = "Database connectivity", notify = FALSE)) {
+    message(format_missing_packages_message("Database connectivity", missing_required_packages(c("DBI", "RMySQL"))))
+    return(NULL)
+  }
   con = tryCatch({DBI::dbConnect(RMySQL::MySQL(),
                        host = host,
                        dbname = db,

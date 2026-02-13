@@ -89,6 +89,9 @@ ordinationServer = function(input,output,session,rvals){
     message("running LDA")
     quietly(label = 'running LDA',{
       if(isTRUE(rvals$runLDAx)){
+        if (!app_require_packages("MASS", feature = "Linear Discriminant Analysis")) {
+          return(NULL)
+        }
         lda = tryCatch(getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),error = function(e) return(list(LDAdf = tibble::tibble(), mod = NULL)))
         rvals$LDAdf = lda$LDAdf
         rvals$LDAmod = lda$mod
@@ -103,6 +106,9 @@ ordinationServer = function(input,output,session,rvals){
     message("running UMAP")
     quietly(label = 'running UMAP',{
       if(isTRUE(rvals$runUMAPx)){
+        if (!app_require_packages("umap", feature = "UMAP")) {
+          return(NULL)
+        }
         umap = tryCatch(umap::umap(rvals$selectedData %>% dplyr::select(tidyselect::any_of(rvals$chem))),error = function(e){
           mynotification(paste("UMAP failed", "UMAP failed to run. Please check your data and try again.\n",e))
           return(NULL)
@@ -117,6 +123,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA plot
   output$pca.plot <- plotly::renderPlotly({
     req(rvals$pca)
+    validate(need(app_require_packages(c("plotly", "factoextra"), feature = "PCA plotting"), ""))
     message("rendering PCA plot")
     quietly(label = 'PCA plot',{
       plotly::ggplotly(factoextra::fviz_pca_ind(
@@ -133,6 +140,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA Eigenvalue plot
   output$eigen.plot <- plotly::renderPlotly({
     req(rvals$pca)
+    validate(need(app_require_packages(c("plotly", "factoextra"), feature = "Eigenvalue plotting"), ""))
     message("rendering eigenvalue plot")
     quietly(label = "PCA plot 2",{
       plotly::ggplotly(factoextra::fviz_eig(rvals$pca))
@@ -142,6 +150,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA Eigenvalue plot
   output$pca.el.plot <- plotly::renderPlotly({
     req(rvals$pca)
+    validate(need(app_require_packages(c("plotly", "factoextra"), feature = "PCA loading plotting"), ""))
     quietly(label = "PCA plot 3",{
       plotly::ggplotly(factoextra::fviz_pca_var(
         rvals$pca,
@@ -156,6 +165,7 @@ ordinationServer = function(input,output,session,rvals){
   # Render PCA contribution table
   output$contribTbl = renderTable({
     req(rvals$pca)
+    validate(need(app_require_packages("factoextra", feature = "PCA contribution table"), ""))
     message("rendering contribution table")
     rowSums(factoextra::get_pca_var(rvals$pca)$contrib[,1:4]) %>%
       as.data.frame() %>%
@@ -168,6 +178,7 @@ ordinationServer = function(input,output,session,rvals){
   output$lda.plot <- plotly::renderPlotly({
     # validate(need(inherits(rvals$LDAmod,"candisc"),""))
     req(rvals$LDAmod)
+    validate(need(app_require_packages("plotly", feature = "LDA plotting"), ""))
     message("rendering LDA plot")
     quietly(label = 'LDA plot',{
       pdf(file = NULL)

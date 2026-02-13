@@ -525,6 +525,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     # imputation
     quietly(label = 'impute',{
       if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0) {
+        if (!app_require_packages("mice", feature = "Imputation")) {
+          return(NULL)
+        }
         message("imputing")
         transformed = rvals$selectedData[, rvals$chem] %>%
           dplyr::mutate_all(quietly(as.numeric))

@@ -73,6 +73,18 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     req(rvals$chem)
     try({
       if(isTruthy(input$cluster.column.text == "")) clusterName = "cluster" else clusterName = input$cluster.column.text
+      required_pkgs = switch(
+        input$cluster.parent,
+        nClust = c("factoextra", "cowplot"),
+        hca = c("dendextend"),
+        hdca = c("dendextend"),
+        kmeans = c("factoextra"),
+        kmedoids = c("factoextra"),
+        character(0)
+      )
+      if (length(required_pkgs) > 0 && !app_require_packages(required_pkgs, feature = "Cluster analysis")) {
+        return(NULL)
+      }
       if (input$cluster.parent == "nClust") {
         kmeans_wss <-
           factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "wss") +

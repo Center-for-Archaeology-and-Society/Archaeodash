@@ -17,8 +17,11 @@ updateCurrent = function(rvals,
                          credentials,
                          input,
                          output,
-                         session) {
+  session) {
   if (isTruthy(credentials$status)) {
+    if (!app_require_packages("DBI", feature = "Saving current dataset")) {
+      return(NULL)
+    }
     tryCatch({
       print(head(rvals$selectedData))
       print(head(rvals$importedData))

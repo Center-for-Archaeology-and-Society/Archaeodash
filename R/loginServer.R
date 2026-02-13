@@ -58,6 +58,13 @@ loginServer = function(con, input = input, output = output, session = session, c
   })
 
   observeEvent(input$login, {
+    if (!app_require_packages(c("DBI", "sodium"), feature = "Login")) {
+      return(NULL)
+    }
+    if (is.null(con)) {
+      mynotification("Database connection is unavailable. Login is disabled.", type = "error")
+      return(NULL)
+    }
     removeModal()
     username <- tolower(isolate(input$username))
     password <- isolate(input$password)
@@ -97,6 +104,13 @@ loginServer = function(con, input = input, output = output, session = session, c
   })
 
   observeEvent(input$registerConfirm, {
+    if (!app_require_packages(c("DBI", "sodium"), feature = "Registration")) {
+      return(NULL)
+    }
+    if (is.null(con)) {
+      mynotification("Database connection is unavailable. Registration is disabled.", type = "error")
+      return(NULL)
+    }
     removeModal()
     username <- tolower(isolate(input$username))
     password <- isolate(input$password)
