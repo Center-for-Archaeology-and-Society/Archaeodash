@@ -347,22 +347,22 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     req(rvals$chem)
     req(rvals$clusterDT)
     quietly({
-    nms = rvals$clusterDT %>% names()
-    nms = setdiff(nms,'Sample')
-    cluster_cols = rvals$clusterDT %>%
+    assignment_columns = rvals$clusterDT %>% names()
+    assignment_columns = setdiff(assignment_columns,'Sample')
+    assignment_data = rvals$clusterDT %>%
       dplyr::select(-Sample) %>%
-      dplyr::mutate_at(dplyr::vars(nms),factor)
+      dplyr::mutate_at(dplyr::vars(assignment_columns),factor)
     rvals$selectedData =
       rvals$selectedData %>%
-      dplyr::select(-tidyselect::any_of(nms)) %>%
-      dplyr::bind_cols(cluster_cols)
+      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
+      dplyr::bind_cols(assignment_data)
     rvals$importedData =
       rvals$importedData %>%
-      dplyr::select(-tidyselect::any_of(nms)) %>%
-      dplyr::bind_cols(cluster_cols)
+      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
+      dplyr::bind_cols(assignment_data)
 
-    if(length(nms) > 0){
-      rvals$attrGroups = nms[[1]]
+    if(length(assignment_columns) > 0){
+      rvals$attrGroups = assignment_columns[[1]]
       rvals$attrGroupsSub = levels(rvals$selectedData[[rvals$attrGroups]])
       rvals$attrs = unique(c(rvals$attr, rvals$attrGroups, "imputation", "transformation"))
     }

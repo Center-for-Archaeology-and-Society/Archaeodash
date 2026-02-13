@@ -55,10 +55,10 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       return(NULL)
     }
     #mysql table names have a 64 character limit
-    n = nchar(credentials$res$username) + 11
-    fn = input$file1$name %>% tools::file_path_sans_ext() %>% stringr::str_sub(1,64 - n)
-    if(isTruthy(length(fn) > 0)){
-      textInput("datasetName","Enter a name for the dataset", value = fn)
+    username_prefix_length = nchar(credentials$res$username) + 11
+    suggested_name = input$file1$name %>% tools::file_path_sans_ext() %>% stringr::str_sub(1,64 - username_prefix_length)
+    if(isTruthy(length(suggested_name) > 0)){
+      textInput("datasetName","Enter a name for the dataset", value = suggested_name)
     } else {
       textInput("datasetName","Enter a name for the dataset")
     }
@@ -91,10 +91,10 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
 
   output$loadchemUI = renderUI({
     choices = names(rvals$data)
-    dfNum = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
-                               janitor::remove_empty("cols"))
+    numeric_columns_df = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
+                                            janitor::remove_empty("cols"))
     excluded_defaults = c("rowid", "anid")
-    selected = names(dfNum)[!tolower(names(dfNum)) %in% excluded_defaults]
+    selected = names(numeric_columns_df)[!tolower(names(numeric_columns_df)) %in% excluded_defaults]
     selectInput('loadchem',"Choose which columns are elements/predictor variables", choices = choices, selected = selected, multiple = T)
   })
 

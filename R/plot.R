@@ -35,7 +35,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
         y = !!as.name(yvar),
         shape = !!as.name(attrGroups),
         color = !!as.name(attrGroups),
-        key = rowid
+        text = rowid
       )
     ) +
       ggplot2::geom_point()
@@ -47,7 +47,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
         x = !!as.name(xvar),
         y = !!as.name(yvar),
         color = !!as.name(attrGroups),
-        key = rowid
+        text = rowid
       )
     ) +
       ggplot2::geom_point()
@@ -98,10 +98,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   print(i); i = i + 1
   # Extract the data used by ggplot
   gg_data <- ggplot2::ggplot_build(gg)$data[[1]] %>%
-    dplyr::rename(rowid = key) %>%
-    dplyr::left_join(plotdf %>% dplyr::select(tidyselect::all_of(c(
-      'rowid', attrGroups
-    ))), by = "rowid")  %>%
+    dplyr::rename(rowid = text) %>%
+    dplyr::mutate(rowid = as.character(rowid)) %>%
+    dplyr::left_join(
+      plotdf %>%
+        dplyr::select(tidyselect::all_of(c("rowid", attrGroups))) %>%
+        dplyr::mutate(rowid = as.character(rowid)),
+      by = "rowid"
+    )  %>%
     dplyr::rename(
       name = !!as.name(attrGroups)
     ) %>%
@@ -216,7 +220,7 @@ multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = 
       x = elem1,
       y = elem2,
       color = !!as.name(attrGroups),
-      key = rowid
+      text = rowid
     )) +
     ggplot2::geom_point(size = ptsize, alpha = .66) +
     ggplot2::ylab("") +

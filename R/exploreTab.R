@@ -46,52 +46,52 @@ exploreTab = function() {
 }
 
 # Internal helper for Crosstabs calculations.
-build_crosstab_summary <- function(data, col1, col2, summary_type) {
+compute_crosstab_summary <- function(data, group_column, value_column, summary_method) {
   if (!inherits(data, "data.frame")) {
     stop("No data available.", call. = FALSE)
   }
 
-  col_names <- names(data)
-  if (!(col1 %in% col_names)) {
+  column_names <- names(data)
+  if (!(group_column %in% column_names)) {
     stop("Column 1 is not available.", call. = FALSE)
   }
-  if (!(col2 %in% col_names)) {
+  if (!(value_column %in% column_names)) {
     stop("Column 2 is not available.", call. = FALSE)
   }
 
-  if (summary_type == "count") {
+  if (summary_method == "count") {
     return(
       data %>%
-        dplyr::group_by(dplyr::across(tidyselect::all_of(c(col1, col2)))) %>%
+        dplyr::group_by(dplyr::across(tidyselect::all_of(c(group_column, value_column)))) %>%
         dplyr::summarize(count = dplyr::n(), .groups = "drop")
     )
   }
 
-  summary_fn <- switch(
-    summary_type,
+  summary_function <- switch(
+    summary_method,
     mean = mean,
     median = median,
     sd = sd,
     NULL
   )
-  if (is.null(summary_fn)) {
+  if (is.null(summary_function)) {
     stop("Unsupported summary function selected.", call. = FALSE)
   }
 
-  dt_input <- data %>%
+  summary_input <- data %>%
     dplyr::mutate(
-      crosstab_numeric = suppressWarnings(as.numeric(as.character(.data[[col2]])))
+      crosstab_numeric = suppressWarnings(as.numeric(as.character(.data[[value_column]])))
     )
 
-  if (!any(!is.na(dt_input$crosstab_numeric))) {
-    stop(paste0("Column '", col2, "' cannot be converted to numeric values."), call. = FALSE)
+  if (!any(!is.na(summary_input$crosstab_numeric))) {
+    stop(paste0("Column '", value_column, "' cannot be converted to numeric values."), call. = FALSE)
   }
 
-  result_name <- paste0("result-", col2)
-  dt_input %>%
-    dplyr::group_by(dplyr::across(tidyselect::all_of(col1))) %>%
+  result_column_name <- paste0("result-", value_column)
+  summary_input %>%
+    dplyr::group_by(dplyr::across(tidyselect::all_of(group_column))) %>%
     dplyr::summarize(
-      !!result_name := round(summary_fn(crosstab_numeric, na.rm = TRUE), 2),
+      !!result_column_name := round(summary_function(crosstab_numeric, na.rm = TRUE), 2),
       .groups = "drop"
     )
 }
@@ -168,11 +168,11 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
     req(rvals$selectedData, input$crosstab1, input$crosstab2, input$crosstab3)
     quietly({
       tryCatch(
-        build_crosstab_summary(
+        compute_crosstab_summary(
           data = rvals$selectedData,
-          col1 = input$crosstab1,
-          col2 = input$crosstab2,
-          summary_type = input$crosstab3
+          group_column = input$crosstab1,
+          value_column = input$crosstab2,
+          summary_method = input$crosstab3
         ),
         error = function(e) {
           validate(need(FALSE, e$message))
