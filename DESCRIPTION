@@ -18,7 +18,6 @@ Suggests:
     MASS,
     mice,
     RMySQL,
-    shinyWidgets,
     sodium,
     testthat,
     shinytest2,

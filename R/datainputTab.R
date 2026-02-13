@@ -42,14 +42,11 @@ datainputTab = function() {
 dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
   available_group_values <- shiny::reactiveVal(character())
+  active_group_column <- shiny::reactiveVal(NULL)
 
   update_group_selector <- function(selected_values) {
     selected_values <- as.character(selected_values)
-    if (app_require_packages("shinyWidgets", feature = "Enhanced group selection", notify = FALSE)) {
-      shinyWidgets::updatePickerInput(session, "attrGroupsSub", selected = selected_values)
-    } else {
-      updateSelectInput(session, "attrGroupsSub", selected = selected_values)
-    }
+    updateSelectizeInput(session, "attrGroupsSub", selected = selected_values)
   }
 
   apply_new_column <- function(new_column_name, new_value) {
@@ -365,11 +362,19 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dplyr::filter(!is.na(.group_value)) %>%
         dplyr::count(.group_value, name = ".n", sort = FALSE)
       group_mode <- if (is.null(input$groupSelectionMode)) "all" else input$groupSelectionMode
-      prior_selection <- if (!is.null(input$attrGroupsSub)) input$attrGroupsSub else rvals[["attrGroupsSub"]]
+      prior_selection <- if (!is.null(rvals[["attrGroupsSub"]])) {
+        rvals[["attrGroupsSub"]]
+      } else {
+        isolate(input$attrGroupsSub)
+      }
+      prior_group_column <- active_group_column()
+      if (is.null(prior_group_column)) {
+        prior_group_column <- input$attrGroups
+      }
       selection <- resolve_group_selection(
         all_groups = items.all,
         prior_selection = prior_selection,
-        prior_group_column = rvals$attrGroups,
+        prior_group_column = prior_group_column,
         current_group_column = input$attrGroups
       )
       display_items <- filter_group_choices(
@@ -396,43 +401,38 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           inline = TRUE
         ),
         tags$div(
-          style = "display:flex; flex-wrap:wrap; gap:0.35rem; margin:0.25rem 0 0.5rem 0;",
-          actionButton("groupSelectAll", "Select all", class = "mybtn", style = "margin:0; padding:4px 10px;"),
-          actionButton("groupDeselectAll", "Deselect all", class = "mybtn", style = "margin:0; padding:4px 10px;"),
-          actionButton("groupInvertSelection", "Invert selection", class = "mybtn", style = "margin:0; padding:4px 10px;"),
-          actionButton("groupResetSelection", "Reset to all", class = "mybtn", style = "margin:0; padding:4px 10px;")
+          style = "display:grid; grid-template-columns:1fr 1fr; gap:0.2rem; margin:0.15rem 0 0.35rem 0;",
+          actionButton("groupSelectAll", "Select all", class = "mybtn", style = "margin:0; padding:2px 6px; width:100%;"),
+          actionButton("groupDeselectAll", "Deselect all", class = "mybtn", style = "margin:0; padding:2px 6px; width:100%;"),
+          actionButton("groupInvertSelection", "Invert selection", class = "mybtn", style = "margin:0; padding:2px 6px; width:100%;"),
+          actionButton("groupResetSelection", "Reset to all", class = "mybtn", style = "margin:0; padding:2px 6px; width:100%;")
         ),
-        if (app_require_packages("shinyWidgets", feature = "Enhanced group selection", notify = FALSE)) {
-          shinyWidgets::pickerInput(
-            "attrGroupsSub",
-            "Select groups to include",
-            choices = display_choices,
-            multiple = TRUE,
-            selected = picker_selected,
-            options = list(
-              "actions-box" = TRUE,
-              "live-search" = TRUE,
-              "selected-text-format" = "count > 3"
-            )
-          )
-        } else {
-          tagList(
-            tags$div(
-              class = "text-warning",
-              format_missing_packages_message("Enhanced group selection", "shinyWidgets")
-            ),
-            selectInput(
-              "attrGroupsSub",
-              "Select groups to include",
-              choices = display_choices,
-              multiple = TRUE,
-              selected = picker_selected
-            )
-          )
-        }
+        selectizeInput(
+          "attrGroupsSub",
+          "Select groups to include",
+          choices = display_choices,
+          multiple = TRUE,
+          selected = picker_selected,
+          options = list(plugins = list("remove_button"))
+        )
       )
     })
   })
+
+  observeEvent(input$attrGroupsSub, {
+    if (is.null(input$attrGroupsSub)) return(NULL)
+    rvals$attrGroupsSub <- input$attrGroupsSub
+  }, ignoreNULL = FALSE)
+
+  observeEvent(input$attrGroups, {
+    if (is.null(input$attrGroups)) return(NULL)
+    previous_group_column <- active_group_column()
+    if (!is.null(previous_group_column) && !identical(previous_group_column, input$attrGroups)) {
+      # Reset subgroup selection when switching to a different grouping column.
+      rvals$attrGroupsSub <- NULL
+    }
+    active_group_column(input$attrGroups)
+  }, ignoreNULL = FALSE)
 
   observeEvent(input$groupSelectionMode, {
     if (is.null(input$groupSelectionMode)) return(NULL)
@@ -446,20 +446,27 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }, ignoreInit = TRUE)
 
   observeEvent(input$groupSelectAll, {
-    update_group_selector(available_group_values())
+    selected_values <- available_group_values()
+    rvals$attrGroupsSub <- selected_values
+    update_group_selector(selected_values)
   })
 
   observeEvent(input$groupDeselectAll, {
+    rvals$attrGroupsSub <- character()
     update_group_selector(character())
   })
 
   observeEvent(input$groupInvertSelection, {
     selected_values <- if (is.null(input$attrGroupsSub)) character() else input$attrGroupsSub
-    update_group_selector(setdiff(available_group_values(), selected_values))
+    updated_values <- setdiff(available_group_values(), selected_values)
+    rvals$attrGroupsSub <- updated_values
+    update_group_selector(updated_values)
   })
 
   observeEvent(input$groupResetSelection, {
-    update_group_selector(available_group_values())
+    selected_values <- available_group_values()
+    rvals$attrGroupsSub <- selected_values
+    update_group_selector(selected_values)
     if (!is.null(input$groupSelectionMode) && input$groupSelectionMode != "all") {
       updateRadioButtons(session, "groupSelectionMode", selected = "all")
     }

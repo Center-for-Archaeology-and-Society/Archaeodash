@@ -8,7 +8,7 @@
 #' ordinationTab()
 ordinationTab = function(){
   tabPanel(title = "Ordination", id = "ordinationtab",icon = icon("equalizer", lib = "glyphicon"),
-             tabsetPanel(id = "ordination", type = "pills",
+             tabsetPanel(id = "ordinationPanels", type = "pills",
                          tabPanel("PCA",
                                   fluidRow(column(6,
                                                   uiOutput('pcaheader'))),

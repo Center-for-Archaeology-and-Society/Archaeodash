@@ -13,7 +13,7 @@ groupTab = function(){
              uiOutput("eligibleGroupUI"),
              uiOutput("sampleIDUI"),
              selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
-             selectInput("dataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
+             selectInput("membershipDataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
              actionButton("membershipRun","Calculate", class = "mybtn"),
            ),
            mainPanel(
@@ -110,7 +110,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
     mynotification("calculating membership")
     rvals$eligibleGroups = input$eligibleGroups
     rvals$sampleID = input$sampleID
-    if(isTruthy(input$dataset == "elements")){
+    if(isTruthy(input$membershipDataset == "elements")){
       df = rvals$selectedData
     } else {
       req(rvals$pcadf)

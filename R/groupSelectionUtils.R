@@ -1,17 +1,19 @@
 resolve_group_selection <- function(all_groups, prior_selection, prior_group_column, current_group_column) {
   all_groups <- unique(as.character(all_groups))
-  if (is.null(prior_selection)) prior_selection <- character()
-  prior_selection <- as.character(prior_selection)
   if (length(all_groups) == 0) {
     return(character())
   }
-  if (length(prior_selection) == 0 || !identical(prior_group_column, current_group_column)) {
+  if (!identical(prior_group_column, current_group_column)) {
     return(all_groups)
+  }
+  if (is.null(prior_selection)) {
+    return(all_groups)
+  }
+  prior_selection <- as.character(prior_selection)
+  if (length(prior_selection) == 0) {
+    return(character())
   }
   selection <- intersect(prior_selection, all_groups)
-  if (length(selection) == 0) {
-    return(all_groups)
-  }
   selection
 }
 

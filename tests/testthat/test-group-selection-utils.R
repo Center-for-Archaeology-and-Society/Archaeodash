@@ -23,6 +23,17 @@ test_that("resolve_group_selection preserves valid prior selection on same colum
   expect_equal(selected, "B")
 })
 
+test_that("resolve_group_selection preserves explicit empty selection on same column", {
+  selected <- resolve_group_selection(
+    all_groups = c("A", "B", "C"),
+    prior_selection = character(),
+    prior_group_column = "group_col",
+    current_group_column = "group_col"
+  )
+
+  expect_equal(selected, character())
+})
+
 test_that("filter_group_choices returns expected subsets by mode", {
   all_groups <- c("A", "B", "C")
   selection <- c("A", "C")

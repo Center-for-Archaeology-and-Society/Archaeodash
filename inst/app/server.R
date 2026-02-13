@@ -7,6 +7,7 @@ library(profvis)
 options(shiny.maxRequestSize = 100 * 1024^2)
 
 shinyServer(function(input, output, session) {
+  ArchaeoDash:::ensure_shiny_dependency_aliases()
 
   ###  create reactive values  ####
   rvals = reactiveValues(importedData = tibble::tibble(),
