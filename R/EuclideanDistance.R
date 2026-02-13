@@ -10,6 +10,12 @@ euclideanDistanceTab = function() {
            id = "euclideanDistancetab",
            sidebarLayout(
              sidebarPanel(
+               selectInput(
+                 "EDdataset",
+                 "Select dataset to use",
+                 choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+                 selected = "elements"
+               ),
                uiOutput("projectionGroupUI"),
                uiOutput("EDsampleIDUI"),
                radioButtons(
@@ -62,11 +68,68 @@ euclideanDistanceTab = function() {
 #' @examples
 #' euclideanDistanceSrvr(input,output,session,rvals)
 euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
+  get_ed_source_features <- function(df, source) {
+    if (!is.data.frame(df) || nrow(df) == 0) return(character())
+    if (identical(source, "principal components")) {
+      cols <- grep("^PC[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "UMAP")) {
+      cols <- grep("^V[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "linear discriminants")) {
+      cols <- grep("^LD[0-9]+$", names(df), value = TRUE)
+    } else {
+      cols <- intersect(rvals$chem, names(df))
+    }
+    if (length(cols) == 0) {
+      meta_cols <- unique(c(rvals$attrs, rvals$attrGroups, "rowid"))
+      candidate_cols <- setdiff(names(df), meta_cols)
+      numeric_cols <- candidate_cols[vapply(df[candidate_cols], is.numeric, logical(1))]
+      cols <- numeric_cols
+    }
+    cols
+  }
+
+  get_ed_data <- function(source, notify = TRUE) {
+    warn <- function(msg) {
+      if (isTRUE(notify)) mynotification(msg, type = "warning")
+    }
+    if (identical(source, "principal components")) {
+      if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+        warn("No PCA results available. Run confirm selections with PCA enabled.")
+        return(NULL)
+      }
+      df <- rvals$pcadf
+    } else if (identical(source, "UMAP")) {
+      if (!is.data.frame(rvals$umapdf) || nrow(rvals$umapdf) == 0) {
+        warn("No UMAP results available. Run confirm selections with UMAP enabled.")
+        return(NULL)
+      }
+      df <- rvals$umapdf
+    } else if (identical(source, "linear discriminants")) {
+      if (!is.data.frame(rvals$LDAdf) || nrow(rvals$LDAdf) == 0) {
+        warn("No LDA results available. Run confirm selections with LDA enabled.")
+        return(NULL)
+      }
+      df <- rvals$LDAdf
+    } else {
+      df <- rvals$selectedData
+    }
+    if (!"rowid" %in% names(df)) {
+      df <- tibble::rowid_to_column(df, var = "rowid")
+    }
+    feature_cols <- get_ed_source_features(df, source)
+    if (length(feature_cols) == 0) {
+      if (isTRUE(notify)) mynotification("No numeric analysis columns found for this dataset source.", type = "error")
+      return(NULL)
+    }
+    df <- suppressWarnings(df %>% dplyr::mutate_at(dplyr::vars(feature_cols), as.numeric))
+    list(df = df, features = feature_cols)
+  }
 
   output$projectionGroupUI = renderUI({
-    req(nrow(rvals$selectedData) > 0)
+    source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = FALSE)
+    req(!is.null(source_data))
     if(!is.null(rvals$attrGroups)){
-      choices = tryCatch(sort(unique(as.character(rvals$selectedData[[rvals$attrGroups]]))),error = function(e) return(NULL))
+      choices = tryCatch(sort(unique(as.character(source_data$df[[rvals$attrGroups]]))),error = function(e) return(NULL))
     } else {
       choices = NULL
     }
@@ -81,15 +144,18 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   })
 
   output$EDsampleIDUI = renderUI({
-    req(rvals$chem)
+    source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = FALSE)
+    req(!is.null(source_data))
+    source_df <- source_data$df
+    feature_cols <- source_data$features
     quietly(label = "rendering sample ID UI",{
       if(!is.null(rvals$attrs)){
-        choices = tryCatch(names(rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem))),error = function(e) return(NULL))
+        choices = tryCatch(names(source_df %>% dplyr::select(-tidyselect::any_of(feature_cols))),error = function(e) return(NULL))
       } else {
         choices = NULL
       }
-      choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
-      choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
+      choiceLengths = sapply(choices,function(x) length(unique(source_df[[x]])))
+      choices = choices[which(choiceLengths == nrow(source_df))]
       if("anid" %in% tolower(choices)){
         selected = choices[which(tolower(choices) == "anid")]
       } else {
@@ -101,9 +167,28 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 
   observeEvent(input$EDRun,{
     quietly(label = "running Euclidean Distance",{
+      source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = TRUE)
+      if (is.null(source_data)) return(invisible(NULL))
+      analysis_df <- source_data$df
+      feature_cols <- source_data$features
+      if (!input$edsampleID %in% names(analysis_df)) {
+        mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+        return(invisible(NULL))
+      }
       mynotification("calculating Euclidean Distances")
-      rvals$edistance = calcEDistance(data = rvals$selectedData,projection = input$projectionGroup,id = input$edsampleID,attrGroups = rvals$attrGroups,chem = rvals$chem,limit = input$EDlimit, withinGroup = input$EDmethod) %>%
-        dplyr::left_join(rvals$selectedData %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)) %>% dplyr::mutate_all(as.character),by = input$edsampleID)
+      rvals$edistance = calcEDistance(
+        data = analysis_df,
+        projection = input$projectionGroup,
+        id = input$edsampleID,
+        attrGroups = rvals$attrGroups,
+        chem = feature_cols,
+        limit = input$EDlimit,
+        withinGroup = input$EDmethod
+      ) %>%
+        dplyr::left_join(
+          analysis_df %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)) %>% dplyr::mutate_all(as.character),
+          by = input$edsampleID
+        )
       mynotification("completed calculation")
     })
   })
@@ -131,7 +216,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   observeEvent(input$edAssignMatchGroup,{
     quietly(label = "assigning match group",{
       selRows = input$EDTbl_rows_selected
-      rvals$edNewValue = rvals$edistance[[5]][selRows]
+      match_col <- paste0(rvals$attrGroups, "_match")
+      if (!match_col %in% names(rvals$edistance)) {
+        mynotification("Unable to locate matched-group column in Euclidean Distance results.", type = "error")
+        return(invisible(NULL))
+      }
+      rvals$edNewValue = rvals$edistance[[match_col]][selRows]
     })
   })
 

@@ -1,11 +1,80 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>ArchaeoDash Help Guide</title>
+
+<script src="help_files/header-attrs-2.30/header-attrs.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+
+
+
+
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">ArchaeoDash Help Guide</h1>
+
 
 <div id="TOC">
 <ul>
 <li><a href="#about" id="toc-about">About</a></li>
+<li><a href="#accounts-and-sessions"
+id="toc-accounts-and-sessions">Accounts and Sessions</a>
+<ul>
 <li><a href="#registration" id="toc-registration">Registration</a></li>
 <li><a href="#login" id="toc-login">Login</a></li>
+<li><a href="#cookies-and-session-persistence"
+id="toc-cookies-and-session-persistence">Cookies and Session
+Persistence</a></li>
+</ul></li>
+<li><a href="#import-and-manage-data"
+id="toc-import-and-manage-data">Import and Manage Data</a>
+<ul>
 <li><a href="#import-data" id="toc-import-data">Import Data</a></li>
-<li><a href="#data-manager" id="toc-data-manager">Data Manager</a></li>
+</ul></li>
+<li><a href="#data-manager" id="toc-data-manager">Data Manager</a>
+<ul>
+<li><a href="#dataset-management" id="toc-dataset-management">Dataset
+Management</a></li>
+<li><a href="#data-selection-and-preparation"
+id="toc-data-selection-and-preparation">Data Selection and
+Preparation</a></li>
+<li><a href="#transformations"
+id="toc-transformations">Transformations</a></li>
+<li><a href="#additional-data-manager-tools"
+id="toc-additional-data-manager-tools">Additional Data Manager
+Tools</a></li>
+</ul></li>
 <li><a href="#save-data" id="toc-save-data">Save Data</a></li>
 <li><a href="#explore" id="toc-explore">Explore</a>
 <ul>
@@ -16,121 +85,151 @@ PLOTS</a></li>
 <li><a href="#compositional-plot-profile"
 id="toc-compositional-plot-profile">COMPOSITIONAL PLOT PROFILE</a></li>
 </ul></li>
+<li><a href="#visualize-assign" id="toc-visualize-assign">VISUALIZE
+&amp; ASSIGN</a></li>
 <li><a href="#ordination" id="toc-ordination">ORDINATION</a>
 <ul>
 <li><a href="#pca" id="toc-pca">PCA</a></li>
 <li><a href="#lda" id="toc-lda">LDA</a></li>
 </ul></li>
 <li><a href="#cluster" id="toc-cluster">CLUSTER</a></li>
-<li><a href="#group-membership" id="toc-group-membership">GROUP
-MEMBERSHIP</a></li>
+<li><a href="#probabilities-and-distances"
+id="toc-probabilities-and-distances">PROBABILITIES AND DISTANCES</a>
+<ul>
+<li><a href="#membership-probabilities-workflow"
+id="toc-membership-probabilities-workflow">Membership Probabilities
+Workflow</a></li>
+<li><a href="#updating-group-assignments-from-membership-probabilities"
+id="toc-updating-group-assignments-from-membership-probabilities">Updating
+Group Assignments from Membership Probabilities</a></li>
+</ul></li>
 <li><a href="#euclidean-distance" id="toc-euclidean-distance">EUCLIDEAN
 DISTANCE</a></li>
-<li><a href="#visualize-assign" id="toc-visualize-assign">VISUALIZE
-&amp; ASSIGN</a></li>
+<li><a href="#notes-and-troubleshooting"
+id="toc-notes-and-troubleshooting">Notes and Troubleshooting</a></li>
 </ul>
 </div>
 
 <div id="about" class="section level2">
 <h2>About</h2>
 <p>ArchaeoDash was developed in R Shiny to facilitate the analysis of
-elemental data (e.g., portable X-ray fluorescence–PXRF, Neutron
-Activation Analysis–NAA). It has features for data manipulation,
-visualization, clustering, ordination (e.g., PCA, LDA), assessment of
-group membership and more.</p>
+elemental data (for example portable X-ray fluorescence (PXRF) and
+Neutron Activation Analysis (NAA)). It includes tools for data
+management, ordination, clustering, distance-based matching, and group
+assignment.</p>
 <p>This app was originally developed by Matthew Peeples and Andrew Upton
 and has been extensively redesigned by Robert Bischoff in consultation
 with Jeffrey Ferguson.</p>
-<p>We recommend creating an account to prevent loss of data, otherwise
-if the app times out, reloads, or has an error then the current progress
-will be lost. Uploaded data will be stored in a secure database and you
-retain all rights to your data. You must be logged in to access your
-data. No guarantees are made regarding the persistence of data storage.
-Please back up your data regularly.</p>
+<p>We recommend creating an account to reduce data loss risk. If the app
+times out, reloads, or encounters an error while not logged in,
+temporary work may be lost.</p>
 </div>
-<div id="registration" class="section level2">
-<h2>Registration</h2>
-<p>To register, click the <em>LOGIN</em> button on the left sidebar.
-Check the checkbox by <em>Register as a new user</em>. Fill out the
-information. There are no password requirements other than not being
-left empty. You must agree to the notice to complete registration. Once
-you are registered you will be automatically logged in. If you forget
-your password or username, email <a
+<div id="accounts-and-sessions" class="section level2">
+<h2>Accounts and Sessions</h2>
+<div id="registration" class="section level3">
+<h3>Registration</h3>
+<p>Click <em>LOGIN</em> in the side panel, check <em>Register as a new
+user</em>, and complete the form. You must accept the notice to complete
+registration. If you forget your password or username, email <a
 href="mailto:rbischoff@asu.edu">rbischoff@asu.edu</a>.</p>
 </div>
-<div id="login" class="section level2">
-<h2>Login</h2>
-<p>To login click the <em>LOGIN</em> button and enter your username and
-password.</p>
+<div id="login" class="section level3">
+<h3>Login</h3>
+<p>Click <em>LOGIN</em> and enter your username and password.</p>
 </div>
-<div id="import-data" class="section level2">
-<h2>Import Data</h2>
-<p>Click the <em>BROWSE</em> button to upload data. CSV and XLSX are the
-preferred data formats, but all types supported by the R Rio package can
-be uploaded. If you are logged in, then all uploaded data will be stored
-in the database, and the data will be available to select from the
-<em>Choose dataset(s)</em> drop-down list. You will be asked to choose a
-dataset name. One will be auto-populated from the filename of the
-upload. It may be shortened if the name is over 50 characters. If you
-are not logged in then the data will be stored in temporary memory and
-will not be saved. Only one dataset can be used at a time if the user is
-not logged in. If logged in, you can select multiple datasets from the
-drop-down list. Press <em>CONFIRM DATASETS SELECTION</em> to load all
-datasets selected from the drop-down.</p>
+<div id="cookies-and-session-persistence" class="section level3">
+<h3>Cookies and Session Persistence</h3>
+<p>If cookies are accepted, ArchaeoDash stores a local login cookie to
+keep you signed in for up to 30 days. You can decline cookies or log out
+to clear the local session cookie.</p>
+</div>
+</div>
+<div id="import-and-manage-data" class="section level2">
+<h2>Import and Manage Data</h2>
+<div id="import-data" class="section level3">
+<h3>Import Data</h3>
+<p>Click <em>BROWSE</em> to upload data. CSV and XLSX are preferred, and
+other formats supported by the <code>rio</code> package may also
+work.</p>
+<p>If you are logged in:</p>
+<ul>
+<li>Uploaded datasets are stored in your account database area.</li>
+<li>You can select one or multiple datasets from <em>Choose
+dataset(s)</em>.</li>
+<li>Click <em>Confirm dataset selection</em> to load the selected
+datasets.</li>
+</ul>
+<p>If you are not logged in:</p>
+<ul>
+<li>Data is stored in temporary session memory only.</li>
+<li>Only one dataset can be used at a time.</li>
+</ul>
+</div>
 </div>
 <div id="data-manager" class="section level2">
 <h2>Data Manager</h2>
-<p>Selected datasets can be deleted in the <em>Manage datasets</em>
-section and also merged or renamed. For example, you may select three
-datasets from the dataset drop-down and merge them under a new or
-existing name.</p>
-<p>Select the column that will be used for categorization under the
-heading <em>Select descriptive/group column.</em></p>
-<p>Choose any groups you wish to include/exclude in the next
-drop-down.</p>
-<p>Choose any columns containing elmeent concentrations next. Only
-columns containing numeric data will be available to select as an
-element concentration.</p>
-<p><em>Imputation Method</em> controls how missing values can be
-inferred. The underlying Mice package in R has specific requirements
-which may cause this to fail. Missing values will then be converted to
-zeroes.</p>
-<p><em>Select Transformation</em> controls how the element
-concentrations are modified. Click the <em>RESET ELEMENTS TO
-ORIGINAL</em> button to undo a transformation or imputation.</p>
-<p><em>PRESS TO CONFIRM SELECTIONS</em> must be pressed prior to most
-operations. Data will not be modified until this is pressed. You will
-be prompted to name the transformation. If no custom name is used, a
-default timestamp name is assigned. Reusing an existing name will
-overwrite that transformation.</p>
-<p>If you are logged in, saved transformations are stored persistently
-for the selected dataset(s). Each saved transformation can include:</p>
+<div id="dataset-management" class="section level3">
+<h3>Dataset Management</h3>
+<p>Use <em>Manage datasets</em> to delete selected datasets or
+merge/rename selected datasets.</p>
+</div>
+<div id="data-selection-and-preparation" class="section level3">
+<h3>Data Selection and Preparation</h3>
 <ul>
-<li>transformed raw data</li>
+<li>Select the descriptive/group column.</li>
+<li>Choose groups to include.</li>
+<li>Select element concentration columns (numeric columns only).</li>
+<li>Choose an imputation method if needed.</li>
+<li>Choose a transformation method if needed.</li>
+</ul>
+<p>Click <em>Press to confirm selections</em> to apply these choices.
+Most analyses require this step before they update. A loading indicator
+is shown while the update runs.</p>
+</div>
+<div id="transformations" class="section level3">
+<h3>Transformations</h3>
+<p>When you confirm selections, you are prompted to name the
+transformation:</p>
+<ul>
+<li>If left blank, a timestamp-based default name is used.</li>
+<li>Reusing an existing name overwrites that transformation.</li>
+</ul>
+<p>Each saved transformation can include:</p>
+<ul>
+<li>Transformed selected data</li>
 <li>PCA results (if selected)</li>
 <li>UMAP results (if selected)</li>
 <li>LDA results (if selected)</li>
 </ul>
-<p>Use the <em>Transformations</em> section in Data Manager to load or
-delete saved transformations. This allows quick switching between
-analytical versions (for example, different group filters) without
-rebuilding each workflow.</p>
-<p>The app still creates/updates the <em>{username}_current</em> dataset
-after confirming selections. If you wish to save this modified dataset
-as a standalone dataset, select it from the dataset drop-down list and
-press <em>MERGE/RENAME SELECTED DATASETS.</em></p>
-<p>If you wish to remove all data from your temporary workspace then
-press <em>CLEAR WORKSPACE.</em></p>
-<p>The <em>ADD NEW COLUMN</em> button can be used to create new
-columns.</p>
+<p>Transformation behavior:</p>
+<ul>
+<li>Selecting a transformation in the <em>Transformations</em> dropdown
+loads it immediately.</li>
+<li><em>Delete</em> removes the selected transformation.</li>
+<li>If logged in, transformations are persisted per selected dataset set
+and can be reloaded later.</li>
+</ul>
+<p>If <em>Run LDA</em> is selected with fewer than three groups, the app
+shows a warning because LDA visualization requires at least three
+groups.</p>
+</div>
+<div id="additional-data-manager-tools" class="section level3">
+<h3>Additional Data Manager Tools</h3>
+<ul>
+<li><em>Reset elements to original</em> resets element values to
+original imported values.</li>
+<li><em>Add new column</em> creates a new column with a default
+value.</li>
+<li><em>Clear workspace</em> reloads the app session and clears
+temporary state.</li>
+</ul>
+</div>
 </div>
 <div id="save-data" class="section level2">
 <h2>Save Data</h2>
-<p>Data can be exported after making any modifications to the data and
-pressing <em>PRESS TO CONFIRM SELECTIONS</em> button. At the bottom of
-the <em>Data Manager</em> sidebar is an export section. Choose the type
-of data you wish to export, enter the filename including the extension,
-and press <em>CLICK HERE TO SAVE FILE</em>.</p>
+<p>Use the export section to download current data products. In most
+cases, confirm selections first so exported tables reflect current
+settings.</p>
 </div>
 <div id="explore" class="section level2">
 <h2>Explore</h2>
@@ -162,31 +261,136 @@ correct type.</p>
 the dataset.</p>
 </div>
 </div>
+<div id="visualize-assign" class="section level2">
+<h2>VISUALIZE &amp; ASSIGN</h2>
+<p>Use this tab to visualize data (elements, PCA, UMAP, LDA) and
+reassign selected points.</p>
+<p>In <em>visualize and select</em>:</p>
+<ol style="list-style-type: decimal">
+<li>Choose data source and x/y variables.</li>
+<li>Select points using lasso/box select.</li>
+<li>Enter a new group designation.</li>
+<li>Click <em>Change Group Assignment</em>.</li>
+</ol>
+<p>In <em>multiplots</em>:</p>
+<ul>
+<li>Build multiple pair plots.</li>
+<li>Toggle interactive mode.</li>
+<li>Save plots to file.</li>
+</ul>
+</div>
 <div id="ordination" class="section level2">
 <h2>ORDINATION</h2>
 <div id="pca" class="section level3">
 <h3>PCA</h3>
-<p>This tab shows information related to the PCA analysis.</p>
+<p>Shows PCA outputs for the current confirmed transformation.</p>
 </div>
 <div id="lda" class="section level3">
 <h3>LDA</h3>
-<p>This tab shows information related to the LDA analysis. Note: LDA
-analysis requires three or more groups for results to be displayed.</p>
+<p>Shows LDA outputs for the current confirmed transformation. LDA
+requires at least three groups.</p>
 </div>
 </div>
 <div id="cluster" class="section level2">
 <h2>CLUSTER</h2>
-<p>This section will be updated soon.</p>
+<p>Cluster methods available:</p>
+<ul>
+<li>Optimal cluster count diagnostics (elbow and silhouette)</li>
+<li>Hierarchical agglomerative clustering</li>
+<li>Hierarchical divisive clustering</li>
+<li>K-means</li>
+<li>K-medoids</li>
+</ul>
+<p>Cluster analysis can be run using:</p>
+<ul>
+<li>elements</li>
+<li>principal components (PCA)</li>
+<li>UMAP</li>
+<li>linear discriminants (LDA)</li>
+</ul>
+<p>After running a method, use <em>Record cluster assignments</em> to
+add cluster labels back into the dataset. You can choose the output
+column name. If the column exists, you will be prompted to overwrite
+it.</p>
 </div>
-<div id="group-membership" class="section level2">
-<h2>GROUP MEMBERSHIP</h2>
-<p>This section will be updated soon.</p>
+<div id="probabilities-and-distances" class="section level2">
+<h2>PROBABILITIES AND DISTANCES</h2>
+<p>This tab includes group size summaries and a full membership
+probabilities table.</p>
+<div id="membership-probabilities-workflow" class="section level3">
+<h3>Membership Probabilities Workflow</h3>
+<ol style="list-style-type: decimal">
+<li>Choose eligible groups and a unique sample ID column.</li>
+<li>Choose method and dataset source (<code>elements</code>,
+<code>principal components</code>, <code>UMAP</code>, or
+<code>linear discriminants</code>).</li>
+<li>Click <em>Calculate</em>.</li>
+</ol>
+<p>The membership table supports filtering and column visibility
+control.</p>
+</div>
+<div id="updating-group-assignments-from-membership-probabilities"
+class="section level3">
+<h3>Updating Group Assignments from Membership Probabilities</h3>
+<p>You can update group assignments directly from selected table
+rows:</p>
+<ol style="list-style-type: decimal">
+<li>Select one or more rows in the membership probabilities table.</li>
+<li>Click <em>Assign Best Group</em> to set each selected row to its
+<code>BestGroup</code>.</li>
+<li>Or enter a value in <em>Enter new group designation</em> and click
+<em>Change Group Assignment</em>.</li>
+</ol>
+<p>These updates write back to the dataset and carry into downstream
+analyses and saved transformations.</p>
+</div>
 </div>
 <div id="euclidean-distance" class="section level2">
 <h2>EUCLIDEAN DISTANCE</h2>
-<p>This section will be updated soon.</p>
+<p>Use this tab to identify closest matches by Euclidean distance.</p>
+<p>Workflow:</p>
+<ol style="list-style-type: decimal">
+<li>Choose dataset source (<code>elements</code>,
+<code>principal components</code>, <code>UMAP</code>, or
+<code>linear discriminants</code>).</li>
+<li>Choose groups to project against.</li>
+<li>Choose sample ID and whether to project within group.</li>
+<li>Choose the number of nearest matches to return.</li>
+<li>Click <em>Calculate</em>.</li>
+</ol>
+<p>The results table supports reassignment:</p>
+<ul>
+<li><em>Assign Match Group</em> sets selected rows to the matched
+group.</li>
+<li><em>Change Group Assignment</em> applies your entered group value to
+selected rows.</li>
+</ul>
 </div>
-<div id="visualize-assign" class="section level2">
-<h2>VISUALIZE &amp; ASSIGN</h2>
-<p>This section will be updated soon.</p>
+<div id="notes-and-troubleshooting" class="section level2">
+<h2>Notes and Troubleshooting</h2>
+<ul>
+<li>If database connection fails, a persistent in-app warning is shown
+and account-linked storage features may be unavailable.</li>
+<li>If an analysis returns no results, verify that required inputs are
+selected and that <em>Press to confirm selections</em> has been run
+after recent data or option changes.</li>
+</ul>
 </div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

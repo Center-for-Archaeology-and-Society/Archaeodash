@@ -45,6 +45,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   available_group_values <- shiny::reactiveVal(character())
   active_group_column <- shiny::reactiveVal(NULL)
   transformation_loading_active <- shiny::reactiveVal(FALSE)
+  dataset_loading_active <- shiny::reactiveVal(FALSE)
 
   show_transformation_loading <- function() {
     transformation_loading_active(TRUE)
@@ -64,6 +65,27 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (isTRUE(transformation_loading_active())) {
       removeModal()
       transformation_loading_active(FALSE)
+    }
+  }
+
+  show_dataset_loading <- function() {
+    dataset_loading_active(TRUE)
+    showModal(modalDialog(
+      title = NULL,
+      footer = NULL,
+      easyClose = FALSE,
+      tags$div(
+        class = "transformation-loading-wrap",
+        tags$div(class = "transformation-loading-spinner"),
+        tags$div(class = "transformation-loading-text", "Loading selected dataset(s)...")
+      )
+    ))
+  }
+
+  hide_dataset_loading <- function() {
+    if (isTRUE(dataset_loading_active())) {
+      removeModal()
+      dataset_loading_active(FALSE)
     }
   }
 
@@ -233,6 +255,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
+    show_dataset_loading()
+    on.exit(hide_dataset_loading(), add = TRUE)
     reset_transformation_store()
     rvals$currentDatasetKey <- build_dataset_key(input$selectedDatasets)
 

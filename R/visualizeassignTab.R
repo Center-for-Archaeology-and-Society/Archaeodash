@@ -119,6 +119,21 @@ visualizeassignTab = function() {
 #' @examples
 #' visualizeAssignServer(input,output,session,rvals)
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
+  observeEvent(input$data.src, {
+    if (!identical(input$data.src, "linear discriminants")) return(NULL)
+    req(rvals$selectedData)
+    req(rvals$attrGroups)
+    if (!(rvals$attrGroups %in% names(rvals$selectedData))) return(NULL)
+    group_count <- rvals$selectedData %>%
+      dplyr::pull(!!as.name(rvals$attrGroups)) %>%
+      as.character() %>%
+      unique() %>%
+      .[!is.na(.)] %>%
+      length()
+    if (group_count < 3) {
+      mynotification("LDA requires at least three groups to visualize these data.", type = "warning")
+    }
+  }, ignoreInit = TRUE)
 
   observeEvent({
     rvals$selectedData

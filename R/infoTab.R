@@ -9,7 +9,10 @@ infoTabUI = function() {
   navbarMenu("Info",
              tabPanel("Help", value = "help",
                       icon = icon("info"),
-                      includeHTML("www/help.html")
+                      tags$iframe(
+                        src = "help.html",
+                        style = "width:100%; height:80vh; border:none;"
+                      )
              ),
              tabPanel("Terms & Conditions", value = "terms",
                       icon = icon("info"),

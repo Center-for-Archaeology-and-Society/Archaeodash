@@ -18,7 +18,12 @@ groupTab = function(){
                    uiOutput("eligibleGroupUI"),
                    uiOutput("sampleIDUI"),
                    selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
-                   selectInput("membershipDataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
+                   selectInput(
+                     "membershipDataset",
+                     "select dataset to use",
+                     choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+                     selected = "elements"
+                   ),
                    actionButton("membershipRun","Calculate", class = "mybtn")
                  )
                ),
@@ -73,6 +78,57 @@ groupTab = function(){
 #' @examples
 #' groupServer(input,output,session,rvals)
 groupServer = function(input,output,session,rvals, credentials, con){
+  membership_proxy <- DT::dataTableProxy("membershipTbl")
+
+  get_source_features <- function(df, source) {
+    if (!is.data.frame(df) || nrow(df) == 0) return(character())
+    if (identical(source, "principal components")) {
+      cols <- grep("^PC[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "UMAP")) {
+      cols <- grep("^V[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "linear discriminants")) {
+      cols <- grep("^LD[0-9]+$", names(df), value = TRUE)
+    } else {
+      cols <- intersect(rvals$chem, names(df))
+    }
+    if (length(cols) == 0) {
+      meta_cols <- unique(c(rvals$attrs, rvals$attrGroups, "rowid", "ID", "BestGroup", "GroupVal"))
+      candidate_cols <- setdiff(names(df), meta_cols)
+      numeric_cols <- candidate_cols[vapply(df[candidate_cols], is.numeric, logical(1))]
+      cols <- numeric_cols
+    }
+    cols
+  }
+
+  get_membership_data <- function(source) {
+    if (identical(source, "principal components")) {
+      if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+        mynotification("No PCA results available. Run confirm selections with PCA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$pcadf
+    } else if (identical(source, "UMAP")) {
+      if (!is.data.frame(rvals$umapdf) || nrow(rvals$umapdf) == 0) {
+        mynotification("No UMAP results available. Run confirm selections with UMAP enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$umapdf
+    } else if (identical(source, "linear discriminants")) {
+      if (!is.data.frame(rvals$LDAdf) || nrow(rvals$LDAdf) == 0) {
+        mynotification("No LDA results available. Run confirm selections with LDA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$LDAdf
+    } else {
+      df <- rvals$selectedData
+    }
+    features <- get_source_features(df, source)
+    if (length(features) == 0) {
+      mynotification("No numeric analysis columns found for this dataset source.", type = "error")
+      return(NULL)
+    }
+    list(df = df, features = features)
+  }
 
   ##### UI Outputs for membership groups ####
 
@@ -89,8 +145,21 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$eligibleGroupUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
+    source <- if (is.null(input$membershipDataset)) "elements" else input$membershipDataset
+    source_df <- switch(
+      source,
+      "principal components" = rvals$pcadf,
+      "UMAP" = rvals$umapdf,
+      "linear discriminants" = rvals$LDAdf,
+      rvals$selectedData
+    )
+    if (!is.data.frame(source_df) || nrow(source_df) == 0) {
+      source_df <- rvals$selectedData
+      source <- "elements"
+    }
+    source_features <- get_source_features(source_df, source)
     if(isTruthy(!is.null(rvals$attrs))){
-      eligible = tryCatch(getEligible(rvals$selectedData, chem = rvals$chem, group = rvals$attrGroups),error = function(e) return(NULL))
+      eligible = tryCatch(getEligible(source_df, chem = source_features, group = rvals$attrGroups),error = function(e) return(NULL))
     } else {
       eligible = NULL
     }
@@ -104,9 +173,20 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$sampleIDUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    choices = rvals$attrs
-    choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
-    choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
+    source <- if (is.null(input$membershipDataset)) "elements" else input$membershipDataset
+    source_df <- switch(
+      source,
+      "principal components" = rvals$pcadf,
+      "UMAP" = rvals$umapdf,
+      "linear discriminants" = rvals$LDAdf,
+      rvals$selectedData
+    )
+    if (!is.data.frame(source_df) || nrow(source_df) == 0) {
+      source_df <- rvals$selectedData
+    }
+    choices = intersect(rvals$attrs, names(source_df))
+    choiceLengths = sapply(choices,function(x) length(unique(source_df[[x]])))
+    choices = choices[which(choiceLengths == nrow(source_df))]
     if(isTruthy(!is.null(rvals$sampleID))){
       selected = rvals$sampleID
     } else {
@@ -124,17 +204,26 @@ groupServer = function(input,output,session,rvals, credentials, con){
     mynotification("calculating membership")
     rvals$eligibleGroups = input$eligibleGroups
     rvals$sampleID = input$sampleID
-    if(isTruthy(input$membershipDataset == "elements")){
-      df = rvals$selectedData
-    } else {
-      req(rvals$pcadf)
-      df = rvals$pcadf
+    source_data <- get_membership_data(input$membershipDataset)
+    if (is.null(source_data)) return(invisible(NULL))
+    df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
+    feature_cols <- source_data$features
+    if (!input$sampleID %in% names(df)) {
+      mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+      return(invisible(NULL))
     }
     selected_data_with_rowid <- rvals$selectedData
     if (!"rowid" %in% names(selected_data_with_rowid)) {
       selected_data_with_rowid <- tibble::rowid_to_column(selected_data_with_rowid, var = "rowid")
     }
-    rvals$membershipProbs = group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+    rvals$membershipProbs = group.mem.probs(
+      data = df,
+      chem = feature_cols,
+      group = rvals$attrGroups,
+      eligible = input$eligibleGroups,
+      method = input$membershipMethod,
+      ID = input$sampleID
+    )
     if (inherits(rvals$membershipProbs,"data.frame")){
       rvals$membershipProbs = rvals$membershipProbs %>%
         dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
@@ -198,38 +287,71 @@ groupServer = function(input,output,session,rvals, credentials, con){
     )
   })
 
+  apply_membership_assignment <- function(values) {
+    req(rvals$membershipProbs)
+    selected_rows <- input$membershipTbl_rows_selected
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      mynotification("Select one or more rows in Membership Probabilities first.", type = "warning")
+      return(invisible(NULL))
+    }
+    if (length(values) == 1) {
+      values <- rep(values, length(selected_rows))
+    }
+    if (length(values) != length(selected_rows)) {
+      mynotification("Assignment value count does not match selected rows.", type = "error")
+      return(invisible(NULL))
+    }
+
+    rowid <- as.character(rvals$membershipProbs$rowid[selected_rows])
+    if (length(rowid) == 0 || !all(rowid %in% as.character(rvals$importedData$rowid))) {
+      mynotification("Selected rows could not be mapped back to the dataset.", type = "error")
+      return(invisible(NULL))
+    }
+
+    replaceCell(
+      rowid = rowid,
+      col = rvals$attrGroups,
+      value = values,
+      rvals = rvals,
+      con = con,
+      credentials = credentials,
+      input = input,
+      output = output,
+      session = session
+    )
+
+    if (is.data.frame(rvals$membershipProbs) && nrow(rvals$membershipProbs) > 0) {
+      DT::replaceData(membership_proxy, rvals$membershipProbs, resetPaging = FALSE, rownames = FALSE)
+    }
+    mynotification("Updated selected row assignments.", type = "message")
+    invisible(NULL)
+  }
+
   observeEvent(input$gAssignBestGroup,{
-    quietly(label = "assigning match group",{
-      selRows = input$membershipTbl_rows_selected
-      rvals$gNewValue = rvals$membershipProbs[[4]][selRows]
+    quietly(label = "assigning best group",{
+      req(rvals$membershipProbs)
+      selected_rows <- input$membershipTbl_rows_selected
+      if (is.null(selected_rows) || length(selected_rows) == 0) {
+        mynotification("Select one or more rows in Membership Probabilities first.", type = "warning")
+        return(invisible(NULL))
+      }
+      if (!"BestGroup" %in% names(rvals$membershipProbs)) {
+        mynotification("BestGroup column is missing from membership results.", type = "error")
+        return(invisible(NULL))
+      }
+      best_values <- as.character(rvals$membershipProbs$BestGroup[selected_rows])
+      apply_membership_assignment(best_values)
     })
   })
 
   observeEvent(input$gChangeGroup,{
     quietly(label = "assigning new group",{
-      rvals$gNewValue = input$gNewGroup
-    })
-  })
-
-  observeEvent(rvals$gNewValue, {
-    message("updating group")
-    quietly(label = "updating group",{
-      if(isTruthy(!is.null(input$membershipTbl_state$length))){
-        rvals$membershipTbl_state_length = input$membershipTbl_state$length
-      } else {
-        rvals$membershipTbl_state_length = 25
+      new_group <- trimws(as.character(input$gNewGroup))
+      if (!nzchar(new_group)) {
+        mynotification("Enter a new group designation first.", type = "warning")
+        return(invisible(NULL))
       }
-      print("getting rowid")
-      rowid = rvals$membershipProbs$rowid[input$membershipTbl_rows_selected]
-      print(rowid)
-      if(isTruthy(rowid %in% as.character(rvals$importedData$rowid))){
-        print('replacing cell')
-        replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$gNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
-      } else {
-        mynotification("rowid not found in imported data",type = "error")
-      }
-      rvals$gNewValue = NULL
-      print('end')
+      apply_membership_assignment(new_group)
     })
   })
 
