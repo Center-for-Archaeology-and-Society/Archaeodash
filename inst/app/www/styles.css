@@ -41,3 +41,10 @@ body {
 .cookie-banner-content a {
   font-weight: 600;
 }
+
+.membership-table-scroll-box {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 8px;
+}

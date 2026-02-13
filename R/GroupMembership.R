@@ -9,16 +9,25 @@
 groupTab = function(){
   tabPanel(title = "Group Membership",
            id = "groupMembershiptab",
-           sidebarLayout(sidebarPanel(
-             uiOutput("eligibleGroupUI"),
-             uiOutput("sampleIDUI"),
-             selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
-             selectInput("membershipDataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
-             actionButton("membershipRun","Calculate", class = "mybtn"),
-           ),
-           mainPanel(
-             h4("Group Sizes"),
-             DT::DTOutput("grpSizeTbl"),
+           fluidPage(
+             fluidRow(
+               column(
+                 4,
+                 wellPanel(
+                   h4("Group Membership Controls"),
+                   uiOutput("eligibleGroupUI"),
+                   uiOutput("sampleIDUI"),
+                   selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
+                   selectInput("membershipDataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
+                   actionButton("membershipRun","Calculate", class = "mybtn")
+                 )
+               ),
+               column(
+                 8,
+                 h4("Group Sizes"),
+                 DT::DTOutput("grpSizeTbl")
+               )
+             ),
              br(),
              h4("Membership Probabilities"),
              wellPanel(
@@ -26,16 +35,28 @@ groupTab = function(){
                  column(4,
                         actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
                  ),
-                 column(4, offset = 2,
-                        actionButton("gChangeGroup","Change Group Assignment", class = "mybtn"),
-                        textInput("gNewGroup","Enter new group designation")
+                 column(4,
+                        actionButton("gChangeGroup","Change Group Assignment", class = "mybtn")
+                 ),
+                 column(4,
+                        tags$div(
+                          style = "margin-top: 10px;",
+                          textInput("gNewGroup", NULL, placeholder = "Enter new group designation")
+                        )
                  )
                )
              ),
              br(),
-             DT::DTOutput('membershipTbl')
-           ) # end main panel
-           ) # end sidebar layout
+             fluidRow(
+               column(
+                 12,
+                 div(
+                   class = "membership-table-scroll-box",
+                   DT::DTOutput('membershipTbl')
+                 )
+               )
+             )
+           )
   ) # end group membership panel
 }
 
@@ -146,8 +167,10 @@ groupServer = function(input,output,session,rvals, credentials, con){
       selection = 'multiple',
       style = 'bootstrap',
       options = list(
-        pageLength = rvals$membershipTbl_state_length,
-        lengthMenu = c(10,25,50,100, 500,1000)
+        scrollY = "420px",
+        scrollCollapse = TRUE,
+        scrollX = TRUE,
+        paging = FALSE
       )
     )
   })
