@@ -36,6 +36,10 @@ if ! command -v R >/dev/null 2>&1; then
   echo "Error: R is not installed or not on PATH." >&2
   exit 1
 fi
+if ! command -v Rscript >/dev/null 2>&1; then
+  echo "Error: Rscript is not installed or not on PATH." >&2
+  exit 1
+fi
 
 VERSION="$(date +%Y.%m.%d.%H%M)"
 TAG="v$VERSION"
@@ -75,6 +79,35 @@ fi
 
 git commit -m "Release $VERSION"
 git tag "$TAG"
+
+CRAN_REPO="${CRAN_REPO:-https://cloud.r-project.org}"
+Rscript -e "
+  desc <- read.dcf('DESCRIPTION')[1, ]
+  fields <- c('Depends', 'Imports', 'LinkingTo', 'Suggests')
+  raw <- unlist(desc[intersect(fields, colnames(read.dcf('DESCRIPTION')))])
+  tokens <- trimws(unlist(strsplit(raw, ',')))
+  tokens <- tokens[nzchar(tokens)]
+  pkgs <- gsub('^([A-Za-z0-9.]+).*$','\\\\1', tokens)
+  pkgs <- setdiff(unique(pkgs), c('R', rownames(installed.packages(priority='base'))))
+
+  ap <- available.packages(repos='${CRAN_REPO}')
+  deps <- unique(unlist(tools::package_dependencies(pkgs, db=ap, recursive=TRUE), use.names=FALSE))
+  needed <- unique(c(pkgs, deps))
+  installed <- rownames(installed.packages())
+  missing <- setdiff(needed, installed)
+
+  unavailable <- setdiff(missing, rownames(ap))
+  if (length(unavailable) > 0) {
+    stop(paste('Unresolvable dependencies:', paste(unavailable, collapse=', ')))
+  }
+
+  if (length(missing) > 0) {
+    message('Installing missing dependencies: ', paste(missing, collapse=', '))
+    install.packages(missing, repos='${CRAN_REPO}')
+  } else {
+    message('No missing dependencies.')
+  }
+"
 
 R CMD INSTALL .
 
