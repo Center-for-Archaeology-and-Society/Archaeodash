@@ -1,3 +1,59 @@
+#' dataLoader
+#'
+#' @param filename
+#'
+#' @return data
+#' @export
+#'
+#' @examples
+#' dataLoader("data.csv")
+dataLoader = function(filename){
+  data = rio::import(filename, setclass = 'tibble') %>%
+    dplyr::mutate_all(as.character) %>%
+    janitor::clean_names(case = 'none') %>%
+    dplyr::mutate_all(as.character) %>%
+    dplyr::select(-tidyselect::any_of("rowid")) %>%
+    tibble::rowid_to_column()
+  return(data)
+}
+
+# Common INAA element columns derived from inst/app/INAA_test.csv.
+common_inaa_elements <- c(
+  "as", "la", "lu", "nd", "sm", "u", "yb", "ce", "co", "cr", "cs",
+  "eu", "fe", "hf", "ni", "rb", "sb", "sc", "sr", "ta", "tb", "th",
+  "zn", "zr", "al", "ba", "ca", "dy", "k", "mn", "na", "ti", "v"
+)
+
+default_chem_columns <- function(column_names) {
+  normalized_names <- tolower(column_names)
+  matched_common <- column_names[normalized_names %in% common_inaa_elements]
+
+  if (length(matched_common) > 0) {
+    return(matched_common)
+  }
+
+  excluded_defaults <- c("rowid", "anid")
+  column_names[!normalized_names %in% excluded_defaults]
+}
+
+default_id_column <- function(column_names) {
+  matches <- column_names[tolower(column_names) == "anid"]
+  if (length(matches) > 0) {
+    return(matches[[1]])
+  }
+  ""
+}
+
+resolve_id_column <- function(selected_id_column, column_names) {
+  if (is.null(selected_id_column) || !nzchar(selected_id_column)) {
+    return("rowid")
+  }
+  if (!(selected_id_column %in% column_names)) {
+    return("rowid")
+  }
+  selected_id_column
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -5,14 +61,16 @@
 #'
 #' @examples
 #' dataLoaderUI()
-dataLoaderUI <- function() {
+dataLoaderUI = function(){
   showModal(modalDialog(
     title = "Data Loader",
     uiOutput("datasetNameUI"),
     div(textOutput("notification"), style = "color: red; font-size: 16px; padding = 10px;"),
+    uiOutput("idColumnUI"),
     uiOutput("columnsUI"),
     uiOutput("loadchemUI"),
-    footer = tagList(modalButton("cancel"), actionButton("loadData", "load data")),
+    uiOutput("loadOptionsUI"),
+    footer = tagList(modalButton("cancel"), actionButton("loadData","load data")),
     easyClose = F
   ))
 }
@@ -27,97 +85,138 @@ dataLoaderUI <- function() {
 #' @export
 #'
 #' @examples
-#' dataLoaderServer(input, output, session, credentials, con)
-dataLoaderServer <- function(input, output, session, rvals, db) {
-  temp_upload <- reactiveVal()
+#' dataLoaderServer(input,output,session, credentials, con)
+dataLoaderServer = function(rvals, input,output,session, credentials, con){
 
-  observeEvent(input$process_data, {
-    req(input$file1)
-
-    # Load raw data (Assumes first column is a Sample Name/ID)
-    raw_df <- rio::import(input$file_upload$datapath) %>%
-      mutate_all(as.character)
-
-    temp_upload(raw_df)
-
-    showModal(modalDialog(
-      title = "Configure Dataset",
-      p("Select the column that contains sample labels (e.g., ANID):"),
-      selectInput("sample_label_col", "Available Columns:",
-        choices = names(raw_df),
-        selected = names(raw_df)[1],
-        multiple = F
-      ),
-      p("Select the columns that contain element concentrations:"),
-      checkboxGroupInput("selected_cols", "Available Columns:",
-        choices = names(raw_df),
-        selected = names(raw_df)
-      ), # Default to all but first col
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("confirm_save", "Confirm & Save", class = "btn-success")
-      )
-    ))
+  output$datasetNameUI = renderUI({
+    if(!isTruthy(credentials$status)){
+      return(NULL)
+    }
+    #mysql table names have a 64 character limit
+    username_prefix_length = nchar(credentials$res$username) + 11
+    suggested_name = input$file1$name %>% tools::file_path_sans_ext() %>% stringr::str_sub(1,64 - username_prefix_length)
+    if(isTruthy(length(suggested_name) > 0)){
+      textInput("datasetName","Enter a name for the dataset", value = suggested_name)
+    } else {
+      textInput("datasetName","Enter a name for the dataset")
+    }
   })
 
-  observeEvent(input$confirm_save, {
-    removeModal()
-    # Generate unique IDs for this batch
-    batch_ds_uuid <- UUIDgenerate()
-    new_uuids <- replicate(nrow(temp_upload()), UUIDgenerate())
+  output$notification = renderText({
+    if(!isTruthy(credentials$status) || is.null(con)){
+      return(NULL)
+    }
+    req(input$datasetName)
+    tblList = DBI::dbListTables(con)
+    datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
+      janitor::make_clean_names()
+    if(isTruthy(datasetname %in% tblList) && input$datasetName %>% length() > 0){
+      "This dataset already exists. Please choose a different name."
+    } else if(input$datasetName %>% length() == 0){
+      "Please enter a name for the dataset."
+    } else {
+      NULL
+    }
+  })
 
-    # --- TABLE 1: Dataset Mapping ---
-    new_datasets <- data.frame(
-      sample_uuid = new_uuids,
-      dataset_uuid = batch_ds_uuid,
-      dataset_label = input$dataset_name
+  output$idColumnUI = renderUI({
+    choices = names(rvals$data)
+    selected = default_id_column(choices)
+    selectInput(
+      "loadIDColumn",
+      "Choose ID column (defaults to ANID if present; otherwise rowid)",
+      choices = c("Use rowid (default)" = "", choices),
+      selected = selected,
+      multiple = FALSE
     )
+  })
 
-    # --- TABLE 2: Labels (e.g., Original Name from file) ---
-    main_label <- temp_upload() %>%
-      select(any_of(input$sample_label_col)) %>%
-      mutate_all(as.character) %>%
-      pull()
-    main_label <- data.frame(
-      sample_uuid = new_uuids,
-      label_type = "main",
-      label = main_label
+  output$columnsUI = renderUI({
+    choices = names(rvals$data)
+    excluded_defaults = c("rowid", "anid")
+    selected = choices[!tolower(choices) %in% excluded_defaults]
+    selectInput('loadcolumns',"Choose which columns should be included", choices = choices, selected = selected, multiple = T)
+  })
+
+
+  output$loadchemUI = renderUI({
+    choices = names(rvals$data)
+    numeric_columns_df = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
+                                            janitor::remove_empty("cols"))
+    selected = default_chem_columns(names(numeric_columns_df))
+    selectInput('loadchem',"Choose which columns are elements/predictor variables", choices = choices, selected = selected, multiple = T)
+  })
+
+  output$loadOptionsUI = renderUI({
+    tagList(
+      checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = FALSE),
+      checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = FALSE),
+      checkboxInput("loadNAAsZero", "Replace NA values with 0", value = FALSE)
     )
+  })
 
-    new_labels <- temp_upload() %>%
-      select(-any_of(input$selected_cols)) %>%
-      mutate_all(as.character) %>%
-      mutate(sample_uuid = new_uuids, .before = 0) %>%
-      pivot_longer(
-        cols = -sample_uuid,
-        names_to = "label_type",
-        values_to = "label"
-      )
+  observeEvent(input$loadData,{
+    tryCatch({
+      req(rvals$data)
+      req(input$loadcolumns)
+      req(input$loadchem)
 
-    new_labels <- rbind(main_label, new_labels)
+      id_column = resolve_id_column(input$loadIDColumn, names(rvals$data))
+      selected_cols = unique(c("rowid", input$loadcolumns, input$loadchem, id_column))
+      selected_cols = intersect(selected_cols, names(rvals$data))
+      data_loaded = rvals$data %>%
+        dplyr::select(tidyselect::all_of(selected_cols)) %>%
+        dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ suppressWarnings(as.numeric(as.character(.)))))
 
-    data.frame(
-      sample_uuid = new_uuids,
-      label_type = "Original_Name",
-      label = temp_upload() %>% select(-any_of(input$selected_cols))
-    )
+      if(isTRUE(input$loadZeroAsNA)){
+        data_loaded = data_loaded %>%
+          dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ dplyr::na_if(., 0)))
+      }
+      if(isTRUE(input$loadNegativeAsNA)){
+        data_loaded = data_loaded %>%
+          dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ dplyr::if_else(. < 0, NA_real_, .)))
+      }
+      if(isTRUE(input$loadNAAsZero)){
+        data_loaded = data_loaded %>%
+          dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ tidyr::replace_na(., 0)))
+      }
 
-    # --- TABLE 3: Measurements (Pivoting Wide to Long) ---
-    # We exclude the first column (the ID) and pivot the elements
-    new_measurements <- temp_upload() %>%
-      select(any_of(input$selected_cols)) %>%
-      mutate_all(as.numeric) %>%
-      mutate(sample_uuid = new_uuids, before = 0) %>%
-      pivot_longer(
-        cols = -sample_uuid,
-        names_to = "measurement_label",
-        values_to = "value"
-      ) %>%
-      mutate(measurement_type = "original")
+      rvals$importedData = data_loaded
+      rvals$selectedData = data_loaded
+      rvals$chem = intersect(input$loadchem, names(data_loaded))
+      rvals$initialChem = rvals$chem
+      rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
+      rvals$loadNegativeAsNA = isTRUE(input$loadNegativeAsNA)
+      rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
 
-    # Update the "Database" by appending new records
-    db$datasets <- rbind(db$datasets, new_datasets)
-    db$labels <- rbind(db$labels, new_labels)
-    db$measurements <- rbind(db$measurements, new_measurements)
+      if(isTruthy(credentials$status) && !is.null(con)){
+        if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
+          return(NULL)
+        }
+        datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
+          janitor::make_clean_names()
+        if(nchar(datasetname) > 53){
+          mynotification("Error: datasetname is too long. Please try again.", type = "error")
+          return(NULL)
+        }
+        data_metadata = tibble::tibble(
+          field = c("datasetName","created", rep("variable",length(rvals$chem))),
+          value = c(input$datasetName,as.character(as.Date(Sys.time())),rvals$chem)
+        )
+        tblList = DBI::dbListTables(con)
+        if(isTruthy(datasetname %in% tblList) || input$datasetName %>% length() == 0){
+          mynotification("This dataset already exists. Please choose a different name.", type = "error")
+          return(NULL)
+        }
+        DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
+        DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
+        mynotification("Data Loaded")
+      } else {
+        mynotification("Data loaded locally")
+      }
+      removeModal()
+    }, error = function(e){
+      mynotification(paste("An error occurred. Please try again. Error:\n",e), type = "error")
+    })
   })
 }

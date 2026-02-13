@@ -1,5 +1,6 @@
 # ui for Compositional Analysis Dashboard - Compositions
 
+
 library(ArchaeoDash)
 library(shiny)
 library(bslib)
@@ -13,30 +14,39 @@ shinyUI(
     windowTitle = "ArchaeoDash - A Dashboard for Archaeological Compositional Analysis",
     shinyjs::useShinyjs(),
     id = "page",
-    div(
-      class = "mymainpanel",
-      navbarPage(
-        title = "ArchaeoDash",
-        id = "nav",
-        tabPanel(
-          "Data & Login",
-          div(
-            class = "dataInput",
-            h2("Data Manager"),
-            datainputTab(),
-            saveexportTab(),
-            br()
-          )
-        ),
-        homeTab(),
-        exploreTab(),
-        ordinationTab(),
-        clusterTab(),
-        groupTab(),
-        euclideanDistanceTab(),
-        visualizeassignTab(),
-        infoTabUI()
-      ) # end navbarPage
-    ) # end div
-  ) # end page_fluid
+    fluidRow(
+      column(3,
+             div(
+               class = 'mysidecol',
+               actionButton('loginUI','login'),
+               shinyjs::hidden(actionButton('logoutUI','logout')),
+               uiOutput("userMessage"),
+               br(),
+               hr(),
+               br(),
+               h2("Data Manager"),
+               datainputTab(),
+               saveexportTab(),
+               br()
+             )
+      ),
+      column(9,
+             div(
+               class = "mymainpanel",
+               navbarPage(
+                 title = "ArchaeoDash",
+                 id = "nav",
+                 homeTab(),
+                 exploreTab(),
+                 visualizeassignTab(),
+                 ordinationTab(),
+                 clusterTab(),
+                 groupTab(),
+                 euclideanDistanceTab(),
+                 infoTabUI()
+               ) # end navbar
+             ) # end div
+      ) # end column
+    ) # end row
+  ) # end page
 ) # end UI

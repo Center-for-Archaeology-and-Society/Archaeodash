@@ -11,6 +11,9 @@
 #' group.mem.probs(elements,assigned)
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
   probsAlldf = NULL
+  if (identical(method, "Hotellings") && !app_require_packages("ICSNP", feature = "Hotellings T2 group probabilities")) {
+    return(NULL)
+  }
   tryCatch({
   if("PC1" %in% names(data)){
     chem = data %>% dplyr::select(tidyselect::any_of(tidyselect::contains("PC"))) %>% names()

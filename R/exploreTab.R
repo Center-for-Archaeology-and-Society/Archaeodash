@@ -18,7 +18,7 @@ exploreTab = function() {
       tabPanel("Dataset", fluidRow(
         column(
           3,
-          h4(
+          h5(
             "Numbers of samples with missing data by element (pre-imputation)"
           ),
           plotOutput("miss.plot", width = "250px")
@@ -39,12 +39,62 @@ exploreTab = function() {
         "Compositional Profile Plot",
         br(),
         uiOutput("ui.comp"),
-        plotOutput("comp.profile")
+        plotly::plotlyOutput("comp.profile")
       )
     )
   ) # end tabPanel "Impute"
 }
 
+# Internal helper for Crosstabs calculations.
+compute_crosstab_summary <- function(data, group_column, value_column, summary_method) {
+  if (!inherits(data, "data.frame")) {
+    stop("No data available.", call. = FALSE)
+  }
+
+  column_names <- names(data)
+  if (!(group_column %in% column_names)) {
+    stop("Column 1 is not available.", call. = FALSE)
+  }
+  if (!(value_column %in% column_names)) {
+    stop("Column 2 is not available.", call. = FALSE)
+  }
+
+  if (summary_method == "count") {
+    return(
+      data %>%
+        dplyr::group_by(dplyr::across(tidyselect::all_of(c(group_column, value_column)))) %>%
+        dplyr::summarize(count = dplyr::n(), .groups = "drop")
+    )
+  }
+
+  summary_function <- switch(
+    summary_method,
+    mean = mean,
+    median = median,
+    sd = sd,
+    NULL
+  )
+  if (is.null(summary_function)) {
+    stop("Unsupported summary function selected.", call. = FALSE)
+  }
+
+  summary_input <- data %>%
+    dplyr::mutate(
+      crosstab_numeric = suppressWarnings(as.numeric(as.character(.data[[value_column]])))
+    )
+
+  if (!any(!is.na(summary_input$crosstab_numeric))) {
+    stop(paste0("Column '", value_column, "' cannot be converted to numeric values."), call. = FALSE)
+  }
+
+  result_column_name <- paste0("result-", value_column)
+  summary_input %>%
+    dplyr::group_by(dplyr::across(tidyselect::all_of(group_column))) %>%
+    dplyr::summarize(
+      !!result_column_name := round(summary_function(crosstab_numeric, na.rm = TRUE), 2),
+      .groups = "drop"
+    )
+}
 
 #' Explore Server
 #'
@@ -115,28 +165,19 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   })
 
   output$crosstabsDT = DT::renderDT({
-    req(input$crosstab1)
+    req(rvals$selectedData, input$crosstab1, input$crosstab2, input$crosstab3)
     quietly({
-      suppressWarnings({
-      if (input$crosstab3 == "count") {
-        dt = rvals$selectedData %>%
-          dplyr::group_by(dplyr::across(tidyselect::all_of(
-            c(input$crosstab1, input$crosstab2)
-          ))) %>%
-          dplyr::summarize(count = dplyr::n(), .groups = "drop")
-      } else {
-
-          dt = rvals$selectedData %>%
-            dplyr::mutate_at(dplyr::vars(tidyselect::all_of(input$crosstab2),as.numeric)) %>%
-            dplyr::group_by(dplyr::across(tidyselect::all_of(input$crosstab1))) %>%
-            dplyr::summarize(dplyr::across(
-              .names = paste0("result-", input$crosstab2),
-              .cols = tidyselect::all_of(input$crosstab2),
-              .fns = list(!!rlang::sym(input$crosstab3))
-            ))
-      }
-      })
-      dt
+      tryCatch(
+        compute_crosstab_summary(
+          data = rvals$selectedData,
+          group_column = input$crosstab1,
+          value_column = input$crosstab2,
+          summary_method = input$crosstab3
+        ),
+        error = function(e) {
+          validate(need(FALSE, e$message))
+        }
+      )
     })
   })
 
@@ -151,11 +192,13 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # Render missing data plot
   output$miss.plot <- renderPlot({
     validate(need(isTRUE(inherits(
-      rvals[['selectedData']], "data.frame"
+      rvals[['importedData']], "data.frame"
     )), ""))
-    req(rvals[['selectedData']])
-    req(rvals$chem)
-    plot_missing(data = rvals$selectedData[, rvals$chem])
+    req(rvals[['importedData']])
+    chem_for_plot = if (!is.null(rvals$initialChem)) rvals$initialChem else rvals$chem
+    chem_for_plot = chem_for_plot[chem_for_plot %in% names(rvals$importedData)]
+    validate(need(length(chem_for_plot) > 0, "No element columns available for missing-data plot."))
+    plot_missing(data = rvals$importedData[, chem_for_plot, drop = FALSE])
   })
 
   # Render UI for univariate displays
@@ -187,11 +230,16 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # })
 
   # Render compositional profile plot
-  output$comp.profile <- renderPlot({
+  output$comp.profile <- plotly::renderPlotly({
     req(rvals$selectedData)
     req(rvals$chem)
     quietly({
-      comp.profile(rvals$selectedData[, rvals$chem])
+      groups = NULL
+      if (!is.null(rvals$attrGroups) && rvals$attrGroups %in% names(rvals$selectedData)) {
+        groups = rvals$selectedData[[rvals$attrGroups]]
+      }
+      p = comp.profile(rvals$selectedData[, rvals$chem], groups = groups)
+      plotly::ggplotly(p)
     })
   })
 

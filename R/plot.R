@@ -23,31 +23,38 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   # print(Conf)
   # print(int.set)
   if(xvar == yvar) return(NULL)
-  nfac = nlevels(plotdf[[attrGroups]])
+
+  plot_data = plotdf
+  if(!("rowid" %in% names(plot_data))){
+    plot_data$rowid = seq_len(nrow(plot_data))
+  }
+  plot_data = plot_data %>% dplyr::mutate(.plot_key = as.character(rowid))
+
+  nfac = nlevels(plot_data[[attrGroups]])
   if(nfac > 6) mynotification("Too many groups to show symbols", type = "warning")
 
   if(nfac < 7) {
     print(i); i = i + 1
     gg = ggplot2::ggplot(
-      plotdf,
+      plot_data,
       ggplot2::aes(
         x = !!as.name(xvar),
         y = !!as.name(yvar),
         shape = !!as.name(attrGroups),
         color = !!as.name(attrGroups),
-        key = rowid
+        text = .plot_key
       )
     ) +
       ggplot2::geom_point()
   } else {
     print(i); i = i + 1
     gg = ggplot2::ggplot(
-      plotdf,
+      plot_data,
       ggplot2::aes(
         x = !!as.name(xvar),
         y = !!as.name(yvar),
         color = !!as.name(attrGroups),
-        key = rowid
+        text = .plot_key
       )
     ) +
       ggplot2::geom_point()
@@ -98,10 +105,15 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   print(i); i = i + 1
   # Extract the data used by ggplot
   gg_data <- ggplot2::ggplot_build(gg)$data[[1]] %>%
-    dplyr::rename(rowid = key) %>%
-    dplyr::left_join(plotdf %>% dplyr::select(tidyselect::all_of(c(
-      'rowid', attrGroups
-    ))), by = "rowid")  %>%
+    dplyr::rename(rowid = text) %>%
+    dplyr::mutate(rowid = as.character(rowid)) %>%
+    dplyr::left_join(
+      plot_data %>%
+        dplyr::select(.plot_key, tidyselect::all_of(attrGroups)) %>%
+        dplyr::rename(rowid = .plot_key) %>%
+        dplyr::mutate(rowid = as.character(rowid)),
+      by = "rowid"
+    )  %>%
     dplyr::rename(
       name = !!as.name(attrGroups)
     ) %>%
@@ -202,11 +214,16 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
 #' multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
 multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = F,theme){
   message("multiplot")
-  pdf1 = selectedData %>%
+  plot_data = selectedData
+  if(!("rowid" %in% names(plot_data))){
+    plot_data$rowid = seq_len(nrow(plot_data))
+  }
+
+  pdf1 = plot_data %>%
     dplyr::select(rowid,tidyselect::all_of(c(attrGroups,xvar))) %>%
     tidyr::pivot_longer(tidyselect::all_of(xvar), names_to = "xvar", values_to = "elem1") %>%
     tidyr::unite(id, c('rowid',tidyselect::all_of(attrGroups)), sep = "_", remove = F)
-  pdf2 = selectedData %>%
+  pdf2 = plot_data %>%
     dplyr::select(rowid,tidyselect::all_of(c(attrGroups,yvar))) %>%
     tidyr::pivot_longer(tidyselect::all_of(yvar), names_to = "yvar", values_to = "elem2") %>%
     tidyr::unite(id, c('rowid',tidyselect::all_of(attrGroups)), sep = "_", remove = F)
@@ -216,7 +233,7 @@ multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = 
       x = elem1,
       y = elem2,
       color = !!as.name(attrGroups),
-      key = rowid
+      text = rowid
     )) +
     ggplot2::geom_point(size = ptsize, alpha = .66) +
     ggplot2::ylab("") +
