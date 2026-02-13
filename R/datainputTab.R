@@ -41,6 +41,16 @@ datainputTab = function() {
 #' dataInputServer(input, output, session, rvals)
 dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
+  available_group_values <- shiny::reactiveVal(character())
+
+  update_group_selector <- function(selected_values) {
+    selected_values <- as.character(selected_values)
+    if (app_require_packages("shinyWidgets", feature = "Enhanced group selection", notify = FALSE)) {
+      shinyWidgets::updatePickerInput(session, "attrGroupsSub", selected = selected_values)
+    } else {
+      updateSelectInput(session, "attrGroupsSub", selected = selected_values)
+    }
+  }
 
   apply_new_column <- function(new_column_name, new_value) {
     rvals$importedData = quietly(label = "addNewCol",{
@@ -347,25 +357,112 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       items.all = quietly(label = 'items.all',df %>%
                             dplyr::select(tidyselect::any_of(input$attrGroups)) %>% dplyr::pull() %>% unique %>% sort)
       print("subSelect")
-      if (isTRUE(is.null(rvals[['attrGroupsSub']]))) {
-        selection = items.all
-      } else if (!identical(rvals$attrGroups, input$attrGroups)) {
-        # Default to all groups when switching to a different group column.
-        selection = items.all
+      items.all <- as.character(items.all)
+      items.all <- items.all[!is.na(items.all)]
+      available_group_values(items.all)
+      group_counts <- df %>%
+        dplyr::mutate(.group_value = as.character(.data[[input$attrGroups]])) %>%
+        dplyr::filter(!is.na(.group_value)) %>%
+        dplyr::count(.group_value, name = ".n", sort = FALSE)
+      group_mode <- if (is.null(input$groupSelectionMode)) "all" else input$groupSelectionMode
+      prior_selection <- if (!is.null(input$attrGroupsSub)) input$attrGroupsSub else rvals[["attrGroupsSub"]]
+      selection <- resolve_group_selection(
+        all_groups = items.all,
+        prior_selection = prior_selection,
+        prior_group_column = rvals$attrGroups,
+        current_group_column = input$attrGroups
+      )
+      display_items <- filter_group_choices(
+        all_groups = items.all,
+        selection = selection,
+        mode = group_mode
+      )
+      display_counts <- group_counts[group_counts$.group_value %in% display_items, , drop = FALSE]
+      if (nrow(display_counts) > 0) {
+        display_values <- as.character(display_counts$.group_value)
+        display_labels <- paste0(display_values, " (n=", as.integer(display_counts$.n), ")")
+        display_choices <- display_values
+        names(display_choices) <- display_labels
       } else {
-        selection = intersect(rvals[['attrGroupsSub']], items.all)
+        display_choices <- character()
       }
-      if (length(selection) == 0) selection = items.all
+      picker_selected <- if (group_mode == "unselected") character() else selection
       tagList(
-        selectInput(
-          "attrGroupsSub",
-          "Select groups to include",
-          choices = items.all,
-          multiple = TRUE,
-          selected = selection
-        )
+        radioButtons(
+          "groupSelectionMode",
+          "View groups",
+          choices = c("All groups" = "all", "Only selected" = "selected", "Only unselected" = "unselected"),
+          selected = group_mode,
+          inline = TRUE
+        ),
+        tags$div(
+          style = "display:flex; flex-wrap:wrap; gap:0.35rem; margin:0.25rem 0 0.5rem 0;",
+          actionButton("groupSelectAll", "Select all", class = "mybtn", style = "margin:0; padding:4px 10px;"),
+          actionButton("groupDeselectAll", "Deselect all", class = "mybtn", style = "margin:0; padding:4px 10px;"),
+          actionButton("groupInvertSelection", "Invert selection", class = "mybtn", style = "margin:0; padding:4px 10px;"),
+          actionButton("groupResetSelection", "Reset to all", class = "mybtn", style = "margin:0; padding:4px 10px;")
+        ),
+        if (app_require_packages("shinyWidgets", feature = "Enhanced group selection", notify = FALSE)) {
+          shinyWidgets::pickerInput(
+            "attrGroupsSub",
+            "Select groups to include",
+            choices = display_choices,
+            multiple = TRUE,
+            selected = picker_selected,
+            options = list(
+              "actions-box" = TRUE,
+              "live-search" = TRUE,
+              "selected-text-format" = "count > 3"
+            )
+          )
+        } else {
+          tagList(
+            tags$div(
+              class = "text-warning",
+              format_missing_packages_message("Enhanced group selection", "shinyWidgets")
+            ),
+            selectInput(
+              "attrGroupsSub",
+              "Select groups to include",
+              choices = display_choices,
+              multiple = TRUE,
+              selected = picker_selected
+            )
+          )
+        }
       )
     })
+  })
+
+  observeEvent(input$groupSelectionMode, {
+    if (is.null(input$groupSelectionMode)) return(NULL)
+    selected_values <- if (is.null(input$attrGroupsSub)) character() else input$attrGroupsSub
+    if (input$groupSelectionMode == "selected" && length(selected_values) == 0) {
+      mynotification("No groups are currently selected.", type = "warning")
+    }
+    if (input$groupSelectionMode == "unselected" && length(setdiff(available_group_values(), selected_values)) == 0) {
+      mynotification("All groups are currently selected.", type = "warning")
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$groupSelectAll, {
+    update_group_selector(available_group_values())
+  })
+
+  observeEvent(input$groupDeselectAll, {
+    update_group_selector(character())
+  })
+
+  observeEvent(input$groupInvertSelection, {
+    selected_values <- if (is.null(input$attrGroupsSub)) character() else input$attrGroupsSub
+    update_group_selector(setdiff(available_group_values(), selected_values))
+  })
+
+  observeEvent(input$groupResetSelection, {
+    update_group_selector(available_group_values())
+    if (!is.null(input$groupSelectionMode) && input$groupSelectionMode != "all") {
+      updateRadioButtons(session, "groupSelectionMode", selected = "all")
+    }
   })
 
   # Render multi-select lookup for choosing chemical concentration columns
