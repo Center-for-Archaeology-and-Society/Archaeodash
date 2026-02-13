@@ -16,8 +16,17 @@ ordinationTab = function(){
                                     column(6, plotly::plotlyOutput("pca.plot")),
                                     column(6, plotly::plotlyOutput("pca.el.plot"))),
                                   fluidRow(
-                                    column(6, plotly::plotlyOutput("eigen.plot")),
-                                    column(6,tableOutput("contribTbl")))
+                                    column(12, plotly::plotlyOutput("eigen.plot"))),
+                                  fluidRow(
+                                    column(
+                                      12,
+                                      h4("Dimensions / Variable Contributions"),
+                                      div(
+                                        style = "max-height: 360px; overflow-y: auto;",
+                                        tableOutput("contribTbl")
+                                      )
+                                    )
+                                  )
                          ), # end tabPanel PCA
                          tabPanel("LDA",
                                   fluidRow(column(6,

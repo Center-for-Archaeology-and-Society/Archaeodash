@@ -116,12 +116,16 @@ groupServer = function(input,output,session,rvals, credentials, con){
       req(rvals$pcadf)
       df = rvals$pcadf
     }
+    selected_data_with_rowid <- rvals$selectedData
+    if (!"rowid" %in% names(selected_data_with_rowid)) {
+      selected_data_with_rowid <- tibble::rowid_to_column(selected_data_with_rowid, var = "rowid")
+    }
     rvals$membershipProbs = group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
     if (inherits(rvals$membershipProbs,"data.frame")){
       rvals$membershipProbs = rvals$membershipProbs %>%
         dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
         dplyr::left_join(
-          rvals$selectedData %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
+          selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
           by = dplyr::join_by("ID" == !!input$sampleID)
         )
       if(isTruthy(!"rowid" %in% names(rvals$membershipProbs))){

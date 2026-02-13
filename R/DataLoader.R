@@ -36,6 +36,24 @@ default_chem_columns <- function(column_names) {
   column_names[!normalized_names %in% excluded_defaults]
 }
 
+default_id_column <- function(column_names) {
+  matches <- column_names[tolower(column_names) == "anid"]
+  if (length(matches) > 0) {
+    return(matches[[1]])
+  }
+  ""
+}
+
+resolve_id_column <- function(selected_id_column, column_names) {
+  if (is.null(selected_id_column) || !nzchar(selected_id_column)) {
+    return("rowid")
+  }
+  if (!(selected_id_column %in% column_names)) {
+    return("rowid")
+  }
+  selected_id_column
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -48,6 +66,7 @@ dataLoaderUI = function(){
     title = "Data Loader",
     uiOutput("datasetNameUI"),
     div(textOutput("notification"), style = "color: red; font-size: 16px; padding = 10px;"),
+    uiOutput("idColumnUI"),
     uiOutput("columnsUI"),
     uiOutput("loadchemUI"),
     uiOutput("loadOptionsUI"),
@@ -100,6 +119,18 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
     }
   })
 
+  output$idColumnUI = renderUI({
+    choices = names(rvals$data)
+    selected = default_id_column(choices)
+    selectInput(
+      "loadIDColumn",
+      "Choose ID column (defaults to ANID if present; otherwise rowid)",
+      choices = c("Use rowid (default)" = "", choices),
+      selected = selected,
+      multiple = FALSE
+    )
+  })
+
   output$columnsUI = renderUI({
     choices = names(rvals$data)
     excluded_defaults = c("rowid", "anid")
@@ -130,7 +161,9 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       req(input$loadcolumns)
       req(input$loadchem)
 
-      selected_cols = unique(c(input$loadcolumns, input$loadchem))
+      id_column = resolve_id_column(input$loadIDColumn, names(rvals$data))
+      selected_cols = unique(c("rowid", input$loadcolumns, input$loadchem, id_column))
+      selected_cols = intersect(selected_cols, names(rvals$data))
       data_loaded = rvals$data %>%
         dplyr::select(tidyselect::all_of(selected_cols)) %>%
         dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ suppressWarnings(as.numeric(as.character(.)))))
