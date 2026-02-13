@@ -38,11 +38,11 @@ shinyUI(
                  id = "nav",
                  homeTab(),
                  exploreTab(),
+                 visualizeassignTab(),
                  ordinationTab(),
                  clusterTab(),
                  groupTab(),
                  euclideanDistanceTab(),
-                 visualizeassignTab(),
                  infoTabUI()
                ) # end navbar
              ) # end div
