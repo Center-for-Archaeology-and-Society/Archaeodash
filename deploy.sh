@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
 git_as_rjbischo() {
-  git -c user.name="rjbischo" "$@"
+  sudo -u rjbischo git "$@"
 }
 
 if ! git_as_rjbischo rev-parse --is-inside-work-tree >/dev/null 2>&1; then
