@@ -7,7 +7,7 @@
 #' @examples
 #' groupTab()
 groupTab = function(){
-  tabPanel(title = "Group Membership",
+  tabPanel(title = "Probabilities and Distances",
            id = "groupMembershiptab",
            fluidPage(
              fluidRow(
