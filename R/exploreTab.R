@@ -45,6 +45,56 @@ exploreTab = function() {
   ) # end tabPanel "Impute"
 }
 
+# Internal helper for Crosstabs calculations.
+build_crosstab_summary <- function(data, col1, col2, summary_type) {
+  if (!inherits(data, "data.frame")) {
+    stop("No data available.", call. = FALSE)
+  }
+
+  col_names <- names(data)
+  if (!(col1 %in% col_names)) {
+    stop("Column 1 is not available.", call. = FALSE)
+  }
+  if (!(col2 %in% col_names)) {
+    stop("Column 2 is not available.", call. = FALSE)
+  }
+
+  if (summary_type == "count") {
+    return(
+      data %>%
+        dplyr::group_by(dplyr::across(tidyselect::all_of(c(col1, col2)))) %>%
+        dplyr::summarize(count = dplyr::n(), .groups = "drop")
+    )
+  }
+
+  summary_fn <- switch(
+    summary_type,
+    mean = mean,
+    median = median,
+    sd = sd,
+    NULL
+  )
+  if (is.null(summary_fn)) {
+    stop("Unsupported summary function selected.", call. = FALSE)
+  }
+
+  dt_input <- data %>%
+    dplyr::mutate(
+      crosstab_numeric = suppressWarnings(as.numeric(as.character(.data[[col2]])))
+    )
+
+  if (!any(!is.na(dt_input$crosstab_numeric))) {
+    stop(paste0("Column '", col2, "' cannot be converted to numeric values."), call. = FALSE)
+  }
+
+  result_name <- paste0("result-", col2)
+  dt_input %>%
+    dplyr::group_by(dplyr::across(tidyselect::all_of(col1))) %>%
+    dplyr::summarize(
+      !!result_name := summary_fn(crosstab_numeric, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
 
 #' Explore Server
 #'
@@ -115,28 +165,19 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   })
 
   output$crosstabsDT = DT::renderDT({
-    req(input$crosstab1)
+    req(rvals$selectedData, input$crosstab1, input$crosstab2, input$crosstab3)
     quietly({
-      suppressWarnings({
-      if (input$crosstab3 == "count") {
-        dt = rvals$selectedData %>%
-          dplyr::group_by(dplyr::across(tidyselect::all_of(
-            c(input$crosstab1, input$crosstab2)
-          ))) %>%
-          dplyr::summarize(count = dplyr::n(), .groups = "drop")
-      } else {
-
-          dt = rvals$selectedData %>%
-            dplyr::mutate_at(dplyr::vars(tidyselect::all_of(input$crosstab2),as.numeric)) %>%
-            dplyr::group_by(dplyr::across(tidyselect::all_of(input$crosstab1))) %>%
-            dplyr::summarize(dplyr::across(
-              .names = paste0("result-", input$crosstab2),
-              .cols = tidyselect::all_of(input$crosstab2),
-              .fns = list(!!rlang::sym(input$crosstab3))
-            ))
-      }
-      })
-      dt
+      tryCatch(
+        build_crosstab_summary(
+          data = rvals$selectedData,
+          col1 = input$crosstab1,
+          col2 = input$crosstab2,
+          summary_type = input$crosstab3
+        ),
+        error = function(e) {
+          validate(need(FALSE, e$message))
+        }
+      )
     })
   })
 
