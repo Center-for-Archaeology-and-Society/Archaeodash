@@ -159,6 +159,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
         })
         rvals$plotVars = rvals$chem
       }
+      if(is.data.frame(rvals$plotdf) && nrow(rvals$plotdf) > 0 && !("rowid" %in% names(rvals$plotdf))){
+        rvals$plotdf = rvals$plotdf %>% tibble::rowid_to_column("rowid")
+      }
     })
   })
 
@@ -194,7 +197,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     print(plotlySelect)
     if (length(plotlySelect) > 0) {
       rvals$brushSelected = rvals$plotdf %>%
-        dplyr::filter(rowid %in% plotlySelect$key)
+        dplyr::filter(as.character(rowid) %in% as.character(plotlySelect$key))
     }
   })
 
@@ -208,7 +211,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       replaceCell(rowid = rowid,col = rvals$attrGroups,value = input$NewGroup, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
 
       rvals$brushSelected = rvals$plotdf %>%
-        dplyr::filter(rowid %in% plotlySelect$key)
+        dplyr::filter(as.character(rowid) %in% as.character(plotlySelect$key))
 
     })
     inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set")
