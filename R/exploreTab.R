@@ -39,7 +39,7 @@ exploreTab = function() {
         "Compositional Profile Plot",
         br(),
         uiOutput("ui.comp"),
-        plotOutput("comp.profile")
+        plotly::plotlyOutput("comp.profile")
       )
     )
   ) # end tabPanel "Impute"
@@ -230,11 +230,16 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # })
 
   # Render compositional profile plot
-  output$comp.profile <- renderPlot({
+  output$comp.profile <- plotly::renderPlotly({
     req(rvals$selectedData)
     req(rvals$chem)
     quietly({
-      comp.profile(rvals$selectedData[, rvals$chem])
+      groups = NULL
+      if (!is.null(rvals$attrGroups) && rvals$attrGroups %in% names(rvals$selectedData)) {
+        groups = rvals$selectedData[[rvals$attrGroups]]
+      }
+      p = comp.profile(rvals$selectedData[, rvals$chem], groups = groups)
+      plotly::ggplotly(p)
     })
   })
 
