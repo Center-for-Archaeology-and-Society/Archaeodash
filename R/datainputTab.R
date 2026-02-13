@@ -40,6 +40,37 @@ datainputTab = function() {
 #' @examples
 #' dataInputServer(input, output, session, rvals)
 dataInputServer = function(input, output, session, rvals, con, credentials) {
+  pending_new_column <- shiny::reactiveVal(NULL)
+
+  apply_new_column <- function(new_column_name, new_value) {
+    rvals$importedData = quietly(label = "addNewCol",{
+      rvals$importedData %>%
+        dplyr::select(-tidyselect::any_of(new_column_name)) %>%
+        dplyr::mutate(!!as.name(new_column_name) := factor(as.character(new_value)))
+    })
+    rvals$selectedData = quietly(label = "addNewCol2",{
+      rvals$selectedData %>%
+        dplyr::select(-tidyselect::any_of(new_column_name)) %>%
+        dplyr::mutate(!!as.name(new_column_name) := factor(as.character(new_value)))
+    })
+    if (is.null(rvals$attr)) {
+      rvals$attr <- names(rvals$importedData)
+    } else {
+      rvals$attr <- unique(c(rvals$attr, new_column_name))
+    }
+    if (!is.null(rvals$attrs)) {
+      rvals$attrs <- unique(c(rvals$attrs, new_column_name))
+    }
+    updateCurrent(rvals,con,credentials,input,output,session)
+    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
+    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
+    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
+    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
+    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+  }
+
 
   observe({
     if(is.null(con)){
@@ -638,28 +669,32 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$createSubmit,{
-    removeModal()
     print("adding column")
     if(isTRUE(is.null(input$createGroup))) newCol = "cluster" else newCol = input$createGroup
     if(isTRUE(is.null(input$createGroupVal))) val = "1" else val = input$createGroupVal
-    rvals$importedData = quietly(label = "addNewCol",{
-      rvals$importedData %>%
-        dplyr::select(-tidyselect::any_of(newCol)) %>%
-        dplyr::mutate(!!as.name(newCol) := factor(as.character(val)))
-    })
-    rvals$selectedData = quietly(label = "addNewCol2",{
-      rvals$selectedData %>%
-        dplyr::select(-tidyselect::any_of(newCol)) %>%
-        dplyr::mutate(!!as.name(newCol) := factor(as.character(val)))
-    })
-    updateCurrent(rvals,con,credentials,input,output,session)
-    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
-    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
-    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
-    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
-    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    removeModal()
+    if(newCol %in% names(rvals$importedData) || newCol %in% names(rvals$selectedData)){
+      pending_new_column(list(name = newCol, value = val))
+      showModal(modalDialog(
+        title = "Overwrite existing column?",
+        p(paste0("Column '", newCol, "' already exists and will be overwritten.")),
+        footer = tagList(
+          modalButton("Cancel"),
+          actionButton("confirmOverwriteNewCol", "Overwrite")
+        ),
+        easyClose = TRUE
+      ))
+    } else {
+      apply_new_column(new_column_name = newCol, new_value = val)
+    }
+  })
+
+  observeEvent(input$confirmOverwriteNewCol, {
+    req(pending_new_column())
+    pending = pending_new_column()
+    removeModal()
+    apply_new_column(new_column_name = pending$name, new_value = pending$value)
+    pending_new_column(NULL)
   })
 
 }

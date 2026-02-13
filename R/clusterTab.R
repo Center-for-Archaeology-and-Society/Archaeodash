@@ -45,6 +45,27 @@ clusterTab = function(){
 #' @examples
 #' clusterServer(input,output,session,rvals)
 clusterServer = function(input,output,session,rvals, credentials, con){
+  pending_cluster_assignment <- shiny::reactiveVal(NULL)
+
+  apply_cluster_assignment <- function(assignment_columns, assignment_data) {
+    rvals$selectedData =
+      rvals$selectedData %>%
+      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
+      dplyr::bind_cols(assignment_data)
+    rvals$importedData =
+      rvals$importedData %>%
+      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
+      dplyr::bind_cols(assignment_data)
+
+    if(length(assignment_columns) > 0){
+      rvals$attrGroups = assignment_columns[[1]]
+      rvals$attrGroupsSub = levels(rvals$selectedData[[rvals$attrGroups]])
+      rvals$attrs = unique(c(rvals$attr, rvals$attrGroups, "imputation", "transformation"))
+    }
+
+    updateCurrent(rvals,con,credentials,input,output,session)
+    showNotification("assigned cluster")
+  }
 
   # Render button to run clustering algorithm
   output$cluster.buttonUI <- renderUI({
@@ -347,30 +368,46 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     req(rvals$chem)
     req(rvals$clusterDT)
     quietly({
-    assignment_columns = rvals$clusterDT %>% names()
-    assignment_columns = setdiff(assignment_columns,'Sample')
-    assignment_data = rvals$clusterDT %>%
-      dplyr::select(-Sample) %>%
-      dplyr::mutate_at(dplyr::vars(assignment_columns),factor)
-    rvals$selectedData =
-      rvals$selectedData %>%
-      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
-      dplyr::bind_cols(assignment_data)
-    rvals$importedData =
-      rvals$importedData %>%
-      dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
-      dplyr::bind_cols(assignment_data)
+      assignment_columns = rvals$clusterDT %>% names()
+      assignment_columns = setdiff(assignment_columns,'Sample')
+      assignment_data = rvals$clusterDT %>%
+        dplyr::select(-Sample) %>%
+        dplyr::mutate_at(dplyr::vars(assignment_columns),factor)
 
-    if(length(assignment_columns) > 0){
-      rvals$attrGroups = assignment_columns[[1]]
-      rvals$attrGroupsSub = levels(rvals$selectedData[[rvals$attrGroups]])
-      rvals$attrs = unique(c(rvals$attr, rvals$attrGroups, "imputation", "transformation"))
-    }
-
-    updateCurrent(rvals,con,credentials,input,output,session)
+      existing_columns = intersect(assignment_columns, names(rvals$selectedData))
+      if(length(existing_columns) > 0){
+        pending_cluster_assignment(list(
+          assignment_columns = assignment_columns,
+          assignment_data = assignment_data
+        ))
+        showModal(modalDialog(
+          title = "Overwrite existing column?",
+          p(paste0(
+            "The following column(s) already exist and will be overwritten: ",
+            paste(existing_columns, collapse = ", "),
+            "."
+          )),
+          footer = tagList(
+            modalButton("Cancel"),
+            actionButton("confirmClusterOverwrite", "Overwrite")
+          ),
+          easyClose = TRUE
+        ))
+      } else {
+        apply_cluster_assignment(assignment_columns, assignment_data)
+      }
+    })
   })
 
-    showNotification("assigned cluster")
+  observeEvent(input$confirmClusterOverwrite, {
+    req(pending_cluster_assignment())
+    pending = pending_cluster_assignment()
+    removeModal()
+    apply_cluster_assignment(
+      assignment_columns = pending$assignment_columns,
+      assignment_data = pending$assignment_data
+    )
+    pending_cluster_assignment(NULL)
   })
 
 }
