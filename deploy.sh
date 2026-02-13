@@ -82,28 +82,21 @@ git tag "$TAG"
 
 CRAN_REPO="${CRAN_REPO:-https://cloud.r-project.org}"
 Rscript -e "
-  desc <- read.dcf('DESCRIPTION')[1, ]
+  dcf <- read.dcf('DESCRIPTION')
+  desc <- dcf[1, ]
   fields <- c('Depends', 'Imports', 'LinkingTo', 'Suggests')
-  raw <- unlist(desc[intersect(fields, colnames(read.dcf('DESCRIPTION')))])
+  raw <- unlist(desc[intersect(fields, colnames(dcf))], use.names = FALSE)
   tokens <- trimws(unlist(strsplit(raw, ',')))
   tokens <- tokens[nzchar(tokens)]
   pkgs <- gsub('^([A-Za-z0-9.]+).*$','\\\\1', tokens)
   pkgs <- setdiff(unique(pkgs), c('R', rownames(installed.packages(priority='base'))))
 
-  ap <- available.packages(repos='${CRAN_REPO}')
-  deps <- unique(unlist(tools::package_dependencies(pkgs, db=ap, recursive=TRUE), use.names=FALSE))
-  needed <- unique(c(pkgs, deps))
   installed <- rownames(installed.packages())
-  missing <- setdiff(needed, installed)
+  missing <- setdiff(pkgs, installed)
 
-  unavailable <- setdiff(missing, rownames(ap))
-  if (length(unavailable) > 0) {
-    stop(paste('Unresolvable dependencies:', paste(unavailable, collapse=', ')))
-  }
-
-  if (length(missing) > 0) {
+  if (length(missing) > 0L) {
     message('Installing missing dependencies: ', paste(missing, collapse=', '))
-    install.packages(missing, repos='${CRAN_REPO}')
+    install.packages(missing, repos='${CRAN_REPO}', dependencies=TRUE)
   } else {
     message('No missing dependencies.')
   }

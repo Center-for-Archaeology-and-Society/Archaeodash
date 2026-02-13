@@ -83,7 +83,9 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
 
   output$columnsUI = renderUI({
     choices = names(rvals$data)
-    selectInput('loadcolumns',"Choose which columns should be included", choices = choices, selected = choices, multiple = T)
+    excluded_defaults = c("rowid", "anid")
+    selected = choices[!tolower(choices) %in% excluded_defaults]
+    selectInput('loadcolumns',"Choose which columns should be included", choices = choices, selected = selected, multiple = T)
   })
 
 
@@ -91,7 +93,8 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
     choices = names(rvals$data)
     dfNum = suppressWarnings(rvals$data %>% dplyr::mutate_all(as.numeric) %>%
                                janitor::remove_empty("cols"))
-    selected = names(dfNum)
+    excluded_defaults = c("rowid", "anid")
+    selected = names(dfNum)[!tolower(names(dfNum)) %in% excluded_defaults]
     selectInput('loadchem',"Choose which columns are elements/predictor variables", choices = choices, selected = selected, multiple = T)
   })
 

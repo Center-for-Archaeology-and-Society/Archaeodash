@@ -337,16 +337,24 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     quietly({
     nms = rvals$clusterDT %>% names()
     nms = setdiff(nms,'Sample')
+    cluster_cols = rvals$clusterDT %>%
+      dplyr::select(-Sample) %>%
+      dplyr::mutate_at(dplyr::vars(nms),factor)
     rvals$selectedData =
       rvals$selectedData %>%
-      dplyr::bind_cols(rvals$clusterDT %>%
-                         dplyr::select(-Sample) %>%
-                         dplyr::mutate_at(dplyr::vars(nms),factor))
+      dplyr::select(-tidyselect::any_of(nms)) %>%
+      dplyr::bind_cols(cluster_cols)
     rvals$importedData =
       rvals$importedData %>%
-      dplyr::bind_cols(rvals$clusterDT %>%
-                         dplyr::select(-Sample) %>%
-                         dplyr::mutate_at(dplyr::vars(nms),factor))
+      dplyr::select(-tidyselect::any_of(nms)) %>%
+      dplyr::bind_cols(cluster_cols)
+
+    if(length(nms) > 0){
+      rvals$attrGroups = nms[[1]]
+      rvals$attrGroupsSub = levels(rvals$selectedData[[rvals$attrGroups]])
+      rvals$attrs = unique(c(rvals$attr, rvals$attrGroups, "imputation", "transformation"))
+    }
+
     updateCurrent(rvals,con,credentials,input,output,session)
   })
 
