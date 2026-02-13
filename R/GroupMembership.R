@@ -155,6 +155,9 @@ groupServer = function(input,output,session,rvals, credentials, con){
         rvals$membershipProbs = rvals$membershipProbs %>%
           dplyr::mutate(rowid = as.character(as.integer(ID)))
       }
+      priority_cols <- unique(c("ID", "GroupVal", "BestGroup", input$eligibleGroups))
+      rvals$membershipProbs <- rvals$membershipProbs %>%
+        dplyr::select(tidyselect::any_of(priority_cols), tidyselect::everything())
       if(isTruthy(!is.null(rvals$membershipProbs))){
         mynotification("completed calculation")
       }
@@ -167,8 +170,8 @@ groupServer = function(input,output,session,rvals, credentials, con){
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
     hide_by_default <- which(names(rvals$membershipProbs) %in% c("Group", "rowid", "BestValue"))
-    projection_cols <- which(names(rvals$membershipProbs) %in% input$eligibleGroups)
-    hide_targets <- sort(unique(c(hide_by_default, projection_cols)))
+    right_align_cols <- which(names(rvals$membershipProbs) %in% c(input$eligibleGroups, "BestValue"))
+    hide_targets <- sort(unique(hide_by_default))
 
     DT::datatable(
       rvals$membershipProbs,
@@ -188,6 +191,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
         paging = FALSE,
         columnDefs = list(
           list(visible = FALSE, targets = hide_targets - 1),
+          list(className = "dt-right", targets = right_align_cols - 1),
           list(width = "78px", targets = "_all")
         )
       )

@@ -41,7 +41,7 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
   probsAlldf = probsAll %>%
     tibble::as_tibble() %>%
     dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1) %>%
-    dplyr::mutate_if(is.numeric,sprintf,fmt = "%05.2f")
+    dplyr::mutate_if(is.numeric,sprintf,fmt = "%.2f")
   }, error = function(e){
     mynotification(glue::glue("unable to return group membership probabilities: {e}"), type = "error")
   })
