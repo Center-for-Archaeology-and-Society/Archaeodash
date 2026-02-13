@@ -20,10 +20,24 @@ shinyServer(function(input, output, session) {
   # session <<- session; showNotification("warning: global variable is only for testing", type = "warning")
   # credentials <<- reactiveValues(); showNotification("warning: global variable is only for testing", type = "warning")
 
-  con = tryCatch(connect(),error = function(e) {
-    mynotification("unable to connect to database", type = "warning")
+  db_connect_error <- NULL
+  con = tryCatch(connect(), error = function(e) {
+    db_connect_error <<- conditionMessage(e)
     NULL
-    })
+  })
+
+  if (is.null(con)) {
+    observeEvent(TRUE, {
+      showNotification(
+        paste0(
+          "Unable to connect to database. Some features will be disabled.",
+          if (!is.null(db_connect_error) && nzchar(db_connect_error)) paste0(" Details: ", db_connect_error) else ""
+        ),
+        type = "error",
+        duration = NULL
+      )
+    }, once = TRUE, ignoreInit = FALSE)
+  }
 
   loginUI(input = input)
 
@@ -47,6 +61,12 @@ shinyServer(function(input, output, session) {
 
   observeEvent(input$logoutUI,{
     credentials$res = tibble::tibble(username = NA)
+    credentials$status = FALSE
+    session$sendCustomMessage("auth_cookie", list(action = "clear"))
+  })
+
+  observeEvent(input$open_privacy_policy, {
+    updateNavbarPage(session, "nav", selected = "privacy")
   })
 
   #### Import data ####

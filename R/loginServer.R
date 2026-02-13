@@ -16,6 +16,7 @@ loginUI = function(input){
       checkboxInput("registerCheckbox", "Register as a new user", value = FALSE),
       textInput("username", "Username"),
       passwordInput("password", "Password"),
+      checkboxInput("rememberLogin", "Keep me logged in for 30 days on this device", value = TRUE),
       uiOutput("emailUI"),
       p("Forgot password? Email rbischoff@asu.edu for assistance."),
       footer = tagList(
@@ -42,6 +43,9 @@ loginUI = function(input){
 #' @examples
 #' loginServer(con,input,output,session,credentials)
 loginServer = function(con, input = input, output = output, session = session, credentials = credentials){
+
+  credentials$status = FALSE
+  credentials$res = tibble::tibble(username = NA)
 
   output$emailUI = renderUI({
     if (input$registerCheckbox) {
@@ -72,6 +76,9 @@ loginServer = function(con, input = input, output = output, session = session, c
     credentials$res <- DBI::dbGetQuery(con, query)
     if (nrow(credentials$res) == 1 && sodium::password_verify(credentials$res$password[1], password)) {
       credentials$status = TRUE
+      if (isTRUE(input$rememberLogin)) {
+        session$sendCustomMessage("auth_cookie", list(action = "set", username = username))
+      }
       mynotification("Login Successful")
     } else {
       mynotification("Login Failed", type = "error")
@@ -125,12 +132,56 @@ loginServer = function(con, input = input, output = output, session = session, c
       query <- sprintf("SELECT * FROM users WHERE username = '%s'", username)
       credentials$res <- DBI::dbGetQuery(con, query)
       credentials$status = TRUE
+      if (isTRUE(input$rememberLogin)) {
+        session$sendCustomMessage("auth_cookie", list(action = "set", username = username))
+      }
     }, error = function(e) {
       mynotification("Registration Failed: User already exists or invalid data")
       credentials$res = tibble::tibble(username = NA)
       credentials$status = FALSE
     })
   })
+
+  observeEvent(input$remembered_username, {
+    if (!app_require_packages("DBI", feature = "Remembered login")) {
+      return(NULL)
+    }
+    if (is.null(con)) {
+      return(NULL)
+    }
+    if (isTRUE(credentials$status)) {
+      return(NULL)
+    }
+    username <- tolower(trimws(input$remembered_username))
+    if (!nzchar(username)) {
+      return(NULL)
+    }
+    query <- sprintf("SELECT * FROM users WHERE username = '%s'", username)
+    remembered_res <- tryCatch(DBI::dbGetQuery(con, query), error = function(e) NULL)
+    if (is.data.frame(remembered_res) && nrow(remembered_res) == 1) {
+      credentials$res <- remembered_res
+      credentials$status <- TRUE
+      mynotification("Logged in from saved session")
+    } else {
+      session$sendCustomMessage("auth_cookie", list(action = "clear"))
+    }
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$cookie_consent, {
+    if (isTRUE(input$cookie_consent == "accepted") &&
+        isTRUE(credentials$status) &&
+        !is.null(credentials$res$username) &&
+        !is.na(credentials$res$username)) {
+      session$sendCustomMessage(
+        "auth_cookie",
+        list(action = "set", username = as.character(credentials$res$username[[1]]))
+      )
+    }
+    if (isTRUE(input$cookie_consent == "declined")) {
+      session$sendCustomMessage("auth_cookie", list(action = "clear"))
+    }
+  }, ignoreInit = TRUE)
+
   return(credentials)
 }
 

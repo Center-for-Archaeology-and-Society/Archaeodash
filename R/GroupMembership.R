@@ -17,30 +17,23 @@ groupTab = function(){
              actionButton("membershipRun","Calculate", class = "mybtn"),
            ),
            mainPanel(
-             tabsetPanel(id = "GroupMembershipPanels",
-                         type = "pills",
-                         tabPanel(title = "Group Sizes",
-                                  id = "groupSizePanel",
-                                  uiOutput("grpSizeUI")
-                         ),
-                         tabPanel(
-                           title = "Membership Probabilities",
-                           id = "membershipProbs",
-                           wellPanel(
-                             fluidRow(
-                               column(4,
-                                      actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
-                               ),
-                               column(4, offset = 2,
-                                      actionButton("gChangeGroup","Change Group Assignment", class = "mybtn"),
-                                      textInput("gNewGroup","Enter new group designation")
-                               )
-                             )
-                           ),
-                           br(),
-                           DT::DTOutput('membershipTbl')
-                         )
-             ) # end tabset panel
+             h4("Group Sizes"),
+             DT::DTOutput("grpSizeTbl"),
+             br(),
+             h4("Membership Probabilities"),
+             wellPanel(
+               fluidRow(
+                 column(4,
+                        actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
+                 ),
+                 column(4, offset = 2,
+                        actionButton("gChangeGroup","Change Group Assignment", class = "mybtn"),
+                        textInput("gNewGroup","Enter new group designation")
+                 )
+               )
+             ),
+             br(),
+             DT::DTOutput('membershipTbl')
            ) # end main panel
            ) # end sidebar layout
   ) # end group membership panel
@@ -62,7 +55,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   ##### UI Outputs for membership groups ####
 
-  output$grpSizeUI = renderUI({
+  output$grpSizeTbl = DT::renderDataTable({
     req(nrow(rvals$selectedData) > 0)
     tbl = NULL
     quietly(label = "render group size",{
@@ -70,7 +63,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
         as.data.frame() %>%
         setNames(c("Group","Count"))
     })
-    DT::renderDataTable(tbl)
+    DT::datatable(tbl, rownames = FALSE, options = list(dom = "t"))
   })
 
   output$eligibleGroupUI = renderUI({
