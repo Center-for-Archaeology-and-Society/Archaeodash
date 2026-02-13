@@ -347,10 +347,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       items.all = quietly(label = 'items.all',df %>%
                             dplyr::select(tidyselect::any_of(input$attrGroups)) %>% dplyr::pull() %>% unique %>% sort)
       print("subSelect")
-      if(isTRUE(is.null(rvals[['attrGroupsSub']])))
-        selection = items.all else
-          selection = rvals[['attrGroupsSub']]
-      if(!selection[1] %in% items.all) selection = items.all
+      if (isTRUE(is.null(rvals[['attrGroupsSub']]))) {
+        selection = items.all
+      } else if (!identical(rvals$attrGroups, input$attrGroups)) {
+        # Default to all groups when switching to a different group column.
+        selection = items.all
+      } else {
+        selection = intersect(rvals[['attrGroupsSub']], items.all)
+      }
+      if (length(selection) == 0) selection = items.all
       tagList(
         selectInput(
           "attrGroupsSub",
