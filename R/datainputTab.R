@@ -371,9 +371,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         br(),
         uiOutput("transform.options"),
         br(),
-        checkboxInput("runPCA","check to run PCA", value = F),
-        checkboxInput("runUMAP","check to run UMAP", value = F),
-        checkboxInput("runLDA","check to run LDA", value = F),
+        checkboxInput("runPCA","check to run PCA", value = TRUE),
+        checkboxInput("runUMAP","check to run UMAP", value = TRUE),
+        checkboxInput("runLDA","check to run LDA", value = TRUE),
         actionButton("action", "Press to confirm selections", class = "mybtn")
       )
     })
