@@ -91,7 +91,7 @@ build_crosstab_summary <- function(data, col1, col2, summary_type) {
   dt_input %>%
     dplyr::group_by(dplyr::across(tidyselect::all_of(col1))) %>%
     dplyr::summarize(
-      !!result_name := summary_fn(crosstab_numeric, na.rm = TRUE),
+      !!result_name := round(summary_fn(crosstab_numeric, na.rm = TRUE), 2),
       .groups = "drop"
     )
 }
