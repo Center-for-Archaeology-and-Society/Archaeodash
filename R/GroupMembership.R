@@ -79,6 +79,21 @@ groupTab = function(){
 #' groupServer(input,output,session,rvals)
 groupServer = function(input,output,session,rvals, credentials, con){
   membership_proxy <- DT::dataTableProxy("membershipTbl")
+  selected_membership_rowids <- shiny::reactiveVal(character())
+
+  build_membership_display_table <- function(df) {
+    checked_ids <- selected_membership_rowids()
+    df %>%
+      dplyr::mutate(
+        rowid = as.character(rowid),
+        .select = ifelse(
+          rowid %in% checked_ids,
+          paste0('<input type="checkbox" class="membership-row-check" data-rowid="', rowid, '" checked>'),
+          paste0('<input type="checkbox" class="membership-row-check" data-rowid="', rowid, '">')
+        )
+      ) %>%
+      dplyr::select(.select, dplyr::everything())
+  }
 
   get_source_features <- function(df, source) {
     if (!is.data.frame(df) || nrow(df) == 0) return(character())
@@ -225,6 +240,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
       ID = input$sampleID
     )
     if (inherits(rvals$membershipProbs,"data.frame")){
+      selected_membership_rowids(character())
       rvals$membershipProbs = rvals$membershipProbs %>%
         dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
         dplyr::left_join(
@@ -258,18 +274,32 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
+    display_tbl <- build_membership_display_table(rvals$membershipProbs)
+
     hide_by_default <- which(names(rvals$membershipProbs) %in% c("Group", "rowid", "BestValue"))
     right_align_cols <- which(names(rvals$membershipProbs) %in% c(input$eligibleGroups, "BestValue"))
-    hide_targets <- sort(unique(hide_by_default))
+    # Shift hidden/right-aligned targets by one because .select is first.
+    hide_targets <- sort(unique(hide_by_default + 1))
+    right_align_targets <- right_align_cols + 1
 
     DT::datatable(
-      rvals$membershipProbs,
+      display_tbl,
       filter = "top",
       rownames = F,
-      selection = 'multiple',
+      selection = 'none',
       style = 'default',
       class = "compact membership-plain-table nowrap",
       extensions = c("Buttons"),
+      escape = FALSE,
+      callback = DT::JS(
+        "table.on('change', 'input.membership-row-check', function(){",
+        "  var checked = [];",
+        "  table.$('input.membership-row-check:checked').each(function(){",
+        "    checked.push(String($(this).data('rowid')));",
+        "  });",
+        "  Shiny.setInputValue('membership_checked_rowids', checked, {priority: 'event'});",
+        "});"
+      ),
       options = list(
         dom = "Brt",
         buttons = list("colvis"),
@@ -280,18 +310,32 @@ groupServer = function(input,output,session,rvals, credentials, con){
         paging = FALSE,
         columnDefs = list(
           list(visible = FALSE, targets = hide_targets - 1),
-          list(className = "dt-right", targets = right_align_cols - 1),
+          list(className = "dt-right", targets = right_align_targets - 1),
+          list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0),
           list(width = "78px", targets = "_all")
         )
       )
     )
   })
 
+  observeEvent(input$membership_checked_rowids, {
+    rowids <- as.character(input$membership_checked_rowids)
+    rowids <- rowids[!is.na(rowids) & nzchar(rowids)]
+    selected_membership_rowids(unique(rowids))
+  }, ignoreNULL = FALSE)
+
+  get_checked_membership_rows <- function() {
+    req(rvals$membershipProbs)
+    checked_rowids <- selected_membership_rowids()
+    if (length(checked_rowids) == 0) return(integer())
+    which(as.character(rvals$membershipProbs$rowid) %in% checked_rowids)
+  }
+
   apply_membership_assignment <- function(values) {
     req(rvals$membershipProbs)
-    selected_rows <- input$membershipTbl_rows_selected
+    selected_rows <- get_checked_membership_rows()
     if (is.null(selected_rows) || length(selected_rows) == 0) {
-      mynotification("Select one or more rows in Membership Probabilities first.", type = "warning")
+      mynotification("Check one or more rows in Membership Probabilities first.", type = "warning")
       return(invisible(NULL))
     }
     if (length(values) == 1) {
@@ -321,7 +365,12 @@ groupServer = function(input,output,session,rvals, credentials, con){
     )
 
     if (is.data.frame(rvals$membershipProbs) && nrow(rvals$membershipProbs) > 0) {
-      DT::replaceData(membership_proxy, rvals$membershipProbs, resetPaging = FALSE, rownames = FALSE)
+      DT::replaceData(
+        membership_proxy,
+        build_membership_display_table(rvals$membershipProbs),
+        resetPaging = FALSE,
+        rownames = FALSE
+      )
     }
     mynotification("Updated selected row assignments.", type = "message")
     invisible(NULL)
@@ -330,9 +379,9 @@ groupServer = function(input,output,session,rvals, credentials, con){
   observeEvent(input$gAssignBestGroup,{
     quietly(label = "assigning best group",{
       req(rvals$membershipProbs)
-      selected_rows <- input$membershipTbl_rows_selected
+      selected_rows <- get_checked_membership_rows()
       if (is.null(selected_rows) || length(selected_rows) == 0) {
-        mynotification("Select one or more rows in Membership Probabilities first.", type = "warning")
+        mynotification("Check one or more rows in Membership Probabilities first.", type = "warning")
         return(invisible(NULL))
       }
       if (!"BestGroup" %in% names(rvals$membershipProbs)) {
