@@ -101,9 +101,36 @@
     });
   }
 
+  function getStoredTheme() {
+    try {
+      var stored = window.localStorage.getItem("archaeodash_theme");
+      if (stored === "dark" || stored === "light") return stored;
+    } catch (e) {}
+    return "light";
+  }
+
+  function setStoredTheme(mode) {
+    try {
+      window.localStorage.setItem("archaeodash_theme", mode);
+    } catch (e) {}
+  }
+
+  function applyTheme(mode, toggleBtn) {
+    var normalized = mode === "dark" ? "dark" : "light";
+    if (document.body) {
+      document.body.classList.toggle("theme-dark", normalized === "dark");
+    }
+    if (toggleBtn) {
+      toggleBtn.setAttribute("data-theme", normalized);
+      toggleBtn.textContent = normalized === "dark" ? "Light Mode" : "Dark Mode";
+    }
+    return normalized;
+  }
+
   function init() {
     try {
       var toggleBtn = document.getElementById("toggleSidebar");
+      var themeToggleBtn = document.getElementById("themeToggle");
       var sideCol = document.getElementById("sidePanelCol");
       var mainCol = document.getElementById("mainPanelCol");
       var banner = document.getElementById("cookieBanner");
@@ -128,6 +155,17 @@
             toggleBtn.textContent = "Show Side Panel";
           }
         });
+      }
+
+      if (themeToggleBtn) {
+        var activeTheme = applyTheme(getStoredTheme(), themeToggleBtn);
+        themeToggleBtn.addEventListener("click", function () {
+          activeTheme = activeTheme === "dark" ? "light" : "dark";
+          activeTheme = applyTheme(activeTheme, themeToggleBtn);
+          setStoredTheme(activeTheme);
+        });
+      } else {
+        applyTheme(getStoredTheme(), null);
       }
 
       var consent = getCookie("archaeodash_cookie_consent");

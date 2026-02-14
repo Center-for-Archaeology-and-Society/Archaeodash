@@ -167,6 +167,12 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       data_loaded = rvals$data %>%
         dplyr::select(tidyselect::all_of(selected_cols)) %>%
         dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ suppressWarnings(as.numeric(as.character(.)))))
+      data_loaded <- ensure_rowid_column(
+        data = data_loaded,
+        table_name = "loadedData",
+        require_unique = TRUE,
+        allow_long = FALSE
+      )
 
       if(isTRUE(input$loadZeroAsNA)){
         data_loaded = data_loaded %>%
@@ -183,6 +189,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
 
       rvals$importedData = data_loaded
       rvals$selectedData = data_loaded
+      ensure_core_rowids(rvals)
       rvals$chem = intersect(input$loadchem, names(data_loaded))
       rvals$initialChem = rvals$chem
       rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
@@ -210,9 +217,19 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         }
         DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
         DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
+        pref_tbl <- paste0(credentials$res$username, "_preferences")
+        DBI::dbWriteTable(
+          conn = con,
+          name = pref_tbl,
+          value = tibble::tibble(field = "lastOpenedDataset", value = datasetname),
+          row.names = FALSE,
+          overwrite = TRUE
+        )
+        rvals$currentDatasetName <- datasetname
         rvals$currentDatasetKey <- build_dataset_key(datasetname)
         mynotification("Data Loaded")
       } else {
+        rvals$currentDatasetName <- "local_upload"
         rvals$currentDatasetKey <- build_dataset_key(paste0("local_upload_", format(Sys.time(), "%Y%m%d_%H%M%S")))
         mynotification("Data loaded locally")
       }

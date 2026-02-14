@@ -44,6 +44,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
   available_group_values <- shiny::reactiveVal(character())
   active_group_column <- shiny::reactiveVal(NULL)
+  suppress_group_reset <- shiny::reactiveVal(FALSE)
   transformation_loading_active <- shiny::reactiveVal(FALSE)
   dataset_loading_active <- shiny::reactiveVal(FALSE)
 
@@ -52,6 +53,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     showModal(modalDialog(
       title = NULL,
       footer = NULL,
+      class = "transformation-loading-modal",
       easyClose = FALSE,
       tags$div(
         class = "transformation-loading-wrap",
@@ -73,6 +75,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     showModal(modalDialog(
       title = NULL,
       footer = NULL,
+      class = "transformation-loading-modal",
       easyClose = FALSE,
       tags$div(
         class = "transformation-loading-wrap",
@@ -87,6 +90,56 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       removeModal()
       dataset_loading_active(FALSE)
     }
+  }
+
+  safe_username <- function() {
+    raw_username <- tryCatch(credentials$res$username[[1]], error = function(e) "")
+    if (is.null(raw_username) || length(raw_username) == 0 || is.na(raw_username)) return("")
+    as.character(raw_username)
+  }
+
+  safe_scalar_chr <- function(x) {
+    if (is.null(x) || length(x) == 0 || is.na(x[[1]])) return("")
+    as.character(x[[1]])
+  }
+
+  get_last_opened_dataset <- function() {
+    if (!isTruthy(credentials$status) || is.null(con)) return("")
+    username <- safe_username()
+    if (!nzchar(username)) return("")
+    pref_tbl <- paste0(username, "_preferences")
+    if (!DBI::dbExistsTable(con, pref_tbl)) return("")
+    prefs <- tryCatch(
+      dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
+      error = function(e) tibble::tibble()
+    )
+    if (!inherits(prefs, "data.frame") || nrow(prefs) == 0) return("")
+    val <- prefs %>%
+      dplyr::filter(field == "lastOpenedDataset") %>%
+      dplyr::pull(value)
+    safe_scalar_chr(val)
+  }
+
+  set_last_opened_dataset <- function(dataset_name) {
+    if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
+    username <- safe_username()
+    if (!nzchar(username) || !nzchar(dataset_name)) return(invisible(NULL))
+    pref_tbl <- paste0(username, "_preferences")
+    prefs <- tibble::tibble(
+      field = "lastOpenedDataset",
+      value = as.character(dataset_name)
+    )
+    try(
+      DBI::dbWriteTable(
+        conn = con,
+        name = pref_tbl,
+        value = prefs,
+        row.names = FALSE,
+        overwrite = TRUE
+      ),
+      silent = TRUE
+    )
+    invisible(NULL)
   }
 
   update_group_selector <- function(selected_values) {
@@ -132,7 +185,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   load_persisted_transformations <- function() {
     if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
     if (is.null(rvals$currentDatasetKey) || !nzchar(rvals$currentDatasetKey)) return(invisible(NULL))
-    username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+    username <- safe_username()
     if (!nzchar(username)) return(invisible(NULL))
 
     persisted <- tryCatch(
@@ -148,21 +201,21 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     )
     if (length(persisted) > 0) {
       rvals$transformations <- persisted
-      if (is.null(rvals$activeTransformation) || !(rvals$activeTransformation %in% names(persisted))) {
-        rvals$activeTransformation <- names(persisted)[[1]]
-      }
-      refresh_transformation_selector(selected_name = rvals$activeTransformation)
+      rvals$activeTransformation <- NULL
+      refresh_transformation_selector(selected_name = "")
     }
     invisible(NULL)
   }
 
   refresh_transformation_selector <- function(selected_name = rvals$activeTransformation) {
-    choices <- names(rvals$transformations)
-    if (length(choices) == 0) {
+    tx_choices <- names(rvals$transformations)
+    if (length(tx_choices) == 0) {
       choices <- character()
       selected_name <- character()
-    } else if (is.null(selected_name) || !(selected_name %in% choices)) {
-      selected_name <- choices[[1]]
+    } else {
+      choices <- c("Select transformation..." = "", tx_choices)
+      if (is.null(selected_name)) selected_name <- ""
+      if (!(selected_name %in% c("", tx_choices))) selected_name <- ""
     }
     try(updateSelectInput(session, "activeTransformation", choices = choices, selected = selected_name), silent = TRUE)
   }
@@ -223,17 +276,24 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       shiny::invalidateLater(1000, session)
       rvals$tbls = NULL
     } else {
+    username <- safe_username()
+    if (!nzchar(username)) {
+      rvals$tbls <- character()
+      return(invisible(NULL))
+    }
     tbls = DBI::dbListTables(con)
-    tbls = tbls[which(stringr::str_detect(tbls,paste0("^",credentials$res$username,"_")))]
+    tbls = tbls[which(stringr::str_detect(tbls,paste0("^",username,"_")))]
     tbls = tbls[which(!stringr::str_detect(tbls,"_metadata"))]
     tbls = tbls[which(!stringr::str_detect(tbls,"_tx_"))]
     tbls = tbls[which(!stringr::str_detect(tbls,"_transformations$"))]
+    tbls = tbls[which(!stringr::str_detect(tbls,"_preferences$"))]
+    tbls = tbls[which(!stringr::str_detect(tbls,"_current$"))]
     rvals$tbls = tbls
     }
   })
 
   output$confirmPriorUI = renderUI({
-    if(isTruthy(credentials$status)){
+    if(isTruthy(credentials$status) && nzchar(safe_username()) && length(rvals$tbls) > 0){
       actionButton("confirmPrior","Confirm dataset selection", class = 'mybtn')
     } else {
       NULL
@@ -241,16 +301,33 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   output$priorDatasets = renderUI({
-    if(isTruthy(credentials$status)){
-      if(any(stringr::str_detect(rvals$tbls,"_current"))){
-        selection = rvals$tbls[which(stringr::str_detect(rvals$tbls,"_current"))]
-      } else {
-        selection = rvals$tbls[1]
-      }
-      selectInput("selectedDatasets", "Choose dataset(s)", choices = rvals$tbls, multiple = T, selected = selection)
-    } else {
-      NULL
+    if (!isTruthy(credentials$status)) return(NULL)
+    username <- safe_username()
+    if (!nzchar(username)) {
+      return(tags$div(class = "text-muted", "Waiting for login session..."))
     }
+    if (is.null(rvals$tbls) || length(rvals$tbls) == 0) {
+      return(
+        selectInput(
+          "selectedDatasets",
+          "Choose dataset",
+          choices = character(),
+          multiple = FALSE,
+          selected = character()
+        )
+      )
+    }
+
+    pref_selection <- safe_scalar_chr(get_last_opened_dataset())
+    current_selection <- safe_scalar_chr(tryCatch(rvals$currentDatasetName, error = function(e) ""))
+    selection <- if (isTRUE(nzchar(current_selection)) && isTRUE(current_selection %in% rvals$tbls)) {
+      current_selection
+    } else if (isTRUE(nzchar(pref_selection)) && isTRUE(pref_selection %in% rvals$tbls)) {
+      pref_selection
+    } else {
+      rvals$tbls[[1]]
+    }
+    selectInput("selectedDatasets", "Choose dataset", choices = rvals$tbls, multiple = FALSE, selected = selection)
   })
 
   observeEvent(input$confirmPrior,{
@@ -258,7 +335,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     show_dataset_loading()
     on.exit(hide_dataset_loading(), add = TRUE)
     reset_transformation_store()
-    rvals$currentDatasetKey <- build_dataset_key(input$selectedDatasets)
+    selected_dataset <- as.character(input$selectedDatasets[[1]])
+    rvals$currentDatasetName <- selected_dataset
+    rvals$currentDatasetKey <- build_dataset_key(selected_dataset)
+    set_last_opened_dataset(selected_dataset)
 
     null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                    "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
@@ -269,18 +349,17 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       rvals[[var]] <- NULL
     }
 
-    tbls = list()
-    for(tbl in input$selectedDatasets){
-      tbls[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
-        dplyr::mutate_all(as.character)
-    }
-    rvals$importedData = do.call(dplyr::bind_rows,tbls) %>%
+    imported_tbl <- dplyr::tbl(con, selected_dataset) %>%
+      dplyr::collect() %>%
+      dplyr::mutate_all(as.character)
+    rvals$importedData = imported_tbl %>%
       dplyr::select(-tidyselect::any_of('rowid')) %>%
       dplyr::distinct_all() %>%
       tibble::rowid_to_column()
     rvals$selectedData = rvals$importedData
+    ensure_core_rowids(rvals)
 
-    filenames = paste0(input$selectedDatasets,"_metadata")
+    filenames = paste0(selected_dataset, "_metadata")
 
     # get metadata
     tblsmd = list()
@@ -331,7 +410,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     removeModal()
     req(input$selectedDatasets)
     print('deleting datasets')
-    username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+    username <- safe_username()
     for(tbl in input$selectedDatasets){
       if (nzchar(username)) {
         dataset_key <- build_dataset_key(tbl)
@@ -450,18 +529,17 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   output$transformationStoreUI = renderUI({
     req(nrow(rvals$importedData) > 0)
-    choices <- names(rvals$transformations)
-    if (length(choices) == 0) return(NULL)
-    if (is.null(rvals$activeTransformation) || !(rvals$activeTransformation %in% choices)) {
-      rvals$activeTransformation <- choices[[1]]
-    }
+    tx_choices <- names(rvals$transformations)
+    if (length(tx_choices) == 0) return(NULL)
+    choices <- c("Select transformation..." = "", tx_choices)
+    selected_choice <- if (is.null(rvals$activeTransformation) || !(rvals$activeTransformation %in% tx_choices)) "" else rvals$activeTransformation
     tagList(
       h3("Transformations"),
       selectInput(
         "activeTransformation",
         "Select transformation",
         choices = choices,
-        selected = rvals$activeTransformation
+        selected = selected_choice
       ),
       actionButton("deleteTransformation", "Delete", class = "mybtn")
     )
@@ -500,6 +578,19 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       }
       rvals$LDAmod <- lda_result$mod
     }
+    suppress_group_reset(TRUE)
+    on.exit(suppress_group_reset(FALSE), add = TRUE)
+    if (!is.null(snapshot$attrGroups) && nzchar(as.character(snapshot$attrGroups))) {
+      try(updateSelectInput(session, "attrGroups", selected = snapshot$attrGroups), silent = TRUE)
+      active_group_column(snapshot$attrGroups)
+    }
+    if (!is.null(snapshot$attrGroupsSub)) {
+      rvals$attrGroupsSub <- as.character(snapshot$attrGroupsSub)
+      try(updateSelectizeInput(session, "attrGroupsSub", selected = as.character(snapshot$attrGroupsSub)), silent = TRUE)
+    }
+    if (!is.null(input$groupSelectionMode) && !identical(input$groupSelectionMode, "all")) {
+      try(updateRadioButtons(session, "groupSelectionMode", selected = "all"), silent = TRUE)
+    }
     refresh_transformation_selector(selected_name = name)
     mynotification(paste0("loaded transformation: ", name))
   }
@@ -514,7 +605,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(input$activeTransformation)
     if (is.null(rvals$transformations[[input$activeTransformation]])) return(NULL)
     if (isTruthy(credentials$status) && !is.null(con) && !is.null(rvals$currentDatasetKey) && nzchar(rvals$currentDatasetKey)) {
-      username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+      username <- safe_username()
       if (nzchar(username)) {
         try(delete_transformation_db(
           con = con,
@@ -663,6 +754,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(input$attrGroups, {
     if (is.null(input$attrGroups)) return(NULL)
+    if (isTRUE(suppress_group_reset())) {
+      active_group_column(input$attrGroups)
+      return(NULL)
+    }
     previous_group_column <- active_group_column()
     if (!is.null(previous_group_column) && !identical(previous_group_column, input$attrGroups)) {
       # Reset subgroup selection when switching to a different grouping column.
@@ -984,7 +1079,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$transformations[[transformation_name]] <- snapshot
     rvals$activeTransformation <- transformation_name
     if (isTruthy(credentials$status) && !is.null(con)) {
-      username <- tryCatch(as.character(credentials$res$username[[1]]), error = function(e) "")
+      username <- safe_username()
       if (nzchar(username) && !is.null(rvals$currentDatasetKey) && nzchar(rvals$currentDatasetKey)) {
         try(
           persist_transformation_db(

@@ -14,6 +14,7 @@ shinyServer(function(input, output, session) {
   selectedData = tibble::tibble())
   rvals$transformations <- list()
   rvals$activeTransformation <- NULL
+  rvals$currentDatasetName <- NULL
   rvals$currentDatasetKey <- NULL
   credentials = reactiveValues()
   # for testing

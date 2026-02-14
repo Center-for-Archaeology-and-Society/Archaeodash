@@ -62,7 +62,7 @@ visualizeassignTab = function() {
             offset = 0.5,
             br(),
             actionButton('Change', 'Change Group Assignment'),
-            textInput('NewGroup', label = 'Enter new group designation')
+            uiOutput("groupAssignChoiceUI")
           ),
           column(3,
                  offset = 0.5,
@@ -119,6 +119,69 @@ visualizeassignTab = function() {
 #' @examples
 #' visualizeAssignServer(input,output,session,rvals)
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
+  selected_plot_keys <- shiny::reactiveVal(character())
+
+  build_brush_display_table <- function(brush_df) {
+    if (!inherits(brush_df, "data.frame") || !"rowid" %in% names(brush_df)) {
+      return(brush_df)
+    }
+
+    base_df <- if (inherits(rvals$selectedData, "data.frame") && "rowid" %in% names(rvals$selectedData)) {
+      rvals$selectedData
+    } else {
+      brush_df
+    }
+
+    id_col <- ""
+    if (!is.null(rvals$sampleID) && nzchar(as.character(rvals$sampleID)) && as.character(rvals$sampleID) %in% names(base_df)) {
+      id_col <- as.character(rvals$sampleID)
+    } else {
+      anid_matches <- names(base_df)[tolower(names(base_df)) == "anid"]
+      if (length(anid_matches) > 0) id_col <- as.character(anid_matches[[1]])
+    }
+
+    chem_cols <- if (is.null(rvals$chem)) character() else intersect(rvals$chem, names(base_df))
+    metadata_cols <- setdiff(names(base_df), c("rowid", id_col, chem_cols))
+    ordered_cols <- c("rowid", if (nzchar(id_col)) id_col else character(), metadata_cols, chem_cols)
+    ordered_cols <- ordered_cols[ordered_cols %in% names(base_df)]
+
+    selected_rowids <- unique(as.character(brush_df$rowid))
+    base_df %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
+      dplyr::filter(rowid %in% selected_rowids) %>%
+      dplyr::select(tidyselect::any_of(ordered_cols))
+  }
+
+  output$groupAssignChoiceUI <- renderUI({
+    req(rvals$selectedData)
+    req(rvals$attrGroups)
+    req(rvals$attrGroups %in% names(rvals$selectedData))
+    groups <- rvals$selectedData %>%
+      dplyr::pull(!!as.name(rvals$attrGroups)) %>%
+      as.character() %>%
+      unique() %>%
+      sort()
+    groups <- groups[!is.na(groups) & nzchar(groups)]
+    choices <- c(groups, "Create new group..." = "__new__")
+    selected_choice <- if (!is.null(input$groupAssignChoice) && input$groupAssignChoice %in% unname(choices)) {
+      input$groupAssignChoice
+    } else {
+      if (length(groups) > 0) groups[[1]] else "__new__"
+    }
+    tagList(
+      selectInput(
+        "groupAssignChoice",
+        "Assign selected to group",
+        choices = choices,
+        selected = selected_choice
+      ),
+      conditionalPanel(
+        condition = "input.groupAssignChoice == '__new__'",
+        textInput("groupAssignNew", label = "Enter new group designation")
+      )
+    )
+  })
+
   observeEvent(input$data.src, {
     if (!identical(input$data.src, "linear discriminants")) return(NULL)
     req(rvals$selectedData)
@@ -206,28 +269,46 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
-  observeEvent(input$`plotly_selected-A`, {
+  observeEvent(plotly::event_data("plotly_selected", source = "A"), {
     req(rvals$plotdf)
-    plotlySelect <<- plotly::event_data("plotly_selected")
-    print(plotlySelect)
-    if (length(plotlySelect) > 0) {
-      rvals$brushSelected = rvals$plotdf %>%
-        dplyr::filter(as.character(rowid) %in% as.character(plotlySelect$key))
+    plotly_select <- plotly::event_data("plotly_selected", source = "A")
+    if (is.null(plotly_select) || !("key" %in% names(plotly_select))) {
+      selected_plot_keys(character())
+      rvals$brushSelected <- NULL
+      return(invisible(NULL))
     }
-  })
+    keys <- unique(as.character(plotly_select$key))
+    selected_plot_keys(keys)
+    rvals$brushSelected <- rvals$plotdf %>%
+      dplyr::filter(as.character(rowid) %in% keys)
+  }, ignoreNULL = FALSE)
 
   observeEvent(input$Change, {
-    req(rvals$brushSelected)
     req(rvals$plotdf)
     req(rvals$selectedData)
+    selected_rows <- rvals$brushSelected
+    if (is.null(selected_rows) || nrow(selected_rows) == 0) {
+      mynotification("Select one or more points in the plot before changing group assignment.", type = "warning")
+      return(invisible(NULL))
+    }
     quietly(label = "change group assignment",{
-
-      rowid = rvals$brushSelected$rowid
-      replaceCell(rowid = rowid,col = rvals$attrGroups,value = input$NewGroup, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
-
-      rvals$brushSelected = rvals$plotdf %>%
-        dplyr::filter(as.character(rowid) %in% as.character(plotlySelect$key))
-
+      target_group <- if (identical(input$groupAssignChoice, "__new__")) {
+        trimws(as.character(input$groupAssignNew))
+      } else {
+        as.character(input$groupAssignChoice)
+      }
+      if (!nzchar(target_group)) {
+        mynotification("Choose an existing group or enter a new group designation.", type = "warning")
+        return(invisible(NULL))
+      }
+      rowid = as.character(selected_rows$rowid)
+      replaceCell(rowid = rowid,col = rvals$attrGroups,value = target_group, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
+      selected_keys <- selected_plot_keys()
+      if (length(selected_keys) > 0 && inherits(rvals$selectedData, "data.frame") && "rowid" %in% names(rvals$selectedData)) {
+        rvals$brushSelected <- rvals$selectedData %>%
+          dplyr::filter(as.character(rowid) %in% selected_keys)
+      }
+      mynotification(glue::glue("Updated {length(rowid)} row(s) to group '{target_group}'."), type = "message")
     })
     inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set")
     for(i in inputList){
@@ -256,11 +337,19 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       if (is.null(rvals$brushSelected)) {
         p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
       } else {
-        renderTable(rvals$brushSelected)
+        tags$div(
+          style = "overflow-x:auto; width:100%;",
+          tableOutput("brushTable")
+        )
       }
     })
   })
   })
+
+  output$brushTable <- renderTable({
+    req(rvals$brushSelected)
+    build_brush_display_table(rvals$brushSelected)
+  }, rownames = FALSE)
 
   #### multiplots ####
 

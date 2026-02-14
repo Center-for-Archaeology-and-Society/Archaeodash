@@ -3,9 +3,10 @@ title: "ArchaeoDash Help Guide"
 output: 
   html_document: 
     toc: true
+    toc_float: true
     self_contained: false
     highlight: null
-    theme: null
+    theme: flatly
 ---
 
 ## About
@@ -39,8 +40,9 @@ Click *BROWSE* to upload data. CSV and XLSX are preferred, and other formats sup
 If you are logged in:
 
 - Uploaded datasets are stored in your account database area.
-- You can select one or multiple datasets from *Choose dataset(s)*.
-- Click *Confirm dataset selection* to load the selected datasets.
+- Select a dataset from *Choose dataset*.
+- The selector defaults to your last opened dataset.
+- Click *Confirm dataset selection* to load that dataset.
 
 If you are not logged in:
 
@@ -81,7 +83,7 @@ Transformation behavior:
 
 - Selecting a transformation in the *Transformations* dropdown loads it immediately.
 - *Delete* removes the selected transformation.
-- If logged in, transformations are persisted per selected dataset set and can be reloaded later.
+- If logged in, transformations are persisted per selected dataset and can be reloaded later.
 
 If *Run LDA* is selected with fewer than three groups, the app shows a warning because LDA visualization requires at least three groups.
 
@@ -102,6 +104,10 @@ This tab has options for exploring the selected data.
 ### DATASET
 
 This tab contains a plot displaying the number of missing or zero values for each element column as well as a view of the entire selected dataset. Data can be edited here by double clicking a cell and then clicking off the cell when the data has been changed. Extensive data modification should be done in a spreadsheet editor such as Excel and then uploaded to ArchaeoDash.
+
+When logged in, edits autosave directly to the currently selected dataset in the database.
+
+Warning: editing metadata columns (for example group or descriptive columns) changes database records. Make sure you maintain backups before making bulk edits.
 
 ### CROSSTABS
 

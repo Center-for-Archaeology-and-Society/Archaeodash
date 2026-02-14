@@ -33,6 +33,16 @@ shinyUI(
              div(
                class = 'mysidecol',
                actionButton('loginUI','login'),
+               tags$div(
+                 class = "theme-toggle-wrap",
+                 tags$button(
+                   id = "themeToggle",
+                   type = "button",
+                   class = "btn btn-default theme-toggle-btn",
+                   `data-theme` = "light",
+                   "Dark Mode"
+                 )
+               ),
                shinyjs::hidden(actionButton('logoutUI','logout')),
                uiOutput("userMessage"),
                br(),
