@@ -35,7 +35,7 @@ groupTab = function(){
              ),
              br(),
              h4("Membership Probabilities"),
-             wellPanel(
+           wellPanel(
                fluidRow(
                  column(4,
                         actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
@@ -44,10 +44,7 @@ groupTab = function(){
                         actionButton("gChangeGroup","Change Group Assignment", class = "mybtn")
                  ),
                  column(4,
-                        tags$div(
-                          style = "margin-top: 10px;",
-                          textInput("gNewGroup", NULL, placeholder = "Enter new group designation")
-                        )
+                        tags$div(style = "margin-top: 10px;", uiOutput("gGroupAssignChoiceUI"))
                  )
                )
              ),
@@ -82,17 +79,13 @@ groupServer = function(input,output,session,rvals, credentials, con){
   selected_membership_rowids <- shiny::reactiveVal(character())
 
   build_membership_display_table <- function(df) {
-    checked_ids <- selected_membership_rowids()
-    df %>%
-      dplyr::mutate(
-        rowid = as.character(rowid),
-        .select = ifelse(
-          rowid %in% checked_ids,
-          paste0('<input type="checkbox" class="membership-row-check" data-rowid="', rowid, '" checked>'),
-          paste0('<input type="checkbox" class="membership-row-check" data-rowid="', rowid, '">')
-        )
-      ) %>%
-      dplyr::select(.select, dplyr::everything())
+    add_checkbox_column(
+      df = df,
+      checked_rowids = selected_membership_rowids(),
+      rowid_col = "rowid",
+      checkbox_col = ".select",
+      checkbox_class = "membership-row-check"
+    )
   }
 
   get_source_features <- function(df, source) {
@@ -212,6 +205,19 @@ groupServer = function(input,output,session,rvals, credentials, con){
       }
     }
     selectInput("sampleID","Choose sample ID Column",choices = choices,selected = selected)
+  })
+
+  output$gGroupAssignChoiceUI <- renderUI({
+    req(rvals$selectedData)
+    req(rvals$attrGroups)
+    groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
+    selected_choice <- tryCatch(as.character(input$gGroupAssignChoice[[1]]), error = function(e) "")
+    build_group_assignment_ui(
+      choice_input_id = "gGroupAssignChoice",
+      new_input_id = "gGroupAssignNew",
+      groups = groups,
+      selected_choice = selected_choice
+    )
   })
 
   observeEvent(input$membershipRun,{
@@ -395,21 +401,13 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   observeEvent(input$gChangeGroup,{
     quietly(label = "assigning new group",{
-      new_group <- trimws(as.character(input$gNewGroup))
+      new_group <- resolve_group_assignment_target(input$gGroupAssignChoice, input$gGroupAssignNew)
       if (!nzchar(new_group)) {
-        mynotification("Enter a new group designation first.", type = "warning")
+        mynotification("Choose an existing group or enter a new group designation.", type = "warning")
         return(invisible(NULL))
       }
       apply_membership_assignment(new_group)
     })
-  })
-
-  observeEvent(input$gNewGroup,{
-    if(isTruthy(stringr::str_detect(input$gNewGroup,"[a-zA-z]|[0-9]"))){
-      shinyjs::enable("gChangeGroup")
-    } else {
-      shinyjs::disable("gChangeGroup")
-    }
   })
 
 }

@@ -155,30 +155,13 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   output$groupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
     req(rvals$attrGroups)
-    req(rvals$attrGroups %in% names(rvals$selectedData))
-    groups <- rvals$selectedData %>%
-      dplyr::pull(!!as.name(rvals$attrGroups)) %>%
-      as.character() %>%
-      unique() %>%
-      sort()
-    groups <- groups[!is.na(groups) & nzchar(groups)]
-    choices <- c(groups, "Create new group..." = "__new__")
-    selected_choice <- if (!is.null(input$groupAssignChoice) && input$groupAssignChoice %in% unname(choices)) {
-      input$groupAssignChoice
-    } else {
-      if (length(groups) > 0) groups[[1]] else "__new__"
-    }
-    tagList(
-      selectInput(
-        "groupAssignChoice",
-        "Assign selected to group",
-        choices = choices,
-        selected = selected_choice
-      ),
-      conditionalPanel(
-        condition = "input.groupAssignChoice == '__new__'",
-        textInput("groupAssignNew", label = "Enter new group designation")
-      )
+    groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
+    selected_choice <- tryCatch(as.character(input$groupAssignChoice[[1]]), error = function(e) "")
+    build_group_assignment_ui(
+      choice_input_id = "groupAssignChoice",
+      new_input_id = "groupAssignNew",
+      groups = groups,
+      selected_choice = selected_choice
     )
   })
 
@@ -292,11 +275,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       return(invisible(NULL))
     }
     quietly(label = "change group assignment",{
-      target_group <- if (identical(input$groupAssignChoice, "__new__")) {
-        trimws(as.character(input$groupAssignNew))
-      } else {
-        as.character(input$groupAssignChoice)
-      }
+      target_group <- resolve_group_assignment_target(input$groupAssignChoice, input$groupAssignNew)
       if (!nzchar(target_group)) {
         mynotification("Choose an existing group or enter a new group designation.", type = "warning")
         return(invisible(NULL))

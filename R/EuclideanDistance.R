@@ -36,7 +36,7 @@ euclideanDistanceTab = function() {
                tabPanel(
                  title = "Euclidean Distance",
                  id = "eDistance",
-                 wellPanel(fluidRow(
+                wellPanel(fluidRow(
                    column(4, actionButton(
                      'edAssignMatchGroup','Assign Match Group', class = "mybtn"
                    )),
@@ -44,7 +44,7 @@ euclideanDistanceTab = function() {
                      4,
                      offset = 2,
                      actionButton("edChangeGroup", "Change Group Assignment", class = "mybtn"),
-                     textInput("edNewGroup", "Enter new group designation")
+                     uiOutput("edGroupAssignChoiceUI")
                    )
                  )),
                  br(),
@@ -68,6 +68,60 @@ euclideanDistanceTab = function() {
 #' @examples
 #' euclideanDistanceSrvr(input,output,session,rvals)
 euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
+  edProxy = DT::dataTableProxy('EDTbl')
+  selected_ed_rowids <- shiny::reactiveVal(character())
+
+  build_ed_display_table <- function(df) {
+    add_checkbox_column(
+      df = df,
+      checked_rowids = selected_ed_rowids(),
+      rowid_col = "rowid",
+      checkbox_col = ".select",
+      checkbox_class = "ed-row-check"
+    )
+  }
+
+  get_checked_ed_rows <- function() {
+    req(rvals$edistance)
+    checked_rowids <- selected_ed_rowids()
+    if (length(checked_rowids) == 0) return(integer())
+    which(as.character(rvals$edistance$rowid) %in% checked_rowids)
+  }
+
+  apply_ed_assignment <- function(values) {
+    req(rvals$edistance)
+    selected_rows <- get_checked_ed_rows()
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      mynotification("Check one or more rows in Euclidean Distance results first.", type = "warning")
+      return(invisible(NULL))
+    }
+    if (length(values) == 1) values <- rep(values, length(selected_rows))
+    if (length(values) != length(selected_rows)) {
+      mynotification("Assignment value count does not match checked rows.", type = "error")
+      return(invisible(NULL))
+    }
+    rowid <- as.character(rvals$edistance$rowid[selected_rows])
+    if (length(rowid) == 0 || !all(rowid %in% as.character(rvals$importedData$rowid))) {
+      mynotification("Checked rows could not be mapped back to the dataset.", type = "error")
+      return(invisible(NULL))
+    }
+    replaceCell(
+      rowid = rowid,
+      col = rvals$attrGroups,
+      value = values,
+      rvals = rvals,
+      con = con,
+      credentials = credentials,
+      input = input,
+      output = output,
+      session = session
+    )
+    if (is.data.frame(rvals$edistance) && nrow(rvals$edistance) > 0) {
+      DT::replaceData(edProxy, build_ed_display_table(rvals$edistance), resetPaging = FALSE, rownames = FALSE)
+    }
+    invisible(NULL)
+  }
+
   get_ed_source_features <- function(df, source) {
     if (!is.data.frame(df) || nrow(df) == 0) return(character())
     if (identical(source, "principal components")) {
@@ -165,6 +219,19 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     })
   })
 
+  output$edGroupAssignChoiceUI <- renderUI({
+    req(rvals$selectedData)
+    req(rvals$attrGroups)
+    groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
+    selected_choice <- tryCatch(as.character(input$edGroupAssignChoice[[1]]), error = function(e) "")
+    build_group_assignment_ui(
+      choice_input_id = "edGroupAssignChoice",
+      new_input_id = "edGroupAssignNew",
+      groups = groups,
+      selected_choice = selected_choice
+    )
+  })
+
   observeEvent(input$EDRun,{
     quietly(label = "running Euclidean Distance",{
       source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = TRUE)
@@ -189,6 +256,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
           analysis_df %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)) %>% dplyr::mutate_all(as.character),
           by = input$edsampleID
         )
+      selected_ed_rowids(character())
       mynotification("completed calculation")
     })
   })
@@ -196,77 +264,89 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   output$EDTbl = DT::renderDataTable({
     req(rvals$edistance)
     quietly(label = "rendering Euclidean Distance table",{
-      if(is.null(rvals$EDTbl_state_length)){
-        rvals$EDTbl_state_length = 25
+      sort_col <- if (!is.null(input$edsampleID) && input$edsampleID %in% names(rvals$edistance)) {
+        input$edsampleID
+      } else {
+        names(rvals$edistance)[which(names(rvals$edistance) != "rowid")][1]
       }
+      display_tbl <- rvals$edistance %>%
+        dplyr::mutate_at(dplyr::vars(distance),as.numeric) %>%
+        dplyr::mutate_at(dplyr::vars(distance),round,1) %>%
+        dplyr::arrange(!!as.name(sort_col),distance)
+      display_tbl <- build_ed_display_table(display_tbl)
+      hide_by_default <- which(names(display_tbl) %in% c("rowid"))
+      right_align_cols <- which(names(display_tbl) %in% c("distance"))
       DT::datatable(
-        rvals$edistance %>%
-          dplyr::mutate_at(dplyr::vars(distance),as.numeric) %>%
-          dplyr::mutate_at(dplyr::vars(distance),round,1) %>%
-          dplyr::arrange(!!as.name(input$edsampleID),distance),filter = "top",rownames = F,selection = 'multiple', style = 'bootstrap', options = list(
-          pageLength = rvals$EDTbl_state_length,
-          lengthMenu = c(10,25,50,100, 500,1000)
+        display_tbl,
+        filter = "top",
+        rownames = FALSE,
+        selection = "none",
+        style = "default",
+        class = "compact membership-plain-table nowrap",
+        extensions = c("Buttons"),
+        escape = FALSE,
+        callback = DT::JS(
+          "table.on('change', 'input.ed-row-check', function(){",
+          "  var checked = [];",
+          "  table.$('input.ed-row-check:checked').each(function(){",
+          "    checked.push(String($(this).data('rowid')));",
+          "  });",
+          "  Shiny.setInputValue('ed_checked_rowids', checked, {priority: 'event'});",
+          "});"
+        ),
+        options = list(
+          dom = "Brt",
+          buttons = list("colvis"),
+          autoWidth = TRUE,
+          scrollY = "420px",
+          scrollCollapse = TRUE,
+          scrollX = TRUE,
+          paging = FALSE,
+          columnDefs = list(
+            list(visible = FALSE, targets = hide_by_default - 1),
+            list(className = "dt-right", targets = right_align_cols - 1),
+            list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0),
+            list(width = "78px", targets = "_all")
+          )
         )
       )
     })
   })
 
-  edProxy = DT::dataTableProxy('EDTbl')
+  observeEvent(input$ed_checked_rowids, {
+    rowids <- as.character(input$ed_checked_rowids)
+    rowids <- rowids[!is.na(rowids) & nzchar(rowids)]
+    selected_ed_rowids(unique(rowids))
+  }, ignoreNULL = FALSE)
 
   observeEvent(input$edAssignMatchGroup,{
     quietly(label = "assigning match group",{
-      selRows = input$EDTbl_rows_selected
+      selRows <- get_checked_ed_rows()
+      if (is.null(selRows) || length(selRows) == 0) {
+        mynotification("Check one or more rows in Euclidean Distance results first.", type = "warning")
+        return(invisible(NULL))
+      }
       match_col <- paste0(rvals$attrGroups, "_match")
       if (!match_col %in% names(rvals$edistance)) {
         mynotification("Unable to locate matched-group column in Euclidean Distance results.", type = "error")
         return(invisible(NULL))
       }
-      rvals$edNewValue = rvals$edistance[[match_col]][selRows]
+      assign_values <- as.character(rvals$edistance[[match_col]][selRows])
+      apply_ed_assignment(assign_values)
+      mynotification("Updated checked row assignments from match groups.", type = "message")
     })
   })
 
   observeEvent(input$edChangeGroup,{
     quietly(label = "assigning new group",{
-      rvals$edNewValue = input$edNewGroup
-    })
-  })
-
-  observeEvent(rvals$edNewValue, {
-    quietly(label = "changing group",{
-      print("rows selected")
-      print(input$EDTbl_rows_selected)
-      print(head(rvals$edistance))
-      rowid = rvals$edistance$rowid[input$EDTbl_rows_selected]
-      print("rowid")
-      print(rowid)
-      replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$edNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
-      rvals$edNewValue = NULL
-      DT::replaceData(edProxy, rvals$edistance, resetPaging = FALSE)
-      if(!is.null(input$EDTbl_search)){
-        edProxy %>% DT::updateSearch(keywords = list(global = input$EDTbl_search))
+      new_group <- resolve_group_assignment_target(input$edGroupAssignChoice, input$edGroupAssignNew)
+      if (!nzchar(new_group)) {
+        mynotification("Choose an existing group or enter a new group designation.", type = "warning")
+        return(invisible(NULL))
       }
-      if(!is.null(input$EDTbl_state$length)){
-        rvals$EDTbl_state_length = input$EDTbl_state$length
-      } else {
-        rvals$EDTbl_state_length = 25
-      }
-
+      apply_ed_assignment(new_group)
+      mynotification("Updated checked row assignments.", type = "message")
     })
-    rvals$xvar = tryCatch(input$xvar,error = function(e)return(NULL))
-    rvals$xvar2 = tryCatch(input$xvar2,error = function(e)return(NULL))
-    rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
-    rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
-    rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
-  })
-
-  observeEvent(input$edNewGroup,{
-    if(stringr::str_detect(input$edNewGroup,"[a-zA-z]|[0-9]")){
-      shinyjs::enable("edChangeGroup")
-    } else {
-      shinyjs::disable("edChangeGroup")
-    }
   })
 
 }
