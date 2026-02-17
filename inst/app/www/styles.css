@@ -237,6 +237,10 @@ textarea,
   padding: 8px;
 }
 
+.membership-table-scroll-box .checkbox {
+  margin: 4px 0 8px 0;
+}
+
 .membership-table-scroll-box table.dataTable.compact thead th,
 .membership-table-scroll-box table.dataTable.compact tbody td {
   border: none !important;
@@ -249,6 +253,31 @@ textarea,
 
 .membership-table-scroll-box table.dataTable.no-footer {
   border-bottom: none !important;
+}
+
+.membership-table-scroll-box table.membership-compact-table thead th {
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.membership-table-scroll-box table.membership-compact-table thead .dt-right,
+.membership-table-scroll-box table.membership-compact-table tbody .dt-right {
+  text-align: right;
+}
+
+.membership-table-scroll-box table.membership-fullwidth-table thead th,
+.membership-table-scroll-box table.membership-fullwidth-table tbody td {
+  white-space: nowrap;
+}
+
+.dt-buttons .dt-button.buttons-colvis,
+.dt-buttons .dt-button.buttons-colvis:hover,
+.dt-buttons .dt-button.buttons-colvis:focus {
+  background: #2e7f63 !important;
+  border: 1px solid #25654f !important;
+  color: #ffffff !important;
+  text-shadow: none !important;
 }
 
 .transformation-loading-wrap {
@@ -274,15 +303,17 @@ textarea,
   color: var(--text);
 }
 
-.transformation-loading-modal .modal-content {
+.transformation-loading-modal .modal-content,
+.modal-content.transformation-loading-modal {
   border: 1px solid var(--panel-border);
   background: var(--panel);
   color: var(--text);
 }
 
-body.theme-dark .transformation-loading-modal .modal-content {
+body.theme-dark .transformation-loading-modal.modal-dialog .modal-content,
+body.theme-dark .modal-content.transformation-loading-modal {
   border: 1px solid rgba(123, 173, 153, 0.45);
-  background: rgba(14, 27, 33, 0.96);
+  background: rgba(10, 20, 25, 0.97);
   color: #eaf6f0;
 }
 
@@ -293,6 +324,47 @@ body.theme-dark .transformation-loading-modal .transformation-loading-spinner {
 
 body.theme-dark .transformation-loading-modal .transformation-loading-text {
   color: #eaf6f0;
+}
+
+body.theme-dark .modal-content,
+body.theme-dark .well,
+body.theme-dark .panel {
+  background: rgba(18, 31, 37, 0.92) !important;
+  color: var(--text) !important;
+}
+
+body.theme-dark #clustertab,
+body.theme-dark #clustertab h1,
+body.theme-dark #clustertab h2,
+body.theme-dark #clustertab h3,
+body.theme-dark #clustertab h4,
+body.theme-dark #clustertab label,
+body.theme-dark #clustertab .help-block,
+body.theme-dark #clustertab .radio,
+body.theme-dark #clustertab .checkbox {
+  color: #eaf6f0 !important;
+}
+
+body.theme-dark table.dataTable thead th,
+body.theme-dark table.dataTable tbody td,
+body.theme-dark .dataTables_wrapper .dataTables_info,
+body.theme-dark .dataTables_wrapper .dataTables_length,
+body.theme-dark .dataTables_wrapper .dataTables_filter,
+body.theme-dark .dataTables_wrapper .dataTables_paginate {
+  color: #eaf6f0 !important;
+}
+
+body.theme-dark table.dataTable,
+body.theme-dark table.dataTable thead th,
+body.theme-dark table.dataTable tbody td {
+  background: #122127 !important;
+}
+
+body.theme-dark .dataTables_wrapper .dataTables_filter input,
+body.theme-dark .dataTables_wrapper .dataTables_length select {
+  background: #0f1b1e !important;
+  color: #eaf6f0 !important;
+  border: 1px solid rgba(108, 164, 142, 0.45) !important;
 }
 
 @keyframes transformation-spinner-rotate {

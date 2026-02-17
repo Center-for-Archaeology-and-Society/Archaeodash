@@ -54,6 +54,12 @@ groupTab = function(){
                  12,
                  div(
                    class = "membership-table-scroll-box",
+                   fluidRow(
+                     column(
+                       4,
+                       checkboxInput("membershipCompact", "Compact table", value = TRUE)
+                     )
+                   ),
                    DT::DTOutput('membershipTbl')
                  )
                )
@@ -79,9 +85,10 @@ groupServer = function(input,output,session,rvals, credentials, con){
   selected_membership_rowids <- shiny::reactiveVal(character())
 
   build_membership_display_table <- function(df) {
+    checked_rowids <- shiny::isolate(selected_membership_rowids())
     add_checkbox_column(
       df = df,
-      checked_rowids = selected_membership_rowids(),
+      checked_rowids = checked_rowids,
       rowid_col = "rowid",
       checkbox_col = ".select",
       checkbox_class = "membership-row-check"
@@ -281,20 +288,27 @@ groupServer = function(input,output,session,rvals, credentials, con){
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
     display_tbl <- build_membership_display_table(rvals$membershipProbs)
+    compact_mode <- isTRUE(input$membershipCompact)
 
     hide_by_default <- which(names(rvals$membershipProbs) %in% c("Group", "rowid", "BestValue"))
     right_align_cols <- which(names(rvals$membershipProbs) %in% c(input$eligibleGroups, "BestValue"))
+    numeric_cols <- names(rvals$membershipProbs)[vapply(rvals$membershipProbs, is.numeric, logical(1))]
     # Shift hidden/right-aligned targets by one because .select is first.
     hide_targets <- sort(unique(hide_by_default + 1))
     right_align_targets <- right_align_cols + 1
 
-    DT::datatable(
+    dt <- DT::datatable(
       display_tbl,
       filter = "top",
       rownames = F,
       selection = 'none',
       style = 'default',
-      class = "compact membership-plain-table nowrap",
+      class = paste(
+        if (compact_mode) "compact" else "",
+        "membership-plain-table",
+        if (compact_mode) "membership-compact-table" else "membership-fullwidth-table",
+        "nowrap"
+      ),
       extensions = c("Buttons"),
       escape = FALSE,
       callback = DT::JS(
@@ -309,7 +323,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
       options = list(
         dom = "Brt",
         buttons = list("colvis"),
-        autoWidth = TRUE,
+        autoWidth = !compact_mode,
         scrollY = "420px",
         scrollCollapse = TRUE,
         scrollX = TRUE,
@@ -317,11 +331,20 @@ groupServer = function(input,output,session,rvals, credentials, con){
         columnDefs = list(
           list(visible = FALSE, targets = hide_targets - 1),
           list(className = "dt-right", targets = right_align_targets - 1),
-          list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0),
-          list(width = "78px", targets = "_all")
+          list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0)
         )
       )
     )
+    if (compact_mode) {
+      dt$x$options$columnDefs <- c(
+        dt$x$options$columnDefs,
+        list(list(width = "78px", targets = "_all"))
+      )
+    }
+    if (length(numeric_cols) > 0) {
+      dt <- DT::formatRound(dt, columns = numeric_cols, digits = 2)
+    }
+    dt
   })
 
   observeEvent(input$membership_checked_rowids, {

@@ -305,7 +305,7 @@ clusterServer = function(input,output,session,rvals, credentials, con){
 
   output$clusterDT<- DT::renderDataTable({
     req(rvals$clusterDT)
-    DT::datatable(rvals$clusterDT, rownames = F)
+    DT::datatable(rvals$clusterDT, rownames = F, class = "membership-plain-table nowrap")
   })
 
 

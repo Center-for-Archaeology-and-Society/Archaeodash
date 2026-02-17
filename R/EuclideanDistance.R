@@ -72,9 +72,10 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   selected_ed_rowids <- shiny::reactiveVal(character())
 
   build_ed_display_table <- function(df) {
+    checked_rowids <- shiny::isolate(selected_ed_rowids())
     add_checkbox_column(
       df = df,
-      checked_rowids = selected_ed_rowids(),
+      checked_rowids = checked_rowids,
       rowid_col = "rowid",
       checkbox_col = ".select",
       checkbox_class = "ed-row-check"
@@ -243,19 +244,24 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         return(invisible(NULL))
       }
       mynotification("calculating Euclidean Distances")
-      rvals$edistance = calcEDistance(
+      projection_groups <- input$projectionGroup
+      if (is.null(projection_groups) || length(projection_groups) == 0) {
+        mynotification("Choose at least one projection group.", type = "warning")
+        return(invisible(NULL))
+      }
+      rvals$edistance <- calcEDistance(
         data = analysis_df,
-        projection = input$projectionGroup,
+        projection = projection_groups,
         id = input$edsampleID,
         attrGroups = rvals$attrGroups,
         chem = feature_cols,
         limit = input$EDlimit,
         withinGroup = input$EDmethod
-      ) %>%
-        dplyr::left_join(
-          analysis_df %>% dplyr::select(rowid,tidyselect::all_of(input$edsampleID)) %>% dplyr::mutate_all(as.character),
-          by = input$edsampleID
-        )
+      )
+      if (!is.data.frame(rvals$edistance)) {
+        mynotification("Euclidean Distance did not return a result table.", type = "error")
+        return(invisible(NULL))
+      }
       selected_ed_rowids(character())
       mynotification("completed calculation")
     })
@@ -270,13 +276,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         names(rvals$edistance)[which(names(rvals$edistance) != "rowid")][1]
       }
       display_tbl <- rvals$edistance %>%
-        dplyr::mutate_at(dplyr::vars(distance),as.numeric) %>%
-        dplyr::mutate_at(dplyr::vars(distance),round,1) %>%
+        dplyr::mutate_at(dplyr::vars(distance), as.numeric) %>%
         dplyr::arrange(!!as.name(sort_col),distance)
       display_tbl <- build_ed_display_table(display_tbl)
       hide_by_default <- which(names(display_tbl) %in% c("rowid"))
       right_align_cols <- which(names(display_tbl) %in% c("distance"))
-      DT::datatable(
+      dt <- DT::datatable(
         display_tbl,
         filter = "top",
         rownames = FALSE,
@@ -310,6 +315,10 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
           )
         )
       )
+      if ("distance" %in% names(display_tbl)) {
+        dt <- DT::formatRound(dt, columns = "distance", digits = 4)
+      }
+      dt
     })
   })
 
@@ -367,38 +376,52 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 #' @examples
 #' calcEDistance(rvals$selectedData,input$projectionGroup,input$edsampleID,rvals$attrGroups,rvals$chem,input$EDlimit,input$EDmethod)
 calcEDistance = function(data,projection,id,attrGroups,chem,limit,withinGroup){
-  result = NULL
+  result <- NULL
   quietly(label = "calcEDistance",{
-    projections = data %>%
-      dplyr::filter(!!as.name(attrGroups) %in% projection) %>%
-      dplyr::pull(!!as.name(id))
-    m = data[,chem] %>% as.matrix()
-    rownames(m) = data[[id]]
-    d = dist(m,method = "euclidean")
-    result = tibble::as_tibble(as.matrix(d)) %>%
-      dplyr::select(tidyselect::any_of(projections)) %>%
-      tibble::rownames_to_column("match") %>%
-      tidyr::pivot_longer(-match, names_to = "observation", values_to = "distance") %>%
-      dplyr::filter(match != observation) %>%
-      dplyr::group_by(observation) %>%
-      dplyr::arrange(distance) %>%
+    # Use rowid as stable keys so duplicate IDs do not break matrix column names.
+    work <- data %>%
+      dplyr::mutate(
+        .rowid_chr = as.character(rowid),
+        .id_chr = as.character(.data[[id]]),
+        .group_chr = as.character(.data[[attrGroups]])
+      )
+    projection_rowids <- work %>%
+      dplyr::filter(.group_chr %in% projection) %>%
+      dplyr::pull(.rowid_chr)
+
+    m <- work[, chem, drop = FALSE] %>% as.matrix()
+    rownames(m) <- work$.rowid_chr
+    d <- stats::dist(m, method = "euclidean")
+
+    result <- as.data.frame(as.table(as.matrix(d)), stringsAsFactors = FALSE) %>%
+      dplyr::rename(observation_rowid = "Var1", match_rowid = "Var2", distance = "Freq") %>%
+      dplyr::mutate(
+        observation_rowid = as.character(observation_rowid),
+        match_rowid = as.character(match_rowid),
+        distance = as.numeric(distance)
+      ) %>%
+      dplyr::filter(observation_rowid != match_rowid) %>%
+      dplyr::filter(match_rowid %in% projection_rowids) %>%
+      dplyr::group_by(observation_rowid) %>%
+      dplyr::arrange(distance, .by_group = TRUE) %>%
       dplyr::slice_head(n = limit) %>%
       dplyr::ungroup() %>%
-      dplyr::mutate_all(as.character) %>%
-      dplyr::left_join(data %>%
-                         dplyr::select(observation = tidyselect::any_of(id), observationGroup = tidyselect::any_of(attrGroups)) %>%
-                         dplyr::mutate_all(as.character), by = "observation") %>%
-      dplyr::left_join(data %>%
-                         dplyr::select(match = tidyselect::any_of(id), matchGroup = tidyselect::any_of(attrGroups)) %>%
-                         dplyr::mutate_all(as.character), by = "match") %>%
-      dplyr::select(tidyselect::any_of(c('observation','match','distance','observationGroup','matchGroup'))) %>%
-      dplyr::arrange(observation,distance) %>%
-      dplyr::rename(!!as.name(id) := observation,!!as.name(attrGroups) := observationGroup,!!as.name(paste0(attrGroups,"_match")) := matchGroup) %>%
-      dplyr::mutate_at(dplyr::vars(distance),as.numeric) %>%
-      # format distance to 4 decimal places
-      dplyr::mutate_at(dplyr::vars(distance),sprintf, fmt = "%0.4f")
+      dplyr::left_join(
+        work %>%
+          dplyr::select(observation_rowid = .rowid_chr, observation = .id_chr, observationGroup = .group_chr),
+        by = "observation_rowid"
+      ) %>%
+      dplyr::left_join(
+        work %>%
+          dplyr::select(match_rowid = .rowid_chr, match = .id_chr, matchGroup = .group_chr),
+        by = "match_rowid"
+      ) %>%
+      dplyr::mutate(rowid = observation_rowid, .before = 1) %>%
+      dplyr::select(tidyselect::any_of(c("rowid", "observation", "match", "distance", "observationGroup", "matchGroup"))) %>%
+      dplyr::arrange(observation, distance) %>%
+      dplyr::rename(!!as.name(id) := observation,!!as.name(attrGroups) := observationGroup,!!as.name(paste0(attrGroups,"_match")) := matchGroup)
     if(withinGroup == FALSE){
-      result = result %>%
+      result <- result %>%
         dplyr::filter(!!as.name(attrGroups) != !!as.name(paste0(attrGroups,"_match")))
     }
   })
