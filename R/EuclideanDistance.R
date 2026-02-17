@@ -8,50 +8,79 @@
 euclideanDistanceTab = function() {
   tabPanel(title = "Euclidean Distance",
            id = "euclideanDistancetab",
-           sidebarLayout(
-             sidebarPanel(
-               selectInput(
-                 "EDdataset",
-                 "Select dataset to use",
-                 choices = c("elements", "principal components", "UMAP", "linear discriminants"),
-                 selected = "elements"
-               ),
-               uiOutput("projectionGroupUI"),
-               uiOutput("EDsampleIDUI"),
-               radioButtons(
-                 inputId = "EDmethod",
-                 label = "Project within group?",choices = c(TRUE,FALSE),
-                 selected = FALSE
-               ),
-               sliderInput(
-                 "EDlimit",
-                 "Number of closest matches to return for each observation",
-                 min = 1,
-                 max = 100,
-                 value = 10
-               ),
-               actionButton("EDRun", "Calculate", class = "mybtn")
-             ),
-             mainPanel(
-               tabPanel(
-                 title = "Euclidean Distance",
-                 id = "eDistance",
-                wellPanel(fluidRow(
-                   column(4, actionButton(
-                     'edAssignMatchGroup','Assign Match Group', class = "mybtn"
-                   )),
-                   column(
-                     4,
-                     offset = 2,
-                     actionButton("edChangeGroup", "Change Group Assignment", class = "mybtn"),
-                     uiOutput("edGroupAssignChoiceUI")
+           fluidPage(
+             wellPanel(
+               h4("Euclidean Distance Controls"),
+               fluidRow(
+                 column(
+                   3,
+                   selectInput(
+                     "EDdataset",
+                     "Select dataset to use",
+                     choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+                     selected = "elements"
                    )
-                 )),
-                 br(),
-                 DT::DTOutput('EDTbl')
+                 ),
+                 column(3, uiOutput("projectionGroupUI")),
+                 column(3, uiOutput("EDsampleIDUI")),
+                 column(
+                   3,
+                   radioButtons(
+                     inputId = "EDmethod",
+                     label = "Project within group?", choices = c(TRUE, FALSE),
+                     selected = FALSE
+                   )
+                 )
+               ),
+               fluidRow(
+                 column(
+                   6,
+                   sliderInput(
+                     "EDlimit",
+                     "Number of closest matches to return for each observation",
+                     min = 1,
+                     max = 100,
+                     value = 10
+                   )
+                 ),
+                 column(
+                   6,
+                   tags$div(style = "margin-top: 20px;", actionButton("EDRun", "Calculate", class = "mybtn"))
+                 )
                )
-             ) # end main panel
-           ) # end sidebar layout
+             ),
+             wellPanel(
+               fluidRow(
+                 column(4, actionButton(
+                   "edAssignMatchGroup", "Assign Match Group", class = "mybtn"
+                 )),
+                 column(
+                   4,
+                   actionButton("edChangeGroup", "Change Group Assignment", class = "mybtn")
+                 ),
+                 column(
+                   4,
+                   tags$div(style = "margin-top: 10px;", uiOutput("edGroupAssignChoiceUI"))
+                 )
+               )
+             ),
+             br(),
+             fluidRow(
+               column(
+                 12,
+                 div(
+                   class = "membership-table-scroll-box",
+                   fluidRow(
+                     column(
+                       4,
+                       checkboxInput("edCompact", "Compact table", value = TRUE)
+                     )
+                   ),
+                   DT::DTOutput("EDTbl")
+                 )
+               )
+             )
+           )
   ) # end tab panel
 }
 
@@ -270,6 +299,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   output$EDTbl = DT::renderDataTable({
     req(rvals$edistance)
     quietly(label = "rendering Euclidean Distance table",{
+      compact_mode <- isTRUE(input$edCompact)
       sort_col <- if (!is.null(input$edsampleID) && input$edsampleID %in% names(rvals$edistance)) {
         input$edsampleID
       } else {
@@ -287,7 +317,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         rownames = FALSE,
         selection = "none",
         style = "default",
-        class = "compact membership-plain-table nowrap",
+        class = paste(
+          if (compact_mode) "compact" else "",
+          "membership-plain-table",
+          if (compact_mode) "membership-compact-table" else "membership-fullwidth-table",
+          "nowrap"
+        ),
         extensions = c("Buttons"),
         escape = FALSE,
         callback = DT::JS(
@@ -302,7 +337,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         options = list(
           dom = "Brt",
           buttons = list("colvis"),
-          autoWidth = TRUE,
+          autoWidth = !compact_mode,
           scrollY = "420px",
           scrollCollapse = TRUE,
           scrollX = TRUE,
@@ -310,11 +345,16 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
           columnDefs = list(
             list(visible = FALSE, targets = hide_by_default - 1),
             list(className = "dt-right", targets = right_align_cols - 1),
-            list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0),
-            list(width = "78px", targets = "_all")
+            list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0)
           )
         )
       )
+      if (compact_mode) {
+        dt$x$options$columnDefs <- c(
+          dt$x$options$columnDefs,
+          list(list(width = "78px", targets = "_all"))
+        )
+      }
       if ("distance" %in% names(display_tbl)) {
         dt <- DT::formatRound(dt, columns = "distance", digits = 4)
       }

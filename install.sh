@@ -1,15 +1,31 @@
 #!/bin/bash
-echo "updating repository";
+set -euo pipefail
 
-ARG1=${1};
-echo "selected repository is $ARG1";
-lower="${ARG1,,}";
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_REPO_DIR="$SCRIPT_DIR"
+
+# Optional arg1: repo dir path. Defaults to the directory this script is in.
+REPO_DIR="${1:-$DEFAULT_REPO_DIR}"
+if [ ! -d "$REPO_DIR" ]; then
+  echo "Error: repository directory does not exist: $REPO_DIR" >&2
+  exit 1
+fi
+
+REPO_NAME="$(basename "$REPO_DIR")"
+# Optional arg2: docker container name. Defaults to lowercase repo directory name.
+CONTAINER_NAME="${2:-${REPO_NAME,,}}"
+
+echo "updating repository"
+echo "repository directory: $REPO_DIR"
+echo "docker container: $CONTAINER_NAME"
 
 echo "Pulling git repository"
-git -C /mnt/storage/apps/CASRShinySrvr/$ARG1 pull;
-echo "installing package"
-docker exec -it -w /srv/shiny-server  $lower R -e 'devtools::install_local(".", force = T, dependencies = F)';
-echo "restarting container"
-docker restart $lower;
-echo "completed"
+git -C "$REPO_DIR" pull
 
+echo "installing package"
+docker exec -i -w /srv/shiny-server "$CONTAINER_NAME" R -e 'devtools::install_local(".", force = T, dependencies = F)'
+
+echo "restarting container"
+docker restart "$CONTAINER_NAME"
+
+echo "completed"
