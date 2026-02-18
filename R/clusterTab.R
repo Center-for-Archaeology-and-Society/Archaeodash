@@ -31,6 +31,7 @@ clusterTab = function(){
              ), # end sidebarPanel
 
              mainPanel(
+               actionButton("clusterPlotExpand", "Expand Plot", class = "mybtn"),
                plotOutput("clusterPlot"),
                DT::dataTableOutput("clusterDT")
              ) # end mainPanel PCA
@@ -361,6 +362,21 @@ clusterServer = function(input,output,session,rvals, credentials, con){
   output$clusterPlot <- renderPlot({
     req(rvals$clusterPlot)
     rvals$clusterPlot()
+  })
+
+  output$clusterPlotModal <- renderPlot({
+    req(rvals$clusterPlot)
+    rvals$clusterPlot()
+  })
+
+  observeEvent(input$clusterPlotExpand, {
+    req(rvals$clusterPlot)
+    showModal(modalDialog(
+      title = "Cluster Plot",
+      size = "l",
+      easyClose = TRUE,
+      plotOutput("clusterPlotModal", height = "78vh")
+    ))
   })
 
   output$clusterDT<- DT::renderDataTable({

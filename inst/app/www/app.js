@@ -105,26 +105,6 @@
     });
   }
 
-  function bindClusterPlotPopout() {
-    document.addEventListener("click", function (e) {
-      var clusterImg = e.target && e.target.closest ? e.target.closest("#clusterPlot img") : null;
-      if (!clusterImg) return;
-      var src = clusterImg.getAttribute("src");
-      if (!src) return;
-      var win = window.open("", "_blank", "noopener,noreferrer");
-      if (!win) return;
-      var html =
-        "<!doctype html><html><head><title>Cluster Plot</title>" +
-        "<style>html,body{margin:0;height:100%;background:#0f1412;}body{display:flex;align-items:center;justify-content:center;}img{max-width:100vw;max-height:100vh;object-fit:contain;}</style>" +
-        "</head><body><img src=\"" +
-        src.replace(/"/g, "&quot;") +
-        "\" alt=\"Cluster Plot\"/></body></html>";
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
-    });
-  }
-
   function getStoredTheme() {
     try {
       var stored = window.localStorage.getItem("archaeodash_theme");
@@ -240,7 +220,6 @@
       }
 
       bindColvisCloseBehavior();
-      bindClusterPlotPopout();
       registerMessageHandler(function (theme) {
         activeTheme = applyTheme(theme, themeSelect);
         setStoredTheme(activeTheme);
