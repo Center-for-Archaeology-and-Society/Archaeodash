@@ -264,10 +264,40 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           iter.max = input$kmeans.iter.max,
           nstart = input$kmeans.nstart
         )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(
-          kmeans_solution, data = feature_data
-        ) +
-            ggplot2::theme_bw()}
+        color_mode <- tryCatch(as.character(input$clusterColorMode), error = function(e) "clusters")
+        can_color_by_group <- identical(color_mode, "groups") &&
+          isTruthy(rvals$attrGroups) &&
+          rvals$attrGroups %in% names(analysis_df)
+        if (can_color_by_group) {
+          group_col <- rvals$attrGroups
+          plot_df <- feature_data %>%
+            tibble::as_tibble() %>%
+            dplyr::mutate(
+              .cluster = as.factor(kmeans_solution$cluster),
+              .group = as.factor(analysis_df[[group_col]])
+            )
+          x_col <- names(feature_data)[1]
+          y_col <- names(feature_data)[2]
+          rvals$clusterPlot = function(){
+            ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+              ggplot2::geom_point(size = 2.2, alpha = 0.88) +
+              ggplot2::theme_bw() +
+              ggplot2::labs(
+                title = "k-means clustering",
+                subtitle = paste0("Color: ", group_col, " | Shape: cluster"),
+                color = group_col,
+                shape = "Cluster"
+              )
+          }
+        } else {
+          if (identical(color_mode, "groups")) {
+            mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
+          }
+          rvals$clusterPlot = function(){factoextra::fviz_cluster(
+            kmeans_solution, data = feature_data
+          ) +
+              ggplot2::theme_bw()}
+        }
         rvals$clusterDT = kmeans_solution$cluster
         rvals$clusterDT <-
           tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample") %>%
@@ -284,7 +314,37 @@ clusterServer = function(input,output,session,rvals, credentials, con){
             k = input$kmedoids.k,
             metric = input$kmedoids.dist.method
           )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = feature_data) + ggplot2::theme_bw()}
+        color_mode <- tryCatch(as.character(input$clusterColorMode), error = function(e) "clusters")
+        can_color_by_group <- identical(color_mode, "groups") &&
+          isTruthy(rvals$attrGroups) &&
+          rvals$attrGroups %in% names(analysis_df)
+        if (can_color_by_group) {
+          group_col <- rvals$attrGroups
+          plot_df <- feature_data %>%
+            tibble::as_tibble() %>%
+            dplyr::mutate(
+              .cluster = as.factor(pam_solution$cluster),
+              .group = as.factor(analysis_df[[group_col]])
+            )
+          x_col <- names(feature_data)[1]
+          y_col <- names(feature_data)[2]
+          rvals$clusterPlot = function(){
+            ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+              ggplot2::geom_point(size = 2.2, alpha = 0.88) +
+              ggplot2::theme_bw() +
+              ggplot2::labs(
+                title = "k-medoids clustering",
+                subtitle = paste0("Color: ", group_col, " | Shape: cluster"),
+                color = group_col,
+                shape = "Cluster"
+              )
+          }
+        } else {
+          if (identical(color_mode, "groups")) {
+            mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
+          }
+          rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = feature_data) + ggplot2::theme_bw()}
+        }
         rvals$clusterDT <- pam_solution$cluster
         rvals$clusterDT <-
           tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample") %>%
@@ -421,6 +481,12 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           min = 1,
           max = 200,
           step = 1
+        ),
+        radioButtons(
+          "clusterColorMode",
+          "Color plot points by",
+          choices = c("New clusters" = "clusters", "Existing groups" = "groups"),
+          selected = "clusters"
         )
       )
     } else if (input$cluster.parent == "kmedoids") {
@@ -442,6 +508,12 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           min = 1,
           max = 20,
           step = 1
+        ),
+        radioButtons(
+          "clusterColorMode",
+          "Color plot points by",
+          choices = c("New clusters" = "clusters", "Existing groups" = "groups"),
+          selected = "clusters"
         )
       )
     } else {
