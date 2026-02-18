@@ -295,6 +295,23 @@ textarea,
   border: 1px solid var(--input-border);
 }
 
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 3px;
+  background: var(--input-bg);
+}
+
+.checkbox input[type="checkbox"]:focus {
+  outline: 2px solid rgba(71, 201, 151, 0.35);
+  outline-offset: 1px;
+}
+
 .modal-content {
   background: var(--modal-bg) !important;
   color: var(--text) !important;
@@ -466,6 +483,19 @@ body.theme-dark .form-control {
   background: #0f1b1e !important;
   color: #eaf6f0 !important;
   border: 1px solid rgba(108, 164, 142, 0.45) !important;
+}
+
+body.theme-dark input[type="checkbox"] {
+  accent-color: #66e3b3;
+}
+
+body.theme-dark .checkbox input[type="checkbox"] {
+  border: 1px solid rgba(152, 209, 186, 0.65);
+  background: #0f1b1e;
+}
+
+body.theme-dark .checkbox input[type="checkbox"]:focus {
+  outline: 2px solid rgba(102, 227, 179, 0.45);
 }
 
 body.theme-dark .modal-header .close,

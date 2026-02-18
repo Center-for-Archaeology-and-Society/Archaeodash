@@ -985,8 +985,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         )
       ),
       fluidRow(
-        column(4, selectInput("ratioNumerator", "Numerator element", choices = choices, selected = default_num)),
-        column(4, selectInput("ratioDenominator", "Denominator element", choices = choices, selected = default_den)),
+        column(4, selectizeInput("ratioNumerator", "Numerator element(s)", choices = choices, selected = default_num, multiple = TRUE)),
+        column(4, selectizeInput("ratioDenominator", "Denominator element(s)", choices = choices, selected = default_den, multiple = TRUE)),
         column(4, textInput("ratioName", "Ratio name", value = if (nzchar(default_num) && nzchar(default_den)) default_ratio_name(default_num, default_den) else ""))
       ),
       fluidRow(
@@ -1023,48 +1023,69 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     ))
   })
 
+  sync_ratio_name_state <- function() {
+    nums <- unique(as.character(input$ratioNumerator))
+    dens <- unique(as.character(input$ratioDenominator))
+    nums <- nums[!is.na(nums) & nzchar(nums)]
+    dens <- dens[!is.na(dens) & nzchar(dens)]
+    if (length(nums) == 0 || length(dens) == 0) return(invisible(NULL))
+    batch_mode <- length(nums) > 1 || length(dens) > 1
+    if (batch_mode) {
+      try(shinyjs::disable("ratioName"), silent = TRUE)
+      updateTextInput(session, "ratioName", value = "Auto-generated as numerator_denominator")
+    } else {
+      try(shinyjs::enable("ratioName"), silent = TRUE)
+      updateTextInput(session, "ratioName", value = default_ratio_name(nums[[1]], dens[[1]]))
+    }
+    invisible(NULL)
+  }
+
   observeEvent(input$ratioNumerator, {
-    req(input$ratioNumerator)
-    choices <- ratio_source_choices()
-    if (length(choices) == 0) return(NULL)
-    den_choices <- setdiff(choices, input$ratioNumerator)
-    if (length(den_choices) == 0) den_choices <- choices
-    selected_den <- if (!is.null(input$ratioDenominator) && input$ratioDenominator %in% den_choices) input$ratioDenominator else den_choices[[1]]
-    updateSelectInput(session, "ratioDenominator", choices = den_choices, selected = selected_den)
-    ratio_name <- default_ratio_name(input$ratioNumerator, selected_den)
-    updateTextInput(session, "ratioName", value = ratio_name)
+    sync_ratio_name_state()
   })
 
   observeEvent(input$ratioDenominator, {
-    req(input$ratioNumerator, input$ratioDenominator)
-    ratio_name <- default_ratio_name(input$ratioNumerator, input$ratioDenominator)
-    updateTextInput(session, "ratioName", value = ratio_name)
+    sync_ratio_name_state()
   })
 
   observeEvent(input$addRatioSpec, {
     req(input$ratioNumerator, input$ratioDenominator)
-    if (identical(input$ratioNumerator, input$ratioDenominator)) {
+    nums <- unique(as.character(input$ratioNumerator))
+    dens <- unique(as.character(input$ratioDenominator))
+    nums <- nums[!is.na(nums) & nzchar(nums)]
+    dens <- dens[!is.na(dens) & nzchar(dens)]
+    if (length(nums) == 0 || length(dens) == 0) {
+      mynotification("Choose at least one numerator and denominator.", type = "warning")
+      return(invisible(NULL))
+    }
+    combos <- tidyr::expand_grid(numerator = nums, denominator = dens) %>%
+      dplyr::filter(.data$numerator != .data$denominator)
+    if (nrow(combos) == 0) {
       mynotification("Choose different elements for numerator and denominator.", type = "warning")
       return(invisible(NULL))
     }
-    ratio_name <- normalize_ratio_name(input$ratioNumerator, input$ratioDenominator, input$ratioName)
-    if (!nzchar(ratio_name)) {
+    single_mode <- length(nums) == 1 && length(dens) == 1
+    combos <- combos %>%
+      dplyr::mutate(
+        ratio = if (single_mode) {
+          normalize_ratio_name(.data$numerator[[1]], .data$denominator[[1]], input$ratioName)
+        } else {
+          default_ratio_name(.data$numerator, .data$denominator)
+        }
+      )
+    if (any(!nzchar(combos$ratio))) {
       mynotification("Ratio name cannot be empty.", type = "warning")
       return(invisible(NULL))
     }
     specs <- ratio_specs_tbl()
-    new_row <- tibble::tibble(
-      ratio = ratio_name,
-      numerator = as.character(input$ratioNumerator),
-      denominator = as.character(input$ratioDenominator)
-    )
     specs <- specs %>%
-      dplyr::filter(.data$ratio != ratio_name) %>%
-      dplyr::bind_rows(new_row) %>%
+      dplyr::filter(!.data$ratio %in% combos$ratio) %>%
+      dplyr::bind_rows(combos %>% dplyr::select(.data$ratio, .data$numerator, .data$denominator)) %>%
       dplyr::arrange(.data$ratio)
     rvals$ratioSpecs <- specs
-    updateSelectInput(session, "ratioRemoveChoice", choices = specs$ratio, selected = ratio_name)
-    mynotification(paste0("Ratio variable added: ", ratio_name), type = "message")
+    latest_selected <- combos$ratio[[nrow(combos)]]
+    updateSelectInput(session, "ratioRemoveChoice", choices = specs$ratio, selected = latest_selected)
+    mynotification(paste0("Added ", nrow(combos), " ratio variable(s)."), type = "message")
   })
 
   observeEvent(input$removeRatioSpec, {
