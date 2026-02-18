@@ -20,6 +20,7 @@
 - User requested release workflow; bumped package version to `2026.02.18.2319`, committed import-blank updates, tagged `v2026.02.18.2319`, and installed/restarted `archaeodashbeta`.
 - User requested richer plotting controls; expanded symbol pool with repeat-on-overflow behavior, added symbol on/off toggle (default on), added point-label on/off toggle plus configurable label column (default ANID-equivalent), and persisted these settings across transformation save/load.
 - User requested QA + optimization pass for plotting updates; added info popovers for symbol/label controls, removed residual debug noise, expanded docs/help text for new options, reran broader targeted tests for plot and transformation persistence paths, and validated no regressions.
+- User reported selected-dataset load hang; added timeout guards around prior-dataset loading with cancel + explicit timeout notification, added timeout helper tests, then versioned, committed, tagged, and installed.
 
 ## Related
 

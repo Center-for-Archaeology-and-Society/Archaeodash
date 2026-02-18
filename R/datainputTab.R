@@ -450,54 +450,66 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
     show_dataset_loading()
+    selected_dataset <- as.character(input$selectedDatasets[[1]])
     tryCatch({
-      reset_transformation_store()
-      selected_dataset <- as.character(input$selectedDatasets[[1]])
-      rvals$currentDatasetName <- selected_dataset
-      rvals$currentDatasetKey <- build_dataset_key(selected_dataset)
-      set_last_opened_dataset(selected_dataset)
+      with_dataset_load_timeout({
+        reset_transformation_store()
+        rvals$currentDatasetName <- selected_dataset
+        rvals$currentDatasetKey <- build_dataset_key(selected_dataset)
+        set_last_opened_dataset(selected_dataset)
 
-      null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
-                     "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
-                     "plot_theme", "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
+        null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
+                       "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
+                       "plot_theme", "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
 
-      # Loop through the list and set each to NULL
-      for (var in null_vars) {
-        rvals[[var]] <- NULL
-      }
-
-      imported_tbl <- dplyr::tbl(con, selected_dataset) %>%
-        dplyr::collect() %>%
-        dplyr::mutate_all(as.character)
-      rvals$importedData = imported_tbl %>%
-        dplyr::select(-tidyselect::any_of('rowid')) %>%
-        dplyr::distinct_all() %>%
-        tibble::rowid_to_column()
-      rvals$selectedData = rvals$importedData
-      ensure_core_rowids(rvals)
-
-      filenames = paste0(selected_dataset, "_metadata")
-
-      # get metadata
-      tblsmd = list()
-      for(tbl in filenames){
-        if(db_table_exists_safe(con, tbl)){
-          tblsmd[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
-            dplyr::mutate_all(as.character)
+        # Loop through the list and set each to NULL
+        for (var in null_vars) {
+          rvals[[var]] <- NULL
         }
-      }
-      if(length(tblsmd) > 0){
-        tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
-          dplyr::distinct_all() %>%
-          dplyr::filter(field == "variable") %>%
-          dplyr::pull(value)
-        rvals$chem = tblsmd
-        rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
-      }
 
-      load_persisted_transformations()
+        imported_tbl <- dplyr::tbl(con, selected_dataset) %>%
+          dplyr::collect() %>%
+          dplyr::mutate_all(as.character)
+        rvals$importedData = imported_tbl %>%
+          dplyr::select(-tidyselect::any_of('rowid')) %>%
+          dplyr::distinct_all() %>%
+          tibble::rowid_to_column()
+        rvals$selectedData = rvals$importedData
+        ensure_core_rowids(rvals)
+
+        filenames = paste0(selected_dataset, "_metadata")
+
+        # get metadata
+        tblsmd = list()
+        for(tbl in filenames){
+          if(db_table_exists_safe(con, tbl)){
+            tblsmd[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
+              dplyr::mutate_all(as.character)
+          }
+        }
+        if(length(tblsmd) > 0){
+          tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
+            dplyr::distinct_all() %>%
+            dplyr::filter(field == "variable") %>%
+            dplyr::pull(value)
+          rvals$chem = tblsmd
+          rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
+        }
+
+        load_persisted_transformations()
+      }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
-      mynotification(paste("Unable to load selected dataset:", e$message), type = "error")
+      if (is_dataset_load_timeout_error(e)) {
+        mynotification(
+          paste0(
+            "Loading dataset '", selected_dataset, "' timed out after ",
+            dataset_load_timeout_seconds(), " seconds and was cancelled."
+          ),
+          type = "error"
+        )
+      } else {
+        mynotification(paste("Unable to load selected dataset:", e$message), type = "error")
+      }
     }, finally = {
       hide_dataset_loading()
     })
