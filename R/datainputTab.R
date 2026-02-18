@@ -234,6 +234,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }
 
   ratio_specs_tbl <- function(x = NULL) {
+    if (is.null(x)) {
+      x <- tryCatch(rvals$ratioSpecs, error = function(e) NULL)
+    }
     if (!inherits(x, "data.frame")) {
       return(tibble::tibble(ratio = character(), numerator = character(), denominator = character()))
     }
