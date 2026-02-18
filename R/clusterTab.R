@@ -387,7 +387,8 @@ clusterServer = function(input,output,session,rvals, credentials, con){
 
   observeEvent(input$clusterPlotExpand, {
     req(rvals$clusterPlot)
-    use_plotly <- inherits(cluster_plot_gg(), "ggplot")
+    use_plotly <- isTRUE(input$cluster.parent %in% c("kmeans", "kmedoids")) &&
+      inherits(cluster_plot_gg(), "ggplot")
     showModal(modalDialog(
       title = "Cluster Plot",
       size = "l",
