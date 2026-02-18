@@ -28,7 +28,7 @@ updateCurrent = function(rvals,
     if (!nzchar(dataset_name)) {
       dataset_name <- tryCatch(as.character(input$selectedDatasets[[1]]), error = function(e) "")
     }
-    if (!nzchar(dataset_name) || !DBI::dbExistsTable(con, dataset_name)) return(NULL)
+    if (!nzchar(dataset_name) || !db_table_exists_safe(con, dataset_name)) return(NULL)
 
     saveTbl <- rvals$selectedData %>%
       dplyr::select(-tidyselect::any_of(c("transformation", "imputation", rvals$chem))) %>%
@@ -43,7 +43,7 @@ updateCurrent = function(rvals,
 
     meta_name <- paste0(dataset_name, "_metadata")
     old_meta <- tibble::tibble(field = character(), value = character())
-    if (DBI::dbExistsTable(con, meta_name)) {
+    if (db_table_exists_safe(con, meta_name)) {
       old_meta <- dplyr::tbl(con, meta_name) %>%
         dplyr::collect() %>%
         dplyr::mutate_all(as.character)
@@ -69,20 +69,23 @@ updateCurrent = function(rvals,
       value = c(dataset_label, created_label, rvals$chem)
     )
 
-    DBI::dbWriteTable(
-      con,
-      dataset_name,
-      saveTbl,
+    ok_data <- db_write_table_safe(
+      con = con,
+      table_name = dataset_name,
+      value = saveTbl,
+      row.names = FALSE,
       overwrite = TRUE,
-      row.names = FALSE
+      context = "autosaving current dataset"
     )
-    DBI::dbWriteTable(
-      conn = con,
-      name = meta_name,
+    ok_meta <- db_write_table_safe(
+      con = con,
+      table_name = meta_name,
       value = data_metadata,
       row.names = FALSE,
-      overwrite = TRUE
+      overwrite = TRUE,
+      context = "autosaving dataset metadata"
     )
+    if (!isTRUE(ok_data) || !isTRUE(ok_meta)) return(NULL)
     mynotification(paste0("Autosaved to ", dataset_name))
   }, error = function(e) {
     mynotification(paste("Error saving data to database\n", e), type = "error")

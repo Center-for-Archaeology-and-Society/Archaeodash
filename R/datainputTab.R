@@ -481,7 +481,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       # get metadata
       tblsmd = list()
       for(tbl in filenames){
-        if(DBI::dbExistsTable(con,tbl)){
+        if(db_table_exists_safe(con, tbl)){
           tblsmd[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
             dplyr::mutate_all(as.character)
         }
@@ -538,8 +538,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dataset_key <- build_dataset_key(tbl)
         try(delete_transformations_for_dataset_db(con, username, dataset_key), silent = TRUE)
       }
-      DBI::dbRemoveTable(con,tbl)
-      DBI::dbRemoveTable(con,paste0(tbl,"_metadata"))
+      db_remove_table_safe(con, tbl, context = "deleting dataset")
+      db_remove_table_safe(con, paste0(tbl, "_metadata"), context = "deleting dataset metadata")
     }
   })
 
@@ -596,9 +596,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                                 field = "created",value = as.character(as.Date(Sys.time())))
       }
 
-      if(!DBI::dbExistsTable(con,filename)){
-        DBI::dbWriteTable(con,filename,merged, row.names = F)
-        DBI::dbWriteTable(con,paste0(filename,"_metadata"),tblsmd, row.names = F)
+      if(!db_table_exists_safe(con, filename)){
+        db_write_table_safe(con, filename, merged, row.names = FALSE, context = "saving merged dataset")
+        db_write_table_safe(con, paste0(filename, "_metadata"), tblsmd, row.names = FALSE, context = "saving merged dataset metadata")
       } else {
         rvals$mergeFilename = filename
         rvals$merged = merged
@@ -622,8 +622,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(rvals$mergeFilename)
     req(rvals$merged)
     req(rvals$merged_metadata)
-    DBI::dbWriteTable(conn = con,name = rvals$mergeFilename,value = rvals$merged, row.names = F, overwrite = T)
-    DBI::dbWriteTable(conn = con,name = paste0(rvals$mergeFilename,"_metadata"),value = rvals$merged_metadata, row.names = F, overwrite = T)
+    db_write_table_safe(con, rvals$mergeFilename, rvals$merged, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset")
+    db_write_table_safe(con, paste0(rvals$mergeFilename, "_metadata"), rvals$merged_metadata, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset metadata")
     mynotification("merged datasets")
   })
 
@@ -1397,7 +1397,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           transformed = rvals$selectedData[, rvals$chem ]  %>%
             dplyr::mutate_all(quietly(as.numeric))
           if (rvals$transform.method == 'zScore') {
-            transformed = zScale(transformed)
+            transformed = zScore(transformed)
           } else if (rvals$transform.method %in% c("log10", "log")) {
             transformed = transformed  %>%
               dplyr::mutate_all(rvals$transform.method) %>%

@@ -215,11 +215,14 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           mynotification("This dataset already exists. Please choose a different name.", type = "error")
           return(NULL)
         }
-        DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
-        DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
+        ok_data <- db_write_table_safe(con, datasetname, data_loaded, row.names = FALSE, context = "saving uploaded dataset")
+        ok_meta <- db_write_table_safe(con, paste0(datasetname, "_metadata"), data_metadata, row.names = FALSE, context = "saving uploaded dataset metadata")
+        if (!isTRUE(ok_data) || !isTRUE(ok_meta)) {
+          return(NULL)
+        }
         username <- as.character(credentials$res$username[[1]])
         pref_tbl <- paste0(username, "_preferences")
-        prefs <- if (DBI::dbExistsTable(con, pref_tbl)) {
+        prefs <- if (db_table_exists_safe(con, pref_tbl)) {
           tryCatch(
             dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
             error = function(e) tibble::tibble(field = character(), value = character())
@@ -234,13 +237,17 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value)) %>%
           dplyr::filter(.data$field != "lastOpenedDataset") %>%
           dplyr::bind_rows(tibble::tibble(field = "lastOpenedDataset", value = datasetname))
-        DBI::dbWriteTable(
-          conn = con,
-          name = pref_tbl,
+        ok_pref <- db_write_table_safe(
+          con = con,
+          table_name = pref_tbl,
           value = prefs,
           row.names = FALSE,
-          overwrite = TRUE
+          overwrite = TRUE,
+          context = "saving user dataset preference"
         )
+        if (!isTRUE(ok_pref)) {
+          return(NULL)
+        }
         rvals$currentDatasetName <- datasetname
         rvals$currentDatasetKey <- build_dataset_key(datasetname)
         mynotification("Data Loaded")
