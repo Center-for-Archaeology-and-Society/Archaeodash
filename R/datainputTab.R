@@ -279,9 +279,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   normalize_ratio_name <- function(numerator, denominator, proposed = "") {
     proposed <- trimws(as.character(proposed))
     if (!nzchar(proposed)) {
-      proposed <- paste0(as.character(numerator), "_over_", as.character(denominator))
+      proposed <- paste0(as.character(numerator), "_", as.character(denominator))
     }
     janitor::make_clean_names(proposed)
+  }
+
+  default_ratio_name <- function(numerator, denominator) {
+    janitor::make_clean_names(paste0(as.character(numerator), "_", as.character(denominator)))
   }
 
   build_valid_ratio_specs <- function(df, specs) {
@@ -983,7 +987,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       fluidRow(
         column(4, selectInput("ratioNumerator", "Numerator element", choices = choices, selected = default_num)),
         column(4, selectInput("ratioDenominator", "Denominator element", choices = choices, selected = default_den)),
-        column(4, textInput("ratioName", "Ratio name", value = if (nzchar(default_num) && nzchar(default_den)) paste0(default_num, "_over_", default_den) else ""))
+        column(4, textInput("ratioName", "Ratio name", value = if (nzchar(default_num) && nzchar(default_den)) default_ratio_name(default_num, default_den) else ""))
       ),
       fluidRow(
         column(6, actionButton("addRatioSpec", "Add Ratio", class = "mybtn")),
@@ -1027,13 +1031,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (length(den_choices) == 0) den_choices <- choices
     selected_den <- if (!is.null(input$ratioDenominator) && input$ratioDenominator %in% den_choices) input$ratioDenominator else den_choices[[1]]
     updateSelectInput(session, "ratioDenominator", choices = den_choices, selected = selected_den)
-    ratio_name <- normalize_ratio_name(input$ratioNumerator, selected_den, input$ratioName)
+    ratio_name <- default_ratio_name(input$ratioNumerator, selected_den)
     updateTextInput(session, "ratioName", value = ratio_name)
   })
 
   observeEvent(input$ratioDenominator, {
     req(input$ratioNumerator, input$ratioDenominator)
-    ratio_name <- normalize_ratio_name(input$ratioNumerator, input$ratioDenominator, input$ratioName)
+    ratio_name <- default_ratio_name(input$ratioNumerator, input$ratioDenominator)
     updateTextInput(session, "ratioName", value = ratio_name)
   })
 
