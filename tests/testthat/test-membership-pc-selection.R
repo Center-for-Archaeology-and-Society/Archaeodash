@@ -22,8 +22,7 @@ test_that("membership_pc_count_choices includes per-PC and cumulative variance l
   choices <- membership_pc_count_choices(pca_model, c("PC1", "PC2", "PC3"))
 
   expect_equal(unname(choices), c("1", "2", "3"))
-  expect_true(any(grepl("PC1:", names(choices), fixed = TRUE)))
-  expect_true(any(grepl("cumulative:", names(choices), fixed = TRUE)))
+  expect_true(any(grepl("^First 1 PCs \\([0-9.]+%/[0-9.]+%\\)$", names(choices))))
 })
 
 test_that("membership_pc_count_choices falls back when PCA model is unavailable", {

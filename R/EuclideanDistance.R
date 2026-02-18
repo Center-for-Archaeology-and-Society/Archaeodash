@@ -295,7 +295,14 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     }
     selectInput(
       "EDPCCount",
-      "Number of PCs to use",
+      label = bslib::popover(
+        tagList(
+          "Number of PCs to use",
+          trigger = bsicons::bs_icon("info-circle", title = "Help")
+        ),
+        title = "PC label format",
+        "Values are shown as (PC variance / cumulative variance)."
+      ),
       choices = choices,
       selected = default_count
     )

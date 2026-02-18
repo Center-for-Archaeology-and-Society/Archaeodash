@@ -37,8 +37,7 @@ membership_pc_count_choices <- function(pca_model, pc_cols) {
   cum_pct <- cumsum(var_pct)
   labels <- vapply(seq_len(n), function(i) {
     sprintf(
-      "First %d PCs (PC%d: %.1f%%; cumulative: %.1f%%)",
-      i,
+      "First %d PCs (%.1f%%/%.1f%%)",
       i,
       var_pct[[i]],
       cum_pct[[i]]
