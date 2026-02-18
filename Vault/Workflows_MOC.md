@@ -7,6 +7,7 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Ordination_Workflow]]
 - [[Cluster_Workflow]]
 - [[Membership_Probability_Workflow]]
+- [[Mahalanobis_PC_Selection_Update_2026-02-18]]
 - [[Euclidean_Distance_Workflow]]
 
 ## Related

@@ -9,6 +9,7 @@
 - User reported help navigation issue and requested Home help link; added Info/Help controls, external-link new-tab behavior, and a top-of-Home help link.
 - User requested full package-to-vault buildout; analyzed Archaeodash R/Shiny codebase and added atomic MOCs/notes for architecture, workflows, persistence, testing, and risks.
 - User approved quickstart addition; added `Operator_Quickstart_ArchaeoDash` and linked it from index and analysis MOC.
+- User requested Mahalanobis PCA controls; added PC-count selector with PC+cumulative variance labels, wired calculation limit, added tests, installed package, and logged update note.
 
 ## Related
 

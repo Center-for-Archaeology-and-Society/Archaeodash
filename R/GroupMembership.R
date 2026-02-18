@@ -6,6 +6,42 @@
 #'
 #' @examples
 #' groupTab()
+pc_columns_sorted <- function(cols) {
+  cols <- as.character(cols)
+  cols <- cols[grepl("^PC[0-9]+$", cols)]
+  if (length(cols) == 0) return(character())
+  idx <- suppressWarnings(as.integer(sub("^PC", "", cols)))
+  cols[order(idx, na.last = TRUE)]
+}
+
+membership_pc_count_choices <- function(pca_model, pc_cols) {
+  pc_cols <- pc_columns_sorted(pc_cols)
+  if (length(pc_cols) == 0) return(setNames(character(), character()))
+
+  fallback <- setNames(
+    as.character(seq_along(pc_cols)),
+    paste0("First ", seq_along(pc_cols), " PCs")
+  )
+
+  if (is.null(pca_model) || is.null(pca_model$sdev)) return(fallback)
+  var_vec <- as.numeric(pca_model$sdev)^2
+  if (length(var_vec) == 0 || !is.finite(sum(var_vec)) || sum(var_vec) <= 0) return(fallback)
+
+  n <- min(length(pc_cols), length(var_vec))
+  var_pct <- (var_vec[seq_len(n)] / sum(var_vec)) * 100
+  cum_pct <- cumsum(var_pct)
+  labels <- vapply(seq_len(n), function(i) {
+    sprintf(
+      "First %d PCs (PC%d: %.1f%%; cumulative: %.1f%%)",
+      i,
+      i,
+      var_pct[[i]],
+      cum_pct[[i]]
+    )
+  }, character(1))
+  setNames(as.character(seq_len(n)), labels)
+}
+
 groupTab = function(){
   tabPanel(title = "Probabilities and Distances",
            id = "groupMembershiptab",
@@ -24,6 +60,7 @@ groupTab = function(){
                      choices = c("elements", "principal components", "UMAP", "linear discriminants"),
                      selected = "elements"
                    ),
+                   uiOutput("membershipPCCountUI"),
                    actionButton("membershipRun","Calculate", class = "mybtn")
                  )
                ),
@@ -98,7 +135,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
   get_source_features <- function(df, source) {
     if (!is.data.frame(df) || nrow(df) == 0) return(character())
     if (identical(source, "principal components")) {
-      cols <- grep("^PC[0-9]+$", names(df), value = TRUE)
+      cols <- pc_columns_sorted(grep("^PC[0-9]+$", names(df), value = TRUE))
     } else if (identical(source, "UMAP")) {
       cols <- grep("^V[0-9]+$", names(df), value = TRUE)
     } else if (identical(source, "linear discriminants")) {
@@ -222,6 +259,30 @@ groupServer = function(input,output,session,rvals, credentials, con){
     selectInput("sampleID","Choose sample ID Column",choices = choices,selected = selected)
   })
 
+  output$membershipPCCountUI = renderUI({
+    req(input$membershipDataset)
+    if (!identical(input$membershipDataset, "principal components")) {
+      return(NULL)
+    }
+    if (!identical(input$membershipMethod, "Mahalanobis")) {
+      return(NULL)
+    }
+    req(is.data.frame(rvals$pcadf), nrow(rvals$pcadf) > 0)
+    pc_cols <- pc_columns_sorted(names(rvals$pcadf))
+    req(length(pc_cols) > 0)
+    choices <- membership_pc_count_choices(rvals$pca, pc_cols)
+    default_count <- as.character(length(pc_cols))
+    if (!(default_count %in% unname(choices))) {
+      default_count <- unname(choices)[[length(choices)]]
+    }
+    selectInput(
+      "membershipPCCount",
+      "Number of PCs to use (Mahalanobis)",
+      choices = choices,
+      selected = default_count
+    )
+  })
+
   output$gGroupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
     req(rvals$attrGroups)
@@ -242,6 +303,17 @@ groupServer = function(input,output,session,rvals, credentials, con){
     if (is.null(source_data)) return(invisible(NULL))
     df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
     feature_cols <- source_data$features
+    if (identical(input$membershipDataset, "principal components") &&
+        identical(input$membershipMethod, "Mahalanobis")) {
+      selected_pc_count <- tryCatch(as.integer(input$membershipPCCount), error = function(e) integer())
+      if (length(selected_pc_count) == 0 || is.na(selected_pc_count[[1]]) || selected_pc_count[[1]] < 1) {
+        selected_pc_count <- length(feature_cols)
+      } else {
+        selected_pc_count <- selected_pc_count[[1]]
+      }
+      selected_pc_count <- min(selected_pc_count, length(feature_cols))
+      feature_cols <- feature_cols[seq_len(selected_pc_count)]
+    }
     eligible_groups <- tryCatch(as.character(input$eligibleGroups), error = function(e) character())
     eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
     if (length(eligible_groups) == 0) {
