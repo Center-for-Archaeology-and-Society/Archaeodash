@@ -34,7 +34,7 @@ euclideanDistanceTab = function() {
                ),
                fluidRow(
                  column(
-                   6,
+                   4,
                    sliderInput(
                      "EDlimit",
                      "Number of closest matches to return for each observation",
@@ -44,7 +44,11 @@ euclideanDistanceTab = function() {
                    )
                  ),
                  column(
-                   6,
+                   4,
+                   uiOutput("EDPCCountUI")
+                 ),
+                 column(
+                   4,
                    tags$div(style = "margin-top: 20px;", actionButton("EDRun", "Calculate", class = "mybtn"))
                  )
                )
@@ -155,7 +159,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   get_ed_source_features <- function(df, source) {
     if (!is.data.frame(df) || nrow(df) == 0) return(character())
     if (identical(source, "principal components")) {
-      cols <- grep("^PC[0-9]+$", names(df), value = TRUE)
+      cols <- pc_columns_sorted(grep("^PC[0-9]+$", names(df), value = TRUE))
     } else if (identical(source, "UMAP")) {
       cols <- grep("^V[0-9]+$", names(df), value = TRUE)
     } else if (identical(source, "linear discriminants")) {
@@ -257,6 +261,46 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     })
   })
 
+  output$EDPCCountUI = renderUI({
+    req(input$EDdataset)
+    if (!identical(input$EDdataset, "principal components")) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "PC count selector appears when dataset is set to principal components."
+        )
+      )
+    }
+    if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "Run Confirm Selections with PCA enabled to populate principal components."
+        )
+      )
+    }
+    pc_cols <- pc_columns_sorted(names(rvals$pcadf))
+    if (length(pc_cols) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "No PC columns were found in the selected PCA dataset."
+        )
+      )
+    }
+    choices <- membership_pc_count_choices(rvals$pca, pc_cols)
+    default_count <- as.character(length(pc_cols))
+    if (!(default_count %in% unname(choices))) {
+      default_count <- unname(choices)[[length(choices)]]
+    }
+    selectInput(
+      "EDPCCount",
+      "Number of PCs to use",
+      choices = choices,
+      selected = default_count
+    )
+  })
+
   output$edGroupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
     req(rvals$attrGroups)
@@ -276,6 +320,9 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       if (is.null(source_data)) return(invisible(NULL))
       analysis_df <- source_data$df
       feature_cols <- source_data$features
+      if (identical(input$EDdataset, "principal components")) {
+        feature_cols <- limit_pc_features(feature_cols, input$EDPCCount)
+      }
       ed_sample_id_col <- tryCatch(as.character(input$edsampleID[[1]]), error = function(e) "")
       if (is.null(ed_sample_id_col) || length(ed_sample_id_col) == 0 || is.na(ed_sample_id_col[[1]])) {
         ed_sample_id_col <- ""

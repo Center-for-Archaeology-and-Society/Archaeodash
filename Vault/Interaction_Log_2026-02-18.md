@@ -13,6 +13,8 @@
 - User asked to address key technical risks; fixed z-score transform bug, added shared DB safe-write/remove helpers, applied them in core paths, added tests, and documented a prioritized risk-reduction plan.
 - User requested commit + install for the risk-mitigation work; committed changes and reinstalled package locally.
 - User requested SQL injection review and remediation; audited DB query paths, parameterized login SQL, quoted persistence identifiers, normalized merge naming, reran targeted tests, and recorded the security audit note.
+- User reported missing Mahalanobis PC selector after reload; verified deployed code contained the feature, clarified selector conditions, added inline visibility hints in Group Membership UI, re-tested, reinstalled package in `archaeodashbeta`, and restarted the container.
+- User requested broader PCA selector behavior; modularized PCA helper logic, enabled PC-count selection for Group Membership across methods and for Euclidean Distance, added PCA variance labels to Visualize/Assign axis dropdowns, expanded tests, installed in `archaeodashbeta`, and restarted container.
 
 ## Related
 

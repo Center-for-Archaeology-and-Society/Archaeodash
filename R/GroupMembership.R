@@ -6,41 +6,6 @@
 #'
 #' @examples
 #' groupTab()
-pc_columns_sorted <- function(cols) {
-  cols <- as.character(cols)
-  cols <- cols[grepl("^PC[0-9]+$", cols)]
-  if (length(cols) == 0) return(character())
-  idx <- suppressWarnings(as.integer(sub("^PC", "", cols)))
-  cols[order(idx, na.last = TRUE)]
-}
-
-membership_pc_count_choices <- function(pca_model, pc_cols) {
-  pc_cols <- pc_columns_sorted(pc_cols)
-  if (length(pc_cols) == 0) return(setNames(character(), character()))
-
-  fallback <- setNames(
-    as.character(seq_along(pc_cols)),
-    paste0("First ", seq_along(pc_cols), " PCs")
-  )
-
-  if (is.null(pca_model) || is.null(pca_model$sdev)) return(fallback)
-  var_vec <- as.numeric(pca_model$sdev)^2
-  if (length(var_vec) == 0 || !is.finite(sum(var_vec)) || sum(var_vec) <= 0) return(fallback)
-
-  n <- min(length(pc_cols), length(var_vec))
-  var_pct <- (var_vec[seq_len(n)] / sum(var_vec)) * 100
-  cum_pct <- cumsum(var_pct)
-  labels <- vapply(seq_len(n), function(i) {
-    sprintf(
-      "First %d PCs (PC%d: %.1f%%; cumulative: %.1f%%)",
-      i,
-      i,
-      var_pct[[i]],
-      cum_pct[[i]]
-    )
-  }, character(1))
-  setNames(as.character(seq_len(n)), labels)
-}
 
 groupTab = function(){
   tabPanel(title = "Probabilities and Distances",
@@ -262,14 +227,30 @@ groupServer = function(input,output,session,rvals, credentials, con){
   output$membershipPCCountUI = renderUI({
     req(input$membershipDataset)
     if (!identical(input$membershipDataset, "principal components")) {
-      return(NULL)
+      return(
+        tags$small(
+          class = "text-muted",
+          "PC count selector appears when dataset is set to principal components."
+        )
+      )
     }
-    if (!identical(input$membershipMethod, "Mahalanobis")) {
-      return(NULL)
+    if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "Run Confirm Selections with PCA enabled to populate principal components."
+        )
+      )
     }
-    req(is.data.frame(rvals$pcadf), nrow(rvals$pcadf) > 0)
     pc_cols <- pc_columns_sorted(names(rvals$pcadf))
-    req(length(pc_cols) > 0)
+    if (length(pc_cols) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "No PC columns were found in the selected PCA dataset."
+        )
+      )
+    }
     choices <- membership_pc_count_choices(rvals$pca, pc_cols)
     default_count <- as.character(length(pc_cols))
     if (!(default_count %in% unname(choices))) {
@@ -277,7 +258,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
     }
     selectInput(
       "membershipPCCount",
-      "Number of PCs to use (Mahalanobis)",
+      "Number of PCs to use",
       choices = choices,
       selected = default_count
     )
@@ -303,16 +284,8 @@ groupServer = function(input,output,session,rvals, credentials, con){
     if (is.null(source_data)) return(invisible(NULL))
     df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
     feature_cols <- source_data$features
-    if (identical(input$membershipDataset, "principal components") &&
-        identical(input$membershipMethod, "Mahalanobis")) {
-      selected_pc_count <- tryCatch(as.integer(input$membershipPCCount), error = function(e) integer())
-      if (length(selected_pc_count) == 0 || is.na(selected_pc_count[[1]]) || selected_pc_count[[1]] < 1) {
-        selected_pc_count <- length(feature_cols)
-      } else {
-        selected_pc_count <- selected_pc_count[[1]]
-      }
-      selected_pc_count <- min(selected_pc_count, length(feature_cols))
-      feature_cols <- feature_cols[seq_len(selected_pc_count)]
+    if (identical(input$membershipDataset, "principal components")) {
+      feature_cols <- limit_pc_features(feature_cols, input$membershipPCCount)
     }
     eligible_groups <- tryCatch(as.character(input$eligibleGroups), error = function(e) character())
     eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]

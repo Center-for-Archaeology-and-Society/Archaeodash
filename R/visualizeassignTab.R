@@ -197,7 +197,8 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           mynotification("No PCA results",type = "warning")
           return(tibble::tibble())
         })
-        rvals$plotVars = rvals$pca$x %>% colnames()
+        rvals$plotVars = pc_columns_sorted(rvals$pca$x %>% colnames())
+        rvals$plotVarChoices = pc_axis_choices_with_variance(rvals$pca, rvals$plotVars)
       } else if (input$data.src == 'linear discriminants') {
         validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
         rvals$plotdf = tryCatch(rvals$LDAdf,error = function(e) {
@@ -205,6 +206,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$LDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
+        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
       } else if (input$data.src == 'UMAP') {
         validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
         rvals$plotdf = tryCatch(rvals$umapdf,error = function(e) {
@@ -212,6 +214,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           return(tibble::tibble())
         })
         rvals$plotVars = c("V1","V2")
+        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
       } else {
         req(nrow(rvals$selectedData) > 0)
         rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
@@ -219,6 +222,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           return(tibble::tibble())
         })
         rvals$plotVars = rvals$chem
+        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
       }
       if(is.data.frame(rvals$plotdf) && nrow(rvals$plotdf) > 0 && !("rowid" %in% names(rvals$plotdf))){
         rvals$plotdf = rvals$plotdf %>% tibble::rowid_to_column("rowid")
@@ -228,12 +232,16 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   output$xvarUI = renderUI({
     req(rvals$plotVars)
-    selectInput('xvar', 'X', rvals$plotVars, selected = rvals$plotVars[1])
+    req(rvals$plotVarChoices)
+    selected_x <- if (!is.null(rvals$xvar) && as.character(rvals$xvar) %in% rvals$plotVars) as.character(rvals$xvar) else rvals$plotVars[1]
+    selectInput('xvar', 'X', rvals$plotVarChoices, selected = selected_x)
   })
 
   output$yvarUI = renderUI({
     req(rvals$plotVars)
-    selectInput('yvar', 'y', rvals$plotVars, selected = rvals$plotVars[2])
+    req(rvals$plotVarChoices)
+    selected_y <- if (!is.null(rvals$yvar) && as.character(rvals$yvar) %in% rvals$plotVars) as.character(rvals$yvar) else rvals$plotVars[min(2, length(rvals$plotVars))]
+    selectInput('yvar', 'y', rvals$plotVarChoices, selected = selected_y)
   })
 
   output$xvar2UI = renderUI({
