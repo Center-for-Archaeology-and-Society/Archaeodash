@@ -364,9 +364,24 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     rvals$clusterPlot()
   })
 
-  output$clusterPlotModal <- renderPlot({
+  output$clusterPlotModalPlotly <- plotly::renderPlotly({
     req(rvals$clusterPlot)
-    rvals$clusterPlot()
+    p <- rvals$clusterPlot()
+    if (inherits(p, "plotly")) {
+      return(p)
+    }
+    if (inherits(p, "ggplot")) {
+      return(plotly::ggplotly(p))
+    }
+    NULL
+  })
+
+  output$clusterPlotModalStatic <- renderPlot({
+    req(rvals$clusterPlot)
+    p <- rvals$clusterPlot()
+    if (!inherits(p, "ggplot") && !inherits(p, "plotly")) {
+      rvals$clusterPlot()
+    }
   })
 
   observeEvent(input$clusterPlotExpand, {
@@ -375,7 +390,11 @@ clusterServer = function(input,output,session,rvals, credentials, con){
       title = "Cluster Plot",
       size = "l",
       easyClose = TRUE,
-      plotOutput("clusterPlotModal", height = "78vh")
+      if (input$cluster.parent %in% c("kmeans", "kmedoids", "nClust")) {
+        plotly::plotlyOutput("clusterPlotModalPlotly", height = "78vh")
+      } else {
+        plotOutput("clusterPlotModalStatic", height = "78vh")
+      }
     ))
   })
 
