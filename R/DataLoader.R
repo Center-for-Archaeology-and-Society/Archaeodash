@@ -217,11 +217,27 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         }
         DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
         DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
-        pref_tbl <- paste0(credentials$res$username, "_preferences")
+        username <- as.character(credentials$res$username[[1]])
+        pref_tbl <- paste0(username, "_preferences")
+        prefs <- if (DBI::dbExistsTable(con, pref_tbl)) {
+          tryCatch(
+            dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
+            error = function(e) tibble::tibble(field = character(), value = character())
+          )
+        } else {
+          tibble::tibble(field = character(), value = character())
+        }
+        if (!all(c("field", "value") %in% names(prefs))) {
+          prefs <- tibble::tibble(field = character(), value = character())
+        }
+        prefs <- prefs %>%
+          dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value)) %>%
+          dplyr::filter(.data$field != "lastOpenedDataset") %>%
+          dplyr::bind_rows(tibble::tibble(field = "lastOpenedDataset", value = datasetname))
         DBI::dbWriteTable(
           conn = con,
           name = pref_tbl,
-          value = tibble::tibble(field = "lastOpenedDataset", value = datasetname),
+          value = prefs,
           row.names = FALSE,
           overwrite = TRUE
         )

@@ -45,7 +45,7 @@
     }, 200);
   }
 
-  function registerMessageHandler(retries) {
+  function registerMessageHandler(applyServerTheme, retries) {
     var remaining = typeof retries === "number" ? retries : 30;
     if (window.Shiny && typeof window.Shiny.addCustomMessageHandler === "function") {
       window.Shiny.addCustomMessageHandler("auth_cookie", function (msg) {
@@ -59,11 +59,15 @@
           eraseCookie("archaeodash_auth_user");
         }
       });
+      window.Shiny.addCustomMessageHandler("theme_preference", function (msg) {
+        if (!msg || !msg.theme || typeof applyServerTheme !== "function") return;
+        applyServerTheme(msg.theme);
+      });
       return;
     }
     if (remaining <= 0) return;
     window.setTimeout(function () {
-      registerMessageHandler(remaining - 1);
+      registerMessageHandler(applyServerTheme, remaining - 1);
     }, 200);
   }
 
@@ -104,9 +108,9 @@
   function getStoredTheme() {
     try {
       var stored = window.localStorage.getItem("archaeodash_theme");
-      if (stored === "dark" || stored === "light") return stored;
+      if (stored === "simple" || stored === "dark" || stored === "light") return stored;
     } catch (e) {}
-    return "light";
+    return "simple";
   }
 
   function setStoredTheme(mode) {
@@ -115,14 +119,19 @@
     } catch (e) {}
   }
 
-  function applyTheme(mode, toggleBtn) {
-    var normalized = mode === "dark" ? "dark" : "light";
+  function normalizeTheme(mode) {
+    if (mode === "dark" || mode === "light" || mode === "simple") return mode;
+    return "simple";
+  }
+
+  function applyTheme(mode, selectInputEl) {
+    var normalized = normalizeTheme(mode);
     if (document.body) {
-      document.body.classList.toggle("theme-dark", normalized === "dark");
+      document.body.classList.remove("theme-simple", "theme-light", "theme-dark");
+      document.body.classList.add("theme-" + normalized);
     }
-    if (toggleBtn) {
-      toggleBtn.setAttribute("data-theme", normalized);
-      toggleBtn.textContent = normalized === "dark" ? "Light Mode" : "Dark Mode";
+    if (selectInputEl && selectInputEl.value !== normalized) {
+      selectInputEl.value = normalized;
     }
     return normalized;
   }
@@ -130,7 +139,7 @@
   function init() {
     try {
       var toggleBtn = document.getElementById("toggleSidebar");
-      var themeToggleBtn = document.getElementById("themeToggle");
+      var themeSelect = document.getElementById("themeSelect");
       var sideCol = document.getElementById("sidePanelCol");
       var mainCol = document.getElementById("mainPanelCol");
       var banner = document.getElementById("cookieBanner");
@@ -157,15 +166,17 @@
         });
       }
 
-      if (themeToggleBtn) {
-        var activeTheme = applyTheme(getStoredTheme(), themeToggleBtn);
-        themeToggleBtn.addEventListener("click", function () {
-          activeTheme = activeTheme === "dark" ? "light" : "dark";
-          activeTheme = applyTheme(activeTheme, themeToggleBtn);
+      var activeTheme = applyTheme(getStoredTheme(), themeSelect);
+      sendToShiny("theme_preference_set", activeTheme, 30);
+
+      if (themeSelect) {
+        themeSelect.addEventListener("change", function () {
+          activeTheme = applyTheme(themeSelect.value, themeSelect);
           setStoredTheme(activeTheme);
+          sendToShiny("theme_preference_set", activeTheme, 30);
         });
       } else {
-        applyTheme(getStoredTheme(), null);
+        applyTheme(activeTheme, null);
       }
 
       var consent = getCookie("archaeodash_cookie_consent");
@@ -205,7 +216,10 @@
       }
 
       bindColvisCloseBehavior();
-      registerMessageHandler(30);
+      registerMessageHandler(function (theme) {
+        activeTheme = applyTheme(theme, themeSelect);
+        setStoredTheme(activeTheme);
+      }, 30);
     } catch (err) {
       if (window.console && console.error) {
         console.error("app.js init failed", err);

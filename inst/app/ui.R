@@ -35,12 +35,16 @@ shinyUI(
                actionButton('loginUI','login'),
                tags$div(
                  class = "theme-toggle-wrap",
-                 tags$button(
-                   id = "themeToggle",
-                   type = "button",
-                   class = "btn btn-default theme-toggle-btn",
-                   `data-theme` = "light",
-                   "Dark Mode"
+                 selectInput(
+                   inputId = "themeSelect",
+                   label = "Theme",
+                   choices = c(
+                     "Simple" = "simple",
+                     "Light" = "light",
+                     "Dark" = "dark"
+                   ),
+                   selected = "light",
+                   width = "100%"
                  )
                ),
                shinyjs::hidden(actionButton('logoutUI','logout')),

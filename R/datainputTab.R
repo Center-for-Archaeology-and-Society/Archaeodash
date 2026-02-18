@@ -108,12 +108,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!isTruthy(credentials$status) || is.null(con)) return("")
     username <- safe_username()
     if (!nzchar(username)) return("")
-    pref_tbl <- paste0(username, "_preferences")
-    if (!DBI::dbExistsTable(con, pref_tbl)) return("")
-    prefs <- tryCatch(
-      dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
-      error = function(e) tibble::tibble()
-    )
+    prefs <- read_user_preferences(username)
     if (!inherits(prefs, "data.frame") || nrow(prefs) == 0) return("")
     val <- prefs %>%
       dplyr::filter(field == "lastOpenedDataset") %>%
@@ -121,15 +116,32 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     safe_scalar_chr(val)
   }
 
+  read_user_preferences <- function(username) {
+    if (is.null(con) || !nzchar(username)) return(tibble::tibble(field = character(), value = character()))
+    pref_tbl <- paste0(username, "_preferences")
+    if (!DBI::dbExistsTable(con, pref_tbl)) return(tibble::tibble(field = character(), value = character()))
+    prefs <- tryCatch(
+      dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
+      error = function(e) tibble::tibble(field = character(), value = character())
+    )
+    if (!inherits(prefs, "data.frame")) return(tibble::tibble(field = character(), value = character()))
+    if (!all(c("field", "value") %in% names(prefs))) return(tibble::tibble(field = character(), value = character()))
+    prefs %>% dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value))
+  }
+
   set_last_opened_dataset <- function(dataset_name) {
     if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
     username <- safe_username()
     if (!nzchar(username) || !nzchar(dataset_name)) return(invisible(NULL))
     pref_tbl <- paste0(username, "_preferences")
-    prefs <- tibble::tibble(
-      field = "lastOpenedDataset",
-      value = as.character(dataset_name)
-    )
+    prefs <- read_user_preferences(username) %>%
+      dplyr::filter(.data$field != "lastOpenedDataset") %>%
+      dplyr::bind_rows(
+        tibble::tibble(
+          field = "lastOpenedDataset",
+          value = as.character(dataset_name)
+        )
+      )
     try(
       DBI::dbWriteTable(
         conn = con,
