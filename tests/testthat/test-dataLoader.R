@@ -36,3 +36,25 @@ test_that("resolve_id_column falls back to rowid when empty or invalid", {
   expect_equal(resolve_id_column("missing", cols), "rowid")
   expect_equal(resolve_id_column("anid", cols), "anid")
 })
+
+test_that("replace_non_element_blanks fills empty and NA metadata fields only", {
+  df <- tibble::tibble(
+    rowid = c(1L, 2L, 3L),
+    site = c("A", "", NA_character_),
+    trench = c(" ", "T2", "T3"),
+    Fe = c(1.1, NA_real_, 3.3)
+  )
+
+  out <- replace_non_element_blanks(df, chem_cols = c("Fe"))
+
+  expect_equal(out$site, c("A", "[blank]", "[blank]"))
+  expect_equal(out$trench, c("[blank]", "T2", "T3"))
+  expect_true(is.numeric(out$Fe))
+  expect_true(is.na(out$Fe[[2]]))
+})
+
+test_that("replace_non_element_blanks leaves data unchanged when no metadata columns", {
+  df <- tibble::tibble(rowid = c(1L, 2L), Fe = c(1.0, 2.0))
+  out <- replace_non_element_blanks(df, chem_cols = c("Fe"))
+  expect_identical(out, df)
+})

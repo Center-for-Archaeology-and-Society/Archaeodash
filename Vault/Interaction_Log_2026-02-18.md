@@ -16,6 +16,8 @@
 - User reported missing Mahalanobis PC selector after reload; verified deployed code contained the feature, clarified selector conditions, added inline visibility hints in Group Membership UI, re-tested, reinstalled package in `archaeodashbeta`, and restarted the container.
 - User requested broader PCA selector behavior; modularized PCA helper logic, enabled PC-count selection for Group Membership across methods and for Euclidean Distance, added PCA variance labels to Visualize/Assign axis dropdowns, expanded tests, installed in `archaeodashbeta`, and restarted container.
 - User requested streamlined PCA labels and help; changed PC-count option labels to `First N PCs (variance%/cumulative%)`, added info-icon popovers in both Probabilities/Distances and Euclidean Distance controls, re-tested, installed to `archaeodashbeta`, and restarted container.
+- User requested file-import metadata blank handling; added an optional (default-on) Data Loader setting to replace empty/NA non-element fields with `[blank]`, implemented helper-backed normalization during file import, and added tests.
+- User requested release workflow; bumped package version to `2026.02.18.2319`, committed import-blank updates, tagged `v2026.02.18.2319`, and installed/restarted `archaeodashbeta`.
 
 ## Related
 

@@ -54,6 +54,23 @@ resolve_id_column <- function(selected_id_column, column_names) {
   selected_id_column
 }
 
+replace_non_element_blanks <- function(data, chem_cols, blank_label = "[blank]") {
+  if (!inherits(data, "data.frame")) return(data)
+  non_element_cols <- setdiff(names(data), c("rowid", chem_cols))
+  if (length(non_element_cols) == 0) return(data)
+  data %>%
+    dplyr::mutate(
+      dplyr::across(
+        tidyselect::any_of(non_element_cols),
+        ~ {
+          values <- as.character(.)
+          values[is.na(values) | !nzchar(trimws(values))] <- blank_label
+          values
+        }
+      )
+    )
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -149,6 +166,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
 
   output$loadOptionsUI = renderUI({
     tagList(
+      checkboxInput("loadBlankNonElement", "Replace empty/NA non-element fields with [blank]", value = TRUE),
       checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = FALSE),
       checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = FALSE),
       checkboxInput("loadNAAsZero", "Replace NA values with 0", value = FALSE)
@@ -186,6 +204,9 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         data_loaded = data_loaded %>%
           dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ tidyr::replace_na(., 0)))
       }
+      if (isTRUE(input$loadBlankNonElement)) {
+        data_loaded <- replace_non_element_blanks(data_loaded, chem_cols = input$loadchem)
+      }
 
       rvals$importedData = data_loaded
       rvals$selectedData = data_loaded
@@ -195,6 +216,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
       rvals$loadNegativeAsNA = isTRUE(input$loadNegativeAsNA)
       rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
+      rvals$loadBlankNonElement = isTRUE(input$loadBlankNonElement)
 
       if(isTruthy(credentials$status) && !is.null(con)){
         if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
