@@ -24,6 +24,31 @@ test_that("refreshNonElementMetadata updates metadata while preserving element v
   expect_equal(refreshed$transformation, transformed$transformation)
 })
 
+test_that("refreshNonElementMetadata can preserve selected metadata columns", {
+  imported <- tibble::tibble(
+    rowid = c("1", "2"),
+    GroupVal = c("A_new", "B_new"),
+    site = c("S1", "S2"),
+    Fe = c(100, 200)
+  )
+  transformed <- tibble::tibble(
+    rowid = c("1", "2"),
+    GroupVal = c("A_old", "B_old"),
+    Fe = c(1.11, 2.22)
+  )
+
+  refreshed <- refreshNonElementMetadata(
+    transformed = transformed,
+    imported_data = imported,
+    chem = c("Fe"),
+    preserve_cols = "GroupVal"
+  )
+
+  expect_equal(refreshed$Fe, transformed$Fe)
+  expect_equal(as.character(refreshed$GroupVal), c("A_old", "B_old"))
+  expect_true("site" %in% names(refreshed))
+})
+
 test_that("refreshTransformationMetadata updates all stored transformed tables", {
   imported <- tibble::tibble(
     rowid = c("1", "2"),
@@ -33,6 +58,7 @@ test_that("refreshTransformationMetadata updates all stored transformed tables",
   )
   snapshot <- list(
     name = "t1",
+    attrGroups = "GroupVal",
     chem = c("Fe"),
     selectedData = tibble::tibble(rowid = c("1", "2"), GroupVal = c("A_old", "B_old"), Fe = c(1, 2)),
     pcadf = tibble::tibble(rowid = c("1", "2"), GroupVal = c("A_old", "B_old"), PC1 = c(0.1, 0.2)),
@@ -46,10 +72,10 @@ test_that("refreshTransformationMetadata updates all stored transformed tables",
     chem = c("Fe")
   )
 
-  expect_equal(as.character(refreshed$t1$selectedData$GroupVal), c("A_new", "B_new"))
-  expect_equal(as.character(refreshed$t1$pcadf$GroupVal), c("A_new", "B_new"))
-  expect_equal(as.character(refreshed$t1$umapdf$GroupVal), c("A_new", "B_new"))
-  expect_equal(as.character(refreshed$t1$LDAdf$GroupVal), c("A_new", "B_new"))
+  expect_equal(as.character(refreshed$t1$selectedData$GroupVal), c("A_old", "B_old"))
+  expect_equal(as.character(refreshed$t1$pcadf$GroupVal), c("A_old", "B_old"))
+  expect_equal(as.character(refreshed$t1$umapdf$GroupVal), c("A_old", "B_old"))
+  expect_equal(as.character(refreshed$t1$LDAdf$GroupVal), c("A_old", "B_old"))
 })
 
 test_that("build and apply transformation snapshot round-trip core fields", {

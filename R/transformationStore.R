@@ -10,9 +10,10 @@ defaultTransformationName <- function() {
 #' @param transformed data frame that may include transformed element columns
 #' @param imported_data canonical uploaded data with latest metadata
 #' @param chem character vector of element columns
+#' @param preserve_cols metadata columns to preserve from `transformed`
 #'
 #' @return data frame with refreshed metadata columns
-refreshNonElementMetadata <- function(transformed, imported_data, chem) {
+refreshNonElementMetadata <- function(transformed, imported_data, chem, preserve_cols = character()) {
   if (!inherits(transformed, "data.frame") || !inherits(imported_data, "data.frame")) {
     return(transformed)
   }
@@ -22,10 +23,12 @@ refreshNonElementMetadata <- function(transformed, imported_data, chem) {
 
   metadata_cols <- setdiff(names(imported_data), chem)
   metadata_cols <- unique(c("rowid", metadata_cols))
+  preserve_cols <- unique(as.character(preserve_cols))
+  preserve_cols <- preserve_cols[!is.na(preserve_cols) & nzchar(preserve_cols)]
   metadata_tbl <- imported_data %>%
-    dplyr::select(tidyselect::any_of(metadata_cols))
+    dplyr::select(tidyselect::any_of(setdiff(metadata_cols, preserve_cols)))
 
-  replace_cols <- setdiff(colnames(metadata_tbl), "rowid")
+  replace_cols <- setdiff(colnames(metadata_tbl), c("rowid", preserve_cols))
   transformed %>%
     dplyr::mutate(rowid = as.character(.data$rowid)) %>%
     dplyr::select(-tidyselect::any_of(replace_cols)) %>%
@@ -123,10 +126,17 @@ refreshTransformationMetadata <- function(transformations, imported_data, chem) 
   if (is.null(transformations) || length(transformations) == 0) return(list())
   lapply(transformations, function(snapshot) {
     if (is.null(snapshot$selectedData)) return(snapshot)
-    snapshot$selectedData <- refreshNonElementMetadata(snapshot$selectedData, imported_data, chem)
-    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, imported_data, chem)
-    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, imported_data, chem)
-    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, imported_data, chem)
+    keep_cols <- unique(c(as.character(snapshot$attrGroups)))
+    keep_cols <- keep_cols[!is.na(keep_cols) & nzchar(keep_cols)]
+    if (length(keep_cols) == 0 && inherits(snapshot$selectedData, "data.frame")) {
+      if ("GroupVal" %in% names(snapshot$selectedData)) {
+        keep_cols <- "GroupVal"
+      }
+    }
+    snapshot$selectedData <- refreshNonElementMetadata(snapshot$selectedData, imported_data, chem, preserve_cols = keep_cols)
+    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, imported_data, chem, preserve_cols = keep_cols)
+    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, imported_data, chem, preserve_cols = keep_cols)
+    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, imported_data, chem, preserve_cols = keep_cols)
     snapshot
   })
 }
