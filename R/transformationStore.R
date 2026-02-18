@@ -55,6 +55,14 @@ buildTransformationSnapshot <- function(rvals, name) {
     runPCA = isTRUE(rvals$runPCA),
     runUMAP = isTRUE(rvals$runUMAP),
     runLDA = isTRUE(rvals$runLDA),
+    data.src = if (is.null(rvals$data.src)) "" else as.character(rvals$data.src),
+    xvar = if (is.null(rvals$xvar)) "" else as.character(rvals$xvar),
+    yvar = if (is.null(rvals$yvar)) "" else as.character(rvals$yvar),
+    xvar2 = if (is.null(rvals$xvar2)) character() else as.character(rvals$xvar2),
+    yvar2 = if (is.null(rvals$yvar2)) character() else as.character(rvals$yvar2),
+    Conf = isTRUE(rvals$Conf),
+    int.set = if (is.null(rvals$int.set)) 0.95 else as.numeric(rvals$int.set[[1]]),
+    plot_theme = if (is.null(rvals$plot_theme)) "viridis" else as.character(rvals$plot_theme),
     ratioSpecs = if (inherits(rvals$ratioSpecs, "data.frame")) rvals$ratioSpecs else tibble::tibble(),
     ratioMode = if (is.null(rvals$ratioMode)) "append" else as.character(rvals$ratioMode),
     selectedData = rvals$selectedData,
@@ -84,6 +92,14 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
   rvals$runPCA <- snapshot$runPCA
   rvals$runUMAP <- snapshot$runUMAP
   rvals$runLDA <- snapshot$runLDA
+  rvals$data.src <- if (is.null(snapshot$data.src) || !nzchar(as.character(snapshot$data.src))) NULL else as.character(snapshot$data.src)
+  rvals$xvar <- if (is.null(snapshot$xvar) || !nzchar(as.character(snapshot$xvar))) NULL else as.character(snapshot$xvar)
+  rvals$yvar <- if (is.null(snapshot$yvar) || !nzchar(as.character(snapshot$yvar))) NULL else as.character(snapshot$yvar)
+  rvals$xvar2 <- if (is.null(snapshot$xvar2) || length(snapshot$xvar2) == 0) NULL else as.character(snapshot$xvar2)
+  rvals$yvar2 <- if (is.null(snapshot$yvar2) || length(snapshot$yvar2) == 0) NULL else as.character(snapshot$yvar2)
+  rvals$Conf <- isTRUE(snapshot$Conf)
+  rvals$int.set <- if (is.null(snapshot$int.set) || !is.finite(as.numeric(snapshot$int.set[[1]]))) NULL else as.numeric(snapshot$int.set[[1]])
+  rvals$plot_theme <- if (is.null(snapshot$plot_theme) || !nzchar(as.character(snapshot$plot_theme))) NULL else as.character(snapshot$plot_theme)
   rvals$ratioSpecs <- if (inherits(snapshot$ratioSpecs, "data.frame")) snapshot$ratioSpecs else tibble::tibble()
   rvals$ratioMode <- if (is.null(snapshot$ratioMode) || !snapshot$ratioMode %in% c("append", "only")) "append" else snapshot$ratioMode
   rvals$selectedData <- snapshot$selectedData

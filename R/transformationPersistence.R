@@ -115,7 +115,8 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
     field = c(
       "dataset_key", "transformation_name", "created", "attrGroups",
       "transform.method", "impute.method", "runPCA", "runUMAP", "runLDA",
-      "chem", "attr", "attrs", "attrGroupsSub", "ratioMode", "ratioSpecs"
+      "chem", "attr", "attrs", "attrGroupsSub", "ratioMode", "ratioSpecs",
+      "data.src", "xvar", "yvar", "xvar2", "yvar2", "Conf", "int.set", "plot_theme"
     ),
     value = c(
       dataset_key,
@@ -132,7 +133,15 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       collapse_transform_values(snapshot$attrs),
       collapse_transform_values(snapshot$attrGroupsSub),
       opt_chr(snapshot$ratioMode, "append"),
-      encode_ratio_specs(snapshot$ratioSpecs)
+      encode_ratio_specs(snapshot$ratioSpecs),
+      opt_chr(snapshot$data.src, ""),
+      opt_chr(snapshot$xvar, ""),
+      opt_chr(snapshot$yvar, ""),
+      collapse_transform_values(snapshot$xvar2),
+      collapse_transform_values(snapshot$yvar2),
+      as.character(isTRUE(snapshot$Conf)),
+      opt_chr(snapshot$int.set, "0.95"),
+      opt_chr(snapshot$plot_theme, "viridis")
     )
   )
   DBI::dbWriteTable(con, meta_tbl, meta, overwrite = TRUE, row.names = FALSE)
@@ -209,6 +218,14 @@ load_transformations_db <- function(con, username, dataset_key) {
       runPCA = identical(get_meta("runPCA", "FALSE"), "TRUE"),
       runUMAP = identical(get_meta("runUMAP", "FALSE"), "TRUE"),
       runLDA = identical(get_meta("runLDA", "FALSE"), "TRUE"),
+      data.src = get_meta("data.src", "elements"),
+      xvar = get_meta("xvar", ""),
+      yvar = get_meta("yvar", ""),
+      xvar2 = split_transform_values(get_meta("xvar2", "")),
+      yvar2 = split_transform_values(get_meta("yvar2", "")),
+      Conf = identical(get_meta("Conf", "FALSE"), "TRUE"),
+      int.set = suppressWarnings(as.numeric(get_meta("int.set", "0.95"))),
+      plot_theme = get_meta("plot_theme", "viridis"),
       ratioMode = get_meta("ratioMode", "append"),
       ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
       selectedData = selected_data,

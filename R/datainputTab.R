@@ -185,8 +185,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
     rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
     rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$Conf,error = function(e)return(NULL))
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    rvals$plot_theme = tryCatch(input$plot_theme,error = function(e)return(NULL))
   }
 
   reset_transformation_store <- function() {
@@ -458,7 +459,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
     null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                    "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
-                   "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
+                   "plot_theme", "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
 
     # Loop through the list and set each to NULL
     for (var in null_vars) {
@@ -628,7 +629,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       reset_transformation_store()
       null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                      "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
-                     "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
+                     "plot_theme", "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
 
       # Loop through the list and set each to NULL
       for (var in null_vars) {
@@ -728,6 +729,30 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!is.null(snapshot$attrGroupsSub)) {
       rvals$attrGroupsSub <- as.character(snapshot$attrGroupsSub)
       try(updateSelectizeInput(session, "attrGroupsSub", selected = as.character(snapshot$attrGroupsSub)), silent = TRUE)
+    }
+    if (!is.null(snapshot$data.src) && nzchar(as.character(snapshot$data.src))) {
+      try(updateSelectInput(session, "data.src", selected = as.character(snapshot$data.src)), silent = TRUE)
+    }
+    if (!is.null(snapshot$xvar) && nzchar(as.character(snapshot$xvar))) {
+      try(updateSelectInput(session, "xvar", selected = as.character(snapshot$xvar)), silent = TRUE)
+    }
+    if (!is.null(snapshot$yvar) && nzchar(as.character(snapshot$yvar))) {
+      try(updateSelectInput(session, "yvar", selected = as.character(snapshot$yvar)), silent = TRUE)
+    }
+    if (!is.null(snapshot$xvar2) && length(snapshot$xvar2) > 0) {
+      try(updateSelectInput(session, "xvar2", selected = as.character(snapshot$xvar2)), silent = TRUE)
+    }
+    if (!is.null(snapshot$yvar2) && length(snapshot$yvar2) > 0) {
+      try(updateSelectInput(session, "yvar2", selected = as.character(snapshot$yvar2)), silent = TRUE)
+    }
+    if (!is.null(snapshot$Conf)) {
+      try(updateCheckboxInput(session, "Conf", value = isTRUE(snapshot$Conf)), silent = TRUE)
+    }
+    if (!is.null(snapshot$int.set) && is.finite(suppressWarnings(as.numeric(snapshot$int.set[[1]])))) {
+      try(updateSliderInput(session, "int.set", value = as.numeric(snapshot$int.set[[1]])), silent = TRUE)
+    }
+    if (!is.null(snapshot$plot_theme) && nzchar(as.character(snapshot$plot_theme))) {
+      try(updateSelectInput(session, "plot_theme", selected = as.character(snapshot$plot_theme)), silent = TRUE)
     }
     if (!is.null(input$groupSelectionMode) && !identical(input$groupSelectionMode, "all")) {
       try(updateRadioButtons(session, "groupSelectionMode", selected = "all"), silent = TRUE)
@@ -1284,8 +1309,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$yvar = tryCatch(input$yvar,error = function(e)return(NULL))
     rvals$yvar2 = tryCatch(input$yvar2,error = function(e)return(NULL))
     rvals$data.src = tryCatch(input$data.src,error = function(e)return(NULL))
-    rvals$Conf = tryCatch(input$data.src,error = function(e)return(NULL))
+    rvals$Conf = tryCatch(input$Conf,error = function(e)return(NULL))
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
+    rvals$plot_theme = tryCatch(input$plot_theme,error = function(e)return(NULL))
     rvals$transform.method = input$transform.method
     rvals$impute.method = input$impute.method
 
