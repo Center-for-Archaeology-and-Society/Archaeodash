@@ -16,22 +16,18 @@ shinyUI(
     shinyjs::useShinyjs(),
     id = "page",
     fluidRow(
-      column(
-        12,
-        tags$button(
-          id = "toggleSidebar",
-          type = "button",
-          class = "btn btn-default sidebar-toggle-btn",
-          `data-collapsed` = "false",
-          "Hide Side Panel"
-        )
-      )
-    ),
-    fluidRow(
       column(3,
              id = "sidePanelCol",
              div(
                class = 'mysidecol',
+               tags$button(
+                 id = "toggleSidebar",
+                 type = "button",
+                 class = "btn btn-default sidebar-arrow-btn",
+                 `data-collapsed` = "false",
+                 `aria-label` = "Collapse side panel",
+                 tags$span(class = "sidebar-arrow-icon", "\u25C0")
+               ),
                actionButton('loginUI','login'),
                tags$div(
                  class = "theme-toggle-wrap",
@@ -78,6 +74,14 @@ shinyUI(
              ) # end div
       ) # end column
     ), # end row
+    tags$button(
+      id = "showSidebarBtn",
+      type = "button",
+      class = "btn btn-default sidebar-show-btn",
+      style = "display:none;",
+      `aria-label` = "Expand side panel",
+      tags$span(class = "sidebar-arrow-icon", "\u25B6")
+    ),
     tags$div(
       id = "cookieBanner",
       class = "cookie-banner",

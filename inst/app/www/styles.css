@@ -17,6 +17,11 @@
   --cookie-border: rgba(74, 129, 110, 0.35);
   --table-bg: #ffffff;
   --table-border: rgba(61, 122, 99, 0.25);
+  --input-bg: #ffffff;
+  --input-border: #b8cfc5;
+  --modal-bg: #ffffff;
+  --modal-border: #c5d8cf;
+  --modal-muted-bg: #eef6f2;
 }
 
 body.theme-dark {
@@ -38,27 +43,37 @@ body.theme-dark {
   --cookie-border: rgba(97, 158, 135, 0.45);
   --table-bg: #122127;
   --table-border: rgba(97, 158, 135, 0.35);
+  --input-bg: #0f1b1e;
+  --input-border: rgba(108, 164, 142, 0.45);
+  --modal-bg: #112127;
+  --modal-border: rgba(123, 173, 153, 0.45);
+  --modal-muted-bg: #182d35;
 }
 
 body.theme-simple {
-  --bg: #eceff1;
-  --bg-grad-1: #f3f5f6;
-  --bg-grad-2: #e5e9ec;
-  --text: #222a30;
-  --muted: #4f5d68;
+  --bg: #eef3ef;
+  --bg-grad-1: #f5f8f5;
+  --bg-grad-2: #e6eee7;
+  --text: #233028;
+  --muted: #4a5f54;
   --panel: #ffffff;
-  --panel-border: #cfd8df;
+  --panel-border: #c8d4cb;
   --panel-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --side-bg-1: #f6f8f9;
-  --side-bg-2: #edf1f3;
-  --side-border: #c7d1d8;
-  --accent: #4d7ea8;
-  --accent-2: #6f95b8;
+  --side-bg-1: #edf4ef;
+  --side-bg-2: #e2ece5;
+  --side-border: #bbcbbf;
+  --accent: #5f866f;
+  --accent-2: #7ca18a;
   --btn-text: #ffffff;
-  --cookie-bg: rgba(250, 252, 253, 0.98);
-  --cookie-border: #c7d1d8;
+  --cookie-bg: rgba(248, 251, 248, 0.98);
+  --cookie-border: #c1cec3;
   --table-bg: #ffffff;
-  --table-border: #d7e0e6;
+  --table-border: #d1ddd3;
+  --input-bg: #ffffff;
+  --input-border: #b8c8bc;
+  --modal-bg: #fbfdfb;
+  --modal-border: #c5d3c8;
+  --modal-muted-bg: #edf4ef;
 }
 
 body {
@@ -72,11 +87,43 @@ body {
 }
 
 body.theme-simple {
-  background: linear-gradient(180deg, #f6f8f9 0%, #e9edf0 100%);
+  background: linear-gradient(180deg, #f5f8f4 0%, #e8eee8 100%);
 }
 
 .sidebar-toggle-btn {
   margin: 10px 0;
+}
+
+.sidebar-arrow-btn {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  margin: 2px 0 8px auto !important;
+  display: block;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sidebar-show-btn {
+  position: fixed;
+  left: 10px;
+  top: 68px;
+  z-index: 1200;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sidebar-arrow-icon {
+  display: inline-block;
+  transform: translateY(-1px);
 }
 
 .mysidecol {
@@ -110,7 +157,7 @@ body.theme-simple {
 .theme-toggle-wrap .form-control {
   border-radius: 10px !important;
   border: 1px solid var(--side-border);
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -147,14 +194,15 @@ body.theme-simple .mymainpanel {
 }
 
 body.theme-simple .navbar-default {
-  background: #e4eaee !important;
+  background: #e2eae3 !important;
   box-shadow: none;
 }
 
 body.theme-simple .navbar-default .navbar-nav > li > a,
 body.theme-simple .nav-tabs > li > a,
 body.theme-simple .nav-pills > li > a {
-  background: #f7f9fa !important;
+  background: #f5f9f5 !important;
+  color: #203128 !important;
 }
 
 body.theme-simple .mybtn,
@@ -242,6 +290,42 @@ select,
 textarea,
 .form-control {
   border-radius: 10px !important;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+}
+
+.modal-content {
+  background: var(--modal-bg) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--modal-border) !important;
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--modal-border) !important;
+}
+
+.modal-title,
+.modal-body,
+.modal-body p,
+.modal-body li,
+.modal-body label,
+.modal-body .help-block {
+  color: var(--text) !important;
+}
+
+.ratio-help-box {
+  margin: 8px 0 12px 0;
+  padding: 10px;
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  background: var(--modal-muted-bg);
+}
+
+.ratio-help-box strong,
+.ratio-help-box li {
+  color: var(--text);
 }
 
 .cookie-banner {
@@ -369,6 +453,21 @@ body.theme-dark .well,
 body.theme-dark .panel {
   background: rgba(18, 31, 37, 0.92) !important;
   color: var(--text) !important;
+}
+
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea,
+body.theme-dark .form-control {
+  background: #0f1b1e !important;
+  color: #eaf6f0 !important;
+  border: 1px solid rgba(108, 164, 142, 0.45) !important;
+}
+
+body.theme-dark .modal-header .close,
+body.theme-dark .modal-footer .close {
+  color: #dff1e9 !important;
+  opacity: 0.75;
 }
 
 body.theme-dark #clustertab,

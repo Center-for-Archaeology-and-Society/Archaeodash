@@ -139,6 +139,7 @@
   function init() {
     try {
       var toggleBtn = document.getElementById("toggleSidebar");
+      var showSidebarBtn = document.getElementById("showSidebarBtn");
       var themeSelect = document.getElementById("themeSelect");
       var sideCol = document.getElementById("sidePanelCol");
       var mainCol = document.getElementById("mainPanelCol");
@@ -149,20 +150,23 @@
 
       if (toggleBtn && sideCol && mainCol) {
         toggleBtn.addEventListener("click", function () {
-          var isCollapsed = toggleBtn.getAttribute("data-collapsed") === "true";
-          if (isCollapsed) {
-            sideCol.style.display = "";
-            mainCol.classList.remove("col-sm-12", "col-md-12");
-            mainCol.classList.add("col-sm-9", "col-md-9");
-            toggleBtn.setAttribute("data-collapsed", "false");
-            toggleBtn.textContent = "Hide Side Panel";
-          } else {
-            sideCol.style.display = "none";
-            mainCol.classList.remove("col-sm-9", "col-md-9");
-            mainCol.classList.add("col-sm-12", "col-md-12");
-            toggleBtn.setAttribute("data-collapsed", "true");
-            toggleBtn.textContent = "Show Side Panel";
+          sideCol.style.display = "none";
+          mainCol.classList.remove("col-sm-9", "col-md-9");
+          mainCol.classList.add("col-sm-12", "col-md-12");
+          toggleBtn.setAttribute("data-collapsed", "true");
+          if (showSidebarBtn) {
+            showSidebarBtn.style.display = "";
           }
+        });
+      }
+
+      if (showSidebarBtn && toggleBtn && sideCol && mainCol) {
+        showSidebarBtn.addEventListener("click", function () {
+          sideCol.style.display = "";
+          mainCol.classList.remove("col-sm-12", "col-md-12");
+          mainCol.classList.add("col-sm-9", "col-md-9");
+          toggleBtn.setAttribute("data-collapsed", "false");
+          showSidebarBtn.style.display = "none";
         });
       }
 

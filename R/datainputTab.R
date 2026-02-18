@@ -964,9 +964,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     default_den <- if (length(choices) > 1) choices[[2]] else default_num
     showModal(modalDialog(
       title = "Ratio Variables",
+      class = "ratio-variables-modal",
       p("Create derived variables as numerator / denominator to support compositional analyses. These can be included in plotting, PCA, UMAP, LDA, and downstream tables."),
       tags$div(
-        style = "margin: 8px 0 12px 0; padding: 10px; border: 1px solid #d8e2dc; border-radius: 6px; background: rgba(245, 250, 247, 0.9);",
+        class = "ratio-help-box",
         tags$strong("How ratio variables work"),
         tags$ul(
           tags$li("Processing order after you click ", tags$em("Press to confirm selections"), ":"),
