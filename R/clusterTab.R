@@ -53,6 +53,7 @@ clusterTab = function(){
 #' clusterServer(input,output,session,rvals)
 clusterServer = function(input,output,session,rvals, credentials, con){
   pending_cluster_assignment <- shiny::reactiveVal(NULL)
+  cluster_plot_gg <- shiny::reactiveVal(NULL)
 
   get_cluster_source_features <- function(df, source) {
     if (!is.data.frame(df) || nrow(df) == 0) return(character())
@@ -199,8 +200,11 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           factoextra::fviz_nbclust(feature_data, cluster::pam, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids ")
 
-        rvals$clusterPlot = function(){cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)}
+        plot_obj <- cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)
+        cluster_plot_gg(plot_obj)
+        rvals$clusterPlot = function(){print(plot_obj)}
       } else if (input$cluster.parent == "hca") {
+        cluster_plot_gg(NULL)
         m <- as.matrix(feature_data)
         rownames(m) <- as.character(analysis_df$rowid)
         hc = as.dendrogram(
@@ -234,6 +238,7 @@ clusterServer = function(input,output,session,rvals, credentials, con){
         colnames(rvals$clusterDT) <-
           c("Sample", clusterName)
       } else if (input$cluster.parent == "hdca") {
+        cluster_plot_gg(NULL)
         m <- as.matrix(feature_data)
         rownames(m) <- as.character(analysis_df$rowid)
         hc = as.dendrogram(
@@ -279,8 +284,7 @@ clusterServer = function(input,output,session,rvals, credentials, con){
             )
           x_col <- names(feature_data)[1]
           y_col <- names(feature_data)[2]
-          rvals$clusterPlot = function(){
-            ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+          plot_obj <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
               ggplot2::geom_point(size = 2.2, alpha = 0.88) +
               ggplot2::theme_bw() +
               ggplot2::labs(
@@ -289,15 +293,17 @@ clusterServer = function(input,output,session,rvals, credentials, con){
                 color = group_col,
                 shape = "Cluster"
               )
-          }
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
         } else {
           if (identical(color_mode, "groups")) {
             mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
           }
-          rvals$clusterPlot = function(){factoextra::fviz_cluster(
+          plot_obj <- factoextra::fviz_cluster(
             kmeans_solution, data = feature_data
-          ) +
-              ggplot2::theme_bw()}
+          ) + ggplot2::theme_bw()
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
         }
         rvals$clusterDT = kmeans_solution$cluster
         rvals$clusterDT <-
@@ -329,8 +335,7 @@ clusterServer = function(input,output,session,rvals, credentials, con){
             )
           x_col <- names(feature_data)[1]
           y_col <- names(feature_data)[2]
-          rvals$clusterPlot = function(){
-            ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+          plot_obj <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
               ggplot2::geom_point(size = 2.2, alpha = 0.88) +
               ggplot2::theme_bw() +
               ggplot2::labs(
@@ -339,12 +344,15 @@ clusterServer = function(input,output,session,rvals, credentials, con){
                 color = group_col,
                 shape = "Cluster"
               )
-          }
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
         } else {
           if (identical(color_mode, "groups")) {
             mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
           }
-          rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = feature_data) + ggplot2::theme_bw()}
+          plot_obj <- factoextra::fviz_cluster(pam_solution, data = feature_data) + ggplot2::theme_bw()
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
         }
         rvals$clusterDT <- pam_solution$cluster
         rvals$clusterDT <-
@@ -365,15 +373,8 @@ clusterServer = function(input,output,session,rvals, credentials, con){
   })
 
   output$clusterPlotModalPlotly <- plotly::renderPlotly({
-    req(rvals$clusterPlot)
-    p <- rvals$clusterPlot()
-    if (inherits(p, "plotly")) {
-      return(p)
-    }
-    if (inherits(p, "ggplot")) {
-      return(plotly::ggplotly(p))
-    }
-    NULL
+    req(cluster_plot_gg())
+    plotly::ggplotly(cluster_plot_gg())
   })
 
   output$clusterPlotModalStatic <- renderPlot({
@@ -386,11 +387,12 @@ clusterServer = function(input,output,session,rvals, credentials, con){
 
   observeEvent(input$clusterPlotExpand, {
     req(rvals$clusterPlot)
+    use_plotly <- inherits(cluster_plot_gg(), "ggplot")
     showModal(modalDialog(
       title = "Cluster Plot",
       size = "l",
       easyClose = TRUE,
-      if (input$cluster.parent %in% c("kmeans", "kmedoids", "nClust")) {
+      if (use_plotly) {
         plotly::plotlyOutput("clusterPlotModalPlotly", height = "78vh")
       } else {
         plotOutput("clusterPlotModalStatic", height = "78vh")
