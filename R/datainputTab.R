@@ -1234,7 +1234,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       transformation_name <- defaultTransformationName()
     }
 
-    base_chem <- as.character(input$chem)
+    base_chem <- unique(as.character(input$chem))
+    base_chem <- base_chem[!is.na(base_chem) & nzchar(base_chem)]
     ratio_specs <- build_valid_ratio_specs(rvals$importedData, ratio_specs_tbl())
     rvals$ratioSpecs <- ratio_specs
     if (is.null(rvals$ratioMode) || !rvals$ratioMode %in% c("append", "only")) {
@@ -1242,9 +1243,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
 
     ratio_source_cols <- unique(c(as.character(ratio_specs$numerator), as.character(ratio_specs$denominator)))
-    chem_for_selection <- unique(c(base_chem, ratio_source_cols))
+    available_base_chem <- intersect(base_chem, names(rvals$importedData))
+    chem_for_selection <- unique(c(available_base_chem, ratio_source_cols))
 
-    rvals$chem = base_chem
+    rvals$chem = available_base_chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
     rvals$attrs = unique(c(rvals$attr,rvals$attrGroups,"imputation","transformation"))
@@ -1271,16 +1273,24 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                    tidyselect::any_of(rvals$attr)
                  ) %>%
                  dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
-                 dplyr::mutate_at(dplyr::vars(rvals$chem), quietly(as.numeric)),
-               error = function(e) mynotification(e))
+                 dplyr::mutate_at(dplyr::vars(tidyselect::any_of(rvals$chem)), quietly(as.numeric)),
+               error = function(e) {
+                 mynotification(e, type = "error")
+                 tibble::tibble()
+               })
+
+    if (!is.data.frame(rvals$selectedData) || nrow(rvals$selectedData) == 0) {
+      mynotification("Unable to build selected dataset for transformation.", type = "error")
+      return(NULL)
+    }
 
     if(isTRUE(rvals$loadNAAsZero)){
       rvals$selectedData = rvals$selectedData %>%
-        dplyr::mutate_at(dplyr::vars(rvals$chem), tidyr::replace_na, 0)
+        dplyr::mutate_at(dplyr::vars(tidyselect::any_of(rvals$chem)), tidyr::replace_na, 0)
     }
 
     quietly(label = 'impute',{
-      if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0) {
+      if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0 & length(rvals$chem) > 0) {
         if (!app_require_packages("mice", feature = "Imputation")) {
           return(NULL)
         }
