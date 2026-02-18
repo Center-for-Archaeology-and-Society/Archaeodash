@@ -25,6 +25,16 @@ homeTab = function() {
                  6,
                  p(
                    class = "lead",
+                   strong("Help Guide: "),
+                   shiny::a(
+                     href = "help.html",
+                     target = "_blank",
+                     rel = "noopener noreferrer",
+                     "Open the ArchaeoDash Help documentation"
+                   )
+                 ),
+                 p(
+                   class = "lead",
                    "Welcome to",
                    strong("ArchaeoDash"),
                    "- ",

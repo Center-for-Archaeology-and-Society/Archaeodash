@@ -9,6 +9,18 @@ output:
     theme: flatly
 ---
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("a[href]").forEach(function (link) {
+    var href = link.getAttribute("href") || "";
+    if (/^(https?:|mailto:)/i.test(href)) {
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+});
+</script>
+
 ## About
 
 ArchaeoDash was developed in R Shiny to facilitate the analysis of elemental data (for example portable X-ray fluorescence (PXRF) and Neutron Activation Analysis (NAA)). It includes tools for data management, ordination, clustering, distance-based matching, and group assignment.

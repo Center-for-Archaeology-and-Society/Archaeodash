@@ -33,6 +33,17 @@
 <link href="help_files/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
 <script src="help_files/tocify-1.9.1/jquery.tocify.js"></script>
 <script src="help_files/navigation-1.1/tabsets.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("a[href]").forEach(function (link) {
+    var href = link.getAttribute("href") || "";
+    if (/^(https?:|mailto:)/i.test(href)) {
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+});
+</script>
 
 <style type="text/css">
   code{white-space: pre-wrap;}
