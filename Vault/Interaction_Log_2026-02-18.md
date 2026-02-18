@@ -12,6 +12,7 @@
 - User requested Mahalanobis PCA controls; added PC-count selector with PC+cumulative variance labels, wired calculation limit, added tests, installed package, and logged update note.
 - User asked to address key technical risks; fixed z-score transform bug, added shared DB safe-write/remove helpers, applied them in core paths, added tests, and documented a prioritized risk-reduction plan.
 - User requested commit + install for the risk-mitigation work; committed changes and reinstalled package locally.
+- User requested SQL injection review and remediation; audited DB query paths, parameterized login SQL, quoted persistence identifiers, normalized merge naming, reran targeted tests, and recorded the security audit note.
 
 ## Related
 

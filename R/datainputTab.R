@@ -572,7 +572,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dplyr::distinct_all() %>%
         tibble::rowid_to_column()
 
-      filename = paste0(credentials$res$username,"_",input$mergeName)
+      filename = paste0(credentials$res$username, "_", input$mergeName) %>%
+        janitor::make_clean_names()
 
       # get metadata
       tblsmd = list()

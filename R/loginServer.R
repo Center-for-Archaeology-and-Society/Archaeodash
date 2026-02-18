@@ -44,6 +44,20 @@ loginUI = function(input){
 #' loginServer(con,input,output,session,credentials)
 loginServer = function(con, input = input, output = output, session = session, credentials = credentials){
 
+  users_table_sql <- function() {
+    DBI::SQL(as.character(DBI::dbQuoteIdentifier(con, "users")))
+  }
+
+  select_user_by_username <- function(username) {
+    query <- DBI::sqlInterpolate(
+      con,
+      "SELECT * FROM ?users_tbl WHERE username = ?username",
+      users_tbl = users_table_sql(),
+      username = username
+    )
+    DBI::dbGetQuery(con, query)
+  }
+
   credentials$status = FALSE
   credentials$res = tibble::tibble(username = NA)
 
@@ -78,10 +92,8 @@ loginServer = function(con, input = input, output = output, session = session, c
       credentials$status = FALSE
       return(NULL)
     }
-    username_sql <- DBI::dbQuoteString(con, username)
-    query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
     credentials$res <- tryCatch(
-      DBI::dbGetQuery(con, query),
+      select_user_by_username(username),
       error = function(e) {
         mynotification(paste0("Login failed due to database query error: ", e$message), type = "error")
         tibble::tibble()
@@ -143,21 +155,19 @@ loginServer = function(con, input = input, output = output, session = session, c
     }
     hashed_password <- sodium::password_store(password)
     # Query to insert new user
-    username_sql <- DBI::dbQuoteString(con, username)
-    password_sql <- DBI::dbQuoteString(con, hashed_password)
-    email_sql <- DBI::dbQuoteString(con, email)
-    query <- sprintf(
-      "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
-      username_sql,
-      password_sql,
-      email_sql
+    insert_query <- DBI::sqlInterpolate(
+      con,
+      "INSERT INTO ?users_tbl (username, password, email) VALUES (?username, ?password, ?email)",
+      users_tbl = users_table_sql(),
+      username = username,
+      password = hashed_password,
+      email = email
     )
     tryCatch({
-      DBI::dbExecute(con, query)
+      DBI::dbExecute(con, insert_query)
       mynotification("Registration Successful")
 
-      query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
-      credentials$res <- DBI::dbGetQuery(con, query)
+      credentials$res <- select_user_by_username(username)
       credentials$status = TRUE
       if (isTRUE(input$rememberLogin)) {
         session$sendCustomMessage("auth_cookie", list(action = "set", username = username))
@@ -183,9 +193,7 @@ loginServer = function(con, input = input, output = output, session = session, c
     if (!nzchar(username)) {
       return(NULL)
     }
-    username_sql <- DBI::dbQuoteString(con, username)
-    query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
-    remembered_res <- tryCatch(DBI::dbGetQuery(con, query), error = function(e) NULL)
+    remembered_res <- tryCatch(select_user_by_username(username), error = function(e) NULL)
     if (is.data.frame(remembered_res) && nrow(remembered_res) == 1) {
       credentials$res <- remembered_res
       credentials$status <- TRUE

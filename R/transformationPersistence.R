@@ -90,6 +90,7 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
   lda_tbl <- paste0(prefix, "_lda")
   meta_tbl <- paste0(prefix, "_meta")
   idx_tbl <- transform_index_table(username)
+  idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
 
   DBI::dbWriteTable(con, selected_tbl, snapshot$selectedData, overwrite = TRUE, row.names = FALSE)
 
@@ -151,7 +152,7 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
   DBI::dbExecute(
     con,
     paste0(
-      "DELETE FROM ", idx_tbl,
+      "DELETE FROM ", idx_tbl_sql,
       " WHERE dataset_key = ", quoted_key,
       " AND transformation_name = ", quoted_name
     )
@@ -177,12 +178,13 @@ load_transformations_db <- function(con, username, dataset_key) {
     return(list())
   }
   idx_tbl <- transform_index_table(username)
+  idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
   if (!DBI::dbExistsTable(con, idx_tbl)) return(list())
 
   quoted_key <- DBI::dbQuoteString(con, dataset_key)
   rows <- DBI::dbGetQuery(
     con,
-    paste0("SELECT * FROM ", idx_tbl, " WHERE dataset_key = ", quoted_key)
+    paste0("SELECT * FROM ", idx_tbl_sql, " WHERE dataset_key = ", quoted_key)
   )
   if (!is.data.frame(rows) || nrow(rows) == 0) return(list())
 
@@ -247,6 +249,7 @@ delete_transformation_db <- function(con, username, dataset_key, transformation_
     return(invisible(FALSE))
   }
   idx_tbl <- transform_index_table(username)
+  idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
   if (!DBI::dbExistsTable(con, idx_tbl)) return(invisible(FALSE))
 
   prefix <- transform_prefix(username, dataset_key, transformation_name)
@@ -266,7 +269,7 @@ delete_transformation_db <- function(con, username, dataset_key, transformation_
   DBI::dbExecute(
     con,
     paste0(
-      "DELETE FROM ", idx_tbl,
+      "DELETE FROM ", idx_tbl_sql,
       " WHERE dataset_key = ", quoted_key,
       " AND transformation_name = ", quoted_name
     )
@@ -280,10 +283,11 @@ delete_transformations_for_dataset_db <- function(con, username, dataset_key) {
     return(invisible(FALSE))
   }
   idx_tbl <- transform_index_table(username)
+  idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
   if (!DBI::dbExistsTable(con, idx_tbl)) return(invisible(FALSE))
 
   quoted_key <- DBI::dbQuoteString(con, dataset_key)
-  rows <- DBI::dbGetQuery(con, paste0("SELECT transformation_name FROM ", idx_tbl, " WHERE dataset_key = ", quoted_key))
+  rows <- DBI::dbGetQuery(con, paste0("SELECT transformation_name FROM ", idx_tbl_sql, " WHERE dataset_key = ", quoted_key))
   if (is.data.frame(rows) && nrow(rows) > 0) {
     for (tx_name in rows$transformation_name) {
       delete_transformation_db(con, username, dataset_key, as.character(tx_name))
