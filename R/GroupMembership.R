@@ -200,13 +200,21 @@ groupServer = function(input,output,session,rvals, credentials, con){
       source_df <- rvals$selectedData
     }
     choices = intersect(rvals$attrs, names(source_df))
+    if ("rowid" %in% names(source_df)) {
+      choices <- unique(c("rowid", choices))
+    }
     choiceLengths = sapply(choices,function(x) length(unique(source_df[[x]])))
     choices = choices[which(choiceLengths == nrow(source_df))]
+    if (length(choices) == 0 && "rowid" %in% names(source_df)) {
+      choices <- "rowid"
+    }
     if(isTruthy(!is.null(rvals$sampleID))){
-      selected = rvals$sampleID
+      selected = as.character(rvals$sampleID[[1]])
     } else {
       if(isTruthy("anid" %in% tolower(choices))){
         selected = choices[which(tolower(choices) == "anid")]
+      } else if ("rowid" %in% choices) {
+        selected = "rowid"
       } else {
         selected = choices[1]
       }
@@ -230,16 +238,49 @@ groupServer = function(input,output,session,rvals, credentials, con){
   observeEvent(input$membershipRun,{
     req(rvals$attrGroups)
     mynotification("calculating membership")
-    rvals$eligibleGroups = input$eligibleGroups
-    rvals$sampleID = input$sampleID
     source_data <- get_membership_data(input$membershipDataset)
     if (is.null(source_data)) return(invisible(NULL))
     df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
     feature_cols <- source_data$features
-    if (!input$sampleID %in% names(df)) {
-      mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+    eligible_groups <- tryCatch(as.character(input$eligibleGroups), error = function(e) character())
+    eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+    if (length(eligible_groups) == 0) {
+      eligible_groups <- tryCatch(
+        getEligible(df, chem = feature_cols, group = rvals$attrGroups),
+        error = function(e) character()
+      )
+      eligible_groups <- as.character(eligible_groups)
+      eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+    }
+    if (length(eligible_groups) == 0) {
+      eligible_groups <- sort(unique(as.character(df[[rvals$attrGroups]])))
+      eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+      if (length(eligible_groups) > 0) {
+        mynotification("Eligible groups were not selected; using all groups.", type = "warning")
+      }
+    }
+    if (length(eligible_groups) == 0) {
+      mynotification("No eligible groups are available for membership calculation.", type = "error")
       return(invisible(NULL))
     }
+    rvals$eligibleGroups <- eligible_groups
+
+    sample_id_col <- tryCatch(as.character(input$sampleID[[1]]), error = function(e) "")
+    if (is.null(sample_id_col) || length(sample_id_col) == 0 || is.na(sample_id_col[[1]])) {
+      sample_id_col <- ""
+    } else {
+      sample_id_col <- sample_id_col[[1]]
+    }
+    if (!nzchar(sample_id_col) || !(sample_id_col %in% names(df))) {
+      if ("rowid" %in% names(df)) {
+        sample_id_col <- "rowid"
+        mynotification("Using rowid as sample ID for this dataset source.", type = "warning")
+      } else {
+        mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+        return(invisible(NULL))
+      }
+    }
+    rvals$sampleID <- sample_id_col
     selected_data_with_rowid <- rvals$selectedData
     if (!"rowid" %in% names(selected_data_with_rowid)) {
       selected_data_with_rowid <- tibble::rowid_to_column(selected_data_with_rowid, var = "rowid")
@@ -248,22 +289,22 @@ groupServer = function(input,output,session,rvals, credentials, con){
       data = df,
       chem = feature_cols,
       group = rvals$attrGroups,
-      eligible = input$eligibleGroups,
+      eligible = eligible_groups,
       method = input$membershipMethod,
-      ID = input$sampleID
+      ID = sample_id_col
     )
     if (inherits(rvals$membershipProbs,"data.frame")){
       selected_membership_rowids(character())
       rvals$membershipProbs = rvals$membershipProbs %>%
         dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
         dplyr::left_join(
-          selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
-          by = dplyr::join_by("ID" == !!input$sampleID)
+          selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(sample_id_col)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
+          by = dplyr::join_by("ID" == !!sample_id_col)
         )
       rvals$membershipProbs <- rvals$membershipProbs %>%
         dplyr::mutate(
           ProjectionIncluded = dplyr::if_else(
-            GroupVal %in% input$eligibleGroups,
+            GroupVal %in% eligible_groups,
             "yes",
             "no"
           ),
@@ -345,7 +386,8 @@ groupServer = function(input,output,session,rvals, credentials, con){
       dt <- DT::formatRound(dt, columns = numeric_cols, digits = 2)
     }
     dt
-  })
+  }, server = FALSE)
+  outputOptions(output, "membershipTbl", suspendWhenHidden = FALSE)
 
   observeEvent(input$membership_checked_rowids, {
     rowids <- as.character(input$membership_checked_rowids)

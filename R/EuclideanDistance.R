@@ -238,10 +238,18 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       } else {
         choices = NULL
       }
+      if ("rowid" %in% names(source_df)) {
+        choices <- unique(c("rowid", choices))
+      }
       choiceLengths = sapply(choices,function(x) length(unique(source_df[[x]])))
       choices = choices[which(choiceLengths == nrow(source_df))]
+      if (length(choices) == 0 && "rowid" %in% names(source_df)) {
+        choices <- "rowid"
+      }
       if("anid" %in% tolower(choices)){
         selected = choices[which(tolower(choices) == "anid")]
+      } else if ("rowid" %in% choices) {
+        selected = "rowid"
       } else {
         selected = choices[1]
       }
@@ -268,12 +276,30 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       if (is.null(source_data)) return(invisible(NULL))
       analysis_df <- source_data$df
       feature_cols <- source_data$features
-      if (!input$edsampleID %in% names(analysis_df)) {
-        mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
-        return(invisible(NULL))
+      ed_sample_id_col <- tryCatch(as.character(input$edsampleID[[1]]), error = function(e) "")
+      if (is.null(ed_sample_id_col) || length(ed_sample_id_col) == 0 || is.na(ed_sample_id_col[[1]])) {
+        ed_sample_id_col <- ""
+      } else {
+        ed_sample_id_col <- ed_sample_id_col[[1]]
+      }
+      if (!nzchar(ed_sample_id_col) || !(ed_sample_id_col %in% names(analysis_df))) {
+        if ("rowid" %in% names(analysis_df)) {
+          ed_sample_id_col <- "rowid"
+          mynotification("Using rowid as sample ID for this dataset source.", type = "warning")
+        } else {
+          mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+          return(invisible(NULL))
+        }
       }
       mynotification("calculating Euclidean Distances")
       projection_groups <- input$projectionGroup
+      if (is.null(projection_groups) || length(projection_groups) == 0) {
+        projection_groups <- sort(unique(as.character(analysis_df[[rvals$attrGroups]])))
+        projection_groups <- projection_groups[!is.na(projection_groups) & nzchar(projection_groups)]
+        if (length(projection_groups) > 0) {
+          mynotification("Projection groups were not selected; using all groups.", type = "warning")
+        }
+      }
       if (is.null(projection_groups) || length(projection_groups) == 0) {
         mynotification("Choose at least one projection group.", type = "warning")
         return(invisible(NULL))
@@ -281,7 +307,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       rvals$edistance <- calcEDistance(
         data = analysis_df,
         projection = projection_groups,
-        id = input$edsampleID,
+        id = ed_sample_id_col,
         attrGroups = rvals$attrGroups,
         chem = feature_cols,
         limit = input$EDlimit,
@@ -360,7 +386,8 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       }
       dt
     })
-  })
+  }, server = FALSE)
+  outputOptions(output, "EDTbl", suspendWhenHidden = FALSE)
 
   observeEvent(input$ed_checked_rowids, {
     rowids <- as.character(input$ed_checked_rowids)
@@ -418,6 +445,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 calcEDistance = function(data,projection,id,attrGroups,chem,limit,withinGroup){
   result <- NULL
   quietly(label = "calcEDistance",{
+    within_group_flag <- isTRUE(as.logical(withinGroup))
     # Use rowid as stable keys so duplicate IDs do not break matrix column names.
     work <- data %>%
       dplyr::mutate(
@@ -458,9 +486,20 @@ calcEDistance = function(data,projection,id,attrGroups,chem,limit,withinGroup){
       ) %>%
       dplyr::mutate(rowid = observation_rowid, .before = 1) %>%
       dplyr::select(tidyselect::any_of(c("rowid", "observation", "match", "distance", "observationGroup", "matchGroup"))) %>%
-      dplyr::arrange(observation, distance) %>%
-      dplyr::rename(!!as.name(id) := observation,!!as.name(attrGroups) := observationGroup,!!as.name(paste0(attrGroups,"_match")) := matchGroup)
-    if(withinGroup == FALSE){
+      dplyr::arrange(observation, distance)
+    if (identical(id, "rowid")) {
+      result <- result %>%
+        dplyr::select(-tidyselect::any_of("observation")) %>%
+        dplyr::rename(!!as.name(attrGroups) := observationGroup, !!as.name(paste0(attrGroups, "_match")) := matchGroup)
+    } else {
+      result <- result %>%
+        dplyr::rename(
+          !!as.name(id) := observation,
+          !!as.name(attrGroups) := observationGroup,
+          !!as.name(paste0(attrGroups, "_match")) := matchGroup
+        )
+    }
+    if(!within_group_flag){
       result <- result %>%
         dplyr::filter(!!as.name(attrGroups) != !!as.name(paste0(attrGroups,"_match")))
     }

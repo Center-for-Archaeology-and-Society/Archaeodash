@@ -11,13 +11,64 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   csv_path <- normalizePath(testthat::test_path("..", "..", "inst", "app", "INAA_test.csv"), mustWork = TRUE)
 
   extract_dt_data <- function(widget_value) {
+    if (inherits(widget_value, "json") || is.character(widget_value)) {
+      widget_value <- tryCatch(
+        jsonlite::fromJSON(as.character(widget_value), simplifyDataFrame = FALSE),
+        error = function(e) widget_value
+      )
+    }
     if (!is.list(widget_value) || is.null(widget_value$x) || is.null(widget_value$x$data)) {
       return(tibble::tibble())
     }
     data <- widget_value$x$data
-    if (is.data.frame(data)) return(tibble::as_tibble(data))
-    as_tibble_try <- tryCatch(tibble::as_tibble(data), error = function(e) tibble::tibble())
-    as_tibble_try
+    column_defs <- tryCatch(widget_value$x$options$columnDefs, error = function(e) list())
+    normalize_defs <- function(defs) {
+      if (is.null(defs)) return(list())
+      if (is.data.frame(defs)) {
+        return(lapply(seq_len(nrow(defs)), function(i) as.list(defs[i, , drop = FALSE])))
+      }
+      if (!is.list(defs)) return(list())
+      if (length(defs) == 0) return(list())
+      if (!is.null(names(defs)) && any(nzchar(names(defs)))) return(list(defs))
+      defs
+    }
+    defs <- normalize_defs(column_defs)
+    idx_to_name <- character()
+    for (d in defs) {
+      if (!is.list(d) || is.null(d$name) || is.null(d$targets)) next
+      target <- suppressWarnings(as.integer(d$targets[[1]]))
+      nm <- as.character(d$name[[1]])
+      if (is.na(target) || !nzchar(nm)) next
+      idx_to_name[target + 1L] <- nm
+    }
+    col_names <- idx_to_name
+
+    if (is.list(data) && !is.data.frame(data) && length(data) > 0) {
+      tbl <- tryCatch(as.data.frame(data, stringsAsFactors = FALSE, check.names = FALSE), error = function(e) NULL)
+      if (inherits(tbl, "data.frame")) {
+        if (length(col_names) >= ncol(tbl) && all(nzchar(col_names[seq_len(ncol(tbl))]))) {
+          names(tbl) <- col_names[seq_len(ncol(tbl))]
+        }
+        return(tibble::as_tibble(tbl))
+      }
+    }
+    if (is.matrix(data)) {
+      if (length(col_names) > 0 && nrow(data) == length(col_names) && ncol(data) != length(col_names)) {
+        data <- t(data)
+      }
+      tbl <- as.data.frame(data, stringsAsFactors = FALSE, check.names = FALSE)
+      if (length(col_names) >= ncol(tbl) && all(nzchar(col_names[seq_len(ncol(tbl))]))) {
+        names(tbl) <- col_names[seq_len(ncol(tbl))]
+      }
+      return(tibble::as_tibble(tbl))
+    }
+    if (is.data.frame(data)) {
+      if (length(col_names) >= ncol(data) && all(nzchar(col_names[seq_len(ncol(data))]))) {
+        names(data) <- col_names[seq_len(ncol(data))]
+      }
+      return(tibble::as_tibble(data, .name_repair = "minimal"))
+    }
+    tryCatch(tibble::as_tibble(data, .name_repair = "minimal"), error = function(e) tibble::tibble())
   }
 
   app <- shinytest2::AppDriver$new(
@@ -66,7 +117,13 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   expect_true(nrow(target_membership) == 1)
   target_rowid <- as.character(target_membership$rowid[[1]])
 
-  app$set_inputs(membership_checked_rowids = target_rowid)
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('membership_checked_rowids', ['%s'], {priority: 'event'});",
+      target_rowid
+    )
+  )
+  app$wait_for_value(input = "membership_checked_rowids", timeout = 10000)
   app$set_inputs(gAssignBestGroup = "click")
   app$wait_for_idle(timeout = 30000)
   membership_after_best <- extract_dt_data(app$get_value(output = "membershipTbl"))
@@ -78,8 +135,20 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   expect_equal(as.character(updated_best$GroupVal[[1]]), as.character(updated_best$BestGroup[[1]]))
 
   new_group_membership <- "ZZ_TEST_MEMBERSHIP"
-  app$set_inputs(membership_checked_rowids = target_rowid)
-  app$set_inputs(gGroupAssignChoice = "__new__", gGroupAssignNew = new_group_membership)
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('membership_checked_rowids', ['%s'], {priority: 'event'});",
+      target_rowid
+    )
+  )
+  app$wait_for_value(input = "membership_checked_rowids", timeout = 10000)
+  app$run_js("Shiny.setInputValue('gGroupAssignChoice', '__new__', {priority: 'event'});")
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('gGroupAssignNew', '%s', {priority: 'event'});",
+      new_group_membership
+    )
+  )
   app$set_inputs(gChangeGroup = "click")
   app$wait_for_idle(timeout = 30000)
   membership_after_new <- extract_dt_data(app$get_value(output = "membershipTbl"))
@@ -122,7 +191,13 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   expect_true(nrow(target_ed) == 1)
   target_ed_rowid <- as.character(target_ed$rowid[[1]])
 
-  app$set_inputs(ed_checked_rowids = target_ed_rowid)
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('ed_checked_rowids', ['%s'], {priority: 'event'});",
+      target_ed_rowid
+    )
+  )
+  app$wait_for_value(input = "ed_checked_rowids", timeout = 10000)
   app$set_inputs(edAssignMatchGroup = "click")
   app$wait_for_idle(timeout = 30000)
   ed_after_match <- extract_dt_data(app$get_value(output = "EDTbl"))
@@ -134,8 +209,20 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   expect_equal(as.character(updated_match[[group_col]][[1]]), as.character(updated_match[[match_col]][[1]]))
 
   new_group_ed <- "ZZ_TEST_ED"
-  app$set_inputs(ed_checked_rowids = target_ed_rowid)
-  app$set_inputs(edGroupAssignChoice = "__new__", edGroupAssignNew = new_group_ed)
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('ed_checked_rowids', ['%s'], {priority: 'event'});",
+      target_ed_rowid
+    )
+  )
+  app$wait_for_value(input = "ed_checked_rowids", timeout = 10000)
+  app$run_js("Shiny.setInputValue('edGroupAssignChoice', '__new__', {priority: 'event'});")
+  app$run_js(
+    sprintf(
+      "Shiny.setInputValue('edGroupAssignNew', '%s', {priority: 'event'});",
+      new_group_ed
+    )
+  )
   app$set_inputs(edChangeGroup = "click")
   app$wait_for_idle(timeout = 30000)
   ed_after_new <- extract_dt_data(app$get_value(output = "EDTbl"))
