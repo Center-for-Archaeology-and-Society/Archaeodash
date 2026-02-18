@@ -233,7 +233,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     try(updateSelectInput(session, "activeTransformation", choices = choices, selected = selected_name), silent = TRUE)
   }
 
-  ratio_specs_tbl <- function(x = rvals$ratioSpecs) {
+  ratio_specs_tbl <- function(x = NULL) {
     if (!inherits(x, "data.frame")) {
       return(tibble::tibble(ratio = character(), numerator = character(), denominator = character()))
     }
@@ -251,12 +251,14 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       dplyr::distinct(.data$ratio, .keep_all = TRUE)
   }
 
-  if (is.null(rvals$ratioSpecs)) {
+  init_ratio_specs <- isolate(rvals$ratioSpecs)
+  if (is.null(init_ratio_specs)) {
     rvals$ratioSpecs <- ratio_specs_tbl()
   } else {
-    rvals$ratioSpecs <- ratio_specs_tbl(rvals$ratioSpecs)
+    rvals$ratioSpecs <- ratio_specs_tbl(init_ratio_specs)
   }
-  if (is.null(rvals$ratioMode) || !rvals$ratioMode %in% c("append", "only")) {
+  init_ratio_mode <- isolate(rvals$ratioMode)
+  if (is.null(init_ratio_mode) || !init_ratio_mode %in% c("append", "only")) {
     rvals$ratioMode <- "append"
   }
 
