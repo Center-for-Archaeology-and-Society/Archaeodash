@@ -35,7 +35,7 @@ If cookies are accepted, ArchaeoDash stores a local login cookie to keep you sig
 
 ### Import Data
 
-Click *BROWSE* to upload data. CSV and XLSX are preferred, and other formats supported by the `rio` package may also work.
+Click *BROWSE* to upload data. CSV and XLSX are preferred, and other formats supported by the [rio package in R](https://cran.r-project.org/package=rio) may also work.
 
 If you are logged in:
 
