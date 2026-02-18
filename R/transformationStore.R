@@ -55,6 +55,8 @@ buildTransformationSnapshot <- function(rvals, name) {
     runPCA = isTRUE(rvals$runPCA),
     runUMAP = isTRUE(rvals$runUMAP),
     runLDA = isTRUE(rvals$runLDA),
+    ratioSpecs = if (inherits(rvals$ratioSpecs, "data.frame")) rvals$ratioSpecs else tibble::tibble(),
+    ratioMode = if (is.null(rvals$ratioMode)) "append" else as.character(rvals$ratioMode),
     selectedData = rvals$selectedData,
     pcadf = rvals$pcadf,
     umapdf = rvals$umapdf,
@@ -82,6 +84,8 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
   rvals$runPCA <- snapshot$runPCA
   rvals$runUMAP <- snapshot$runUMAP
   rvals$runLDA <- snapshot$runLDA
+  rvals$ratioSpecs <- if (inherits(snapshot$ratioSpecs, "data.frame")) snapshot$ratioSpecs else tibble::tibble()
+  rvals$ratioMode <- if (is.null(snapshot$ratioMode) || !snapshot$ratioMode %in% c("append", "only")) "append" else snapshot$ratioMode
   rvals$selectedData <- snapshot$selectedData
   rvals$pcadf <- snapshot$pcadf
   rvals$umapdf <- snapshot$umapdf

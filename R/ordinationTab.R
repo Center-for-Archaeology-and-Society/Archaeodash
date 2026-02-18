@@ -72,10 +72,10 @@ ordinationServer = function(input,output,session,rvals){
 
   output$ldaheader = renderUI({
     # invalidateLater(1000)
-    if(isTruthy(rvals$pcadf)){
+    if(isTRUE(validate_lda_groups(rvals$selectedData, rvals$attrGroups, min_groups = 3, notify = FALSE)) && isTruthy(rvals$LDAdf)){
       h2("Linear Discriminant Analysis")
     } else {
-      h2("Please run LDA first")
+      h4("LDA feature unavailable for current selection (requires at least 3 groups).")
     }
   })
 

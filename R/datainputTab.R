@@ -20,6 +20,7 @@ datainputTab = function() {
     uiOutput("attr"),
     uiOutput("subSelect"),
     uiOutput("chemUI"),
+    uiOutput("ratioUI"),
     uiOutput("actionUI"),
     hr(),
     uiOutput("resetUI"),
@@ -220,6 +221,100 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     try(updateSelectInput(session, "activeTransformation", choices = choices, selected = selected_name), silent = TRUE)
   }
 
+  ratio_specs_tbl <- function(x = rvals$ratioSpecs) {
+    if (!inherits(x, "data.frame")) {
+      return(tibble::tibble(ratio = character(), numerator = character(), denominator = character()))
+    }
+    required <- c("ratio", "numerator", "denominator")
+    if (!all(required %in% names(x))) {
+      return(tibble::tibble(ratio = character(), numerator = character(), denominator = character()))
+    }
+    x %>%
+      dplyr::transmute(
+        ratio = as.character(.data$ratio),
+        numerator = as.character(.data$numerator),
+        denominator = as.character(.data$denominator)
+      ) %>%
+      dplyr::filter(!is.na(.data$ratio), nzchar(.data$ratio)) %>%
+      dplyr::distinct(.data$ratio, .keep_all = TRUE)
+  }
+
+  if (is.null(rvals$ratioSpecs)) {
+    rvals$ratioSpecs <- ratio_specs_tbl()
+  } else {
+    rvals$ratioSpecs <- ratio_specs_tbl(rvals$ratioSpecs)
+  }
+  if (is.null(rvals$ratioMode) || !rvals$ratioMode %in% c("append", "only")) {
+    rvals$ratioMode <- "append"
+  }
+
+  numeric_columns <- function(df) {
+    if (!is.data.frame(df) || nrow(df) == 0) return(character())
+    suppressWarnings({
+      numeric_df <- df %>% dplyr::mutate_all(as.numeric) %>% janitor::remove_empty("cols")
+    })
+    cols <- setdiff(names(numeric_df), "rowid")
+    cols[!is.na(cols) & nzchar(cols)]
+  }
+
+  ratio_source_choices <- function(df = rvals$importedData) {
+    cols <- numeric_columns(df)
+    setdiff(cols, ratio_specs_tbl()$ratio)
+  }
+
+  normalize_ratio_name <- function(numerator, denominator, proposed = "") {
+    proposed <- trimws(as.character(proposed))
+    if (!nzchar(proposed)) {
+      proposed <- paste0(as.character(numerator), "_over_", as.character(denominator))
+    }
+    janitor::make_clean_names(proposed)
+  }
+
+  build_valid_ratio_specs <- function(df, specs) {
+    specs <- ratio_specs_tbl(specs)
+    if (!is.data.frame(df) || nrow(df) == 0 || nrow(specs) == 0) return(ratio_specs_tbl())
+    cols <- names(df)
+    specs %>%
+      dplyr::filter(
+        .data$numerator %in% cols,
+        .data$denominator %in% cols,
+        .data$numerator != .data$denominator
+      ) %>%
+      dplyr::distinct(.data$ratio, .keep_all = TRUE)
+  }
+
+  add_ratio_columns <- function(df, specs) {
+    specs <- build_valid_ratio_specs(df, specs)
+    if (!is.data.frame(df) || nrow(df) == 0 || nrow(specs) == 0) return(df)
+    for (i in seq_len(nrow(specs))) {
+      ratio_col <- as.character(specs$ratio[[i]])
+      num_col <- as.character(specs$numerator[[i]])
+      den_col <- as.character(specs$denominator[[i]])
+      numerator_vals <- suppressWarnings(as.numeric(as.character(df[[num_col]])))
+      denominator_vals <- suppressWarnings(as.numeric(as.character(df[[den_col]])))
+      ratio_vals <- ifelse(is.na(denominator_vals) | denominator_vals == 0, NA_real_, numerator_vals / denominator_vals)
+      df[[ratio_col]] <- ratio_vals
+    }
+    df
+  }
+
+  resolve_final_chem <- function(base_chem, specs, ratio_mode) {
+    base_chem <- as.character(base_chem)
+    ratio_cols <- as.character(specs$ratio)
+    ratio_cols <- ratio_cols[!is.na(ratio_cols) & nzchar(ratio_cols)]
+    if (identical(ratio_mode, "only") && length(ratio_cols) > 0) {
+      return(unique(ratio_cols))
+    }
+    unique(c(base_chem, ratio_cols))
+  }
+
+  ratio_summary_text <- function() {
+    specs <- ratio_specs_tbl()
+    if (nrow(specs) == 0) return("No ratio variables defined.")
+    mode_label <- if (identical(rvals$ratioMode, "only")) "Ratios only" else "Append to elements"
+    paste0(nrow(specs), " ratio variable(s) configured. Mode: ", mode_label, ".")
+  }
+
   compute_ordinations <- function(run_pca = FALSE, run_umap = FALSE, run_lda = FALSE) {
     rvals$pca <- NULL
     rvals$pcadf <- tibble::tibble()
@@ -342,7 +437,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
     null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                    "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
-                   "int.set", "eligibleGroups", "sampleID")
+                   "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
 
     # Loop through the list and set each to NULL
     for (var in null_vars) {
@@ -512,7 +607,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       reset_transformation_store()
       null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                      "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
-                     "int.set", "eligibleGroups", "sampleID")
+                     "int.set", "eligibleGroups", "sampleID", "ratioSpecs", "ratioMode")
 
       # Loop through the list and set each to NULL
       for (var in null_vars) {
@@ -817,12 +912,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     nums1 <- names(dfNum)
     quietly(label = "chem",{
       all = nums1[which(nums1 != 'rowid')]
+      ratio_cols <- ratio_specs_tbl()$ratio
+      choices = unique(c(nums1[which(nums1 != "rowid")], ratio_cols))
       if(is.null(rvals$chem)){
         selected = all
       } else {
         selected = rvals$chem
       }
-      choices = nums1[which(nums1 != 'rowid')]
       selectInput(
         "chem",
         "Select element concentrations:",
@@ -832,6 +928,140 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       )
     })
   })
+
+  output$ratioUI <- renderUI({
+    req(nrow(rvals$importedData) > 0)
+    tagList(
+      actionButton("openRatioBuilder", "Build Ratio Variables", class = "mybtn"),
+      tags$div(style = "margin-top: 4px; font-size: 12px;", ratio_summary_text())
+    )
+  })
+
+  output$ratioSpecsPreview <- renderTable({
+    specs <- ratio_specs_tbl()
+    if (nrow(specs) == 0) return(NULL)
+    specs %>% dplyr::rename(Ratio = ratio, Numerator = numerator, Denominator = denominator)
+  }, striped = TRUE, bordered = TRUE, spacing = "xs", width = "100%")
+
+  observeEvent(input$openRatioBuilder, {
+    req(nrow(rvals$importedData) > 0)
+    choices <- ratio_source_choices()
+    default_num <- if (length(choices) > 0) choices[[1]] else ""
+    default_den <- if (length(choices) > 1) choices[[2]] else default_num
+    showModal(modalDialog(
+      title = "Ratio Variables",
+      p("Create derived variables as numerator / denominator to support compositional analyses. These can be included in plotting, PCA, UMAP, LDA, and downstream tables."),
+      tags$div(
+        style = "margin: 8px 0 12px 0; padding: 10px; border: 1px solid #d8e2dc; border-radius: 6px; background: rgba(245, 250, 247, 0.9);",
+        tags$strong("How ratio variables work"),
+        tags$ul(
+          tags$li("Processing order after you click ", tags$em("Press to confirm selections"), ":"),
+          tags$li("1) Filter selected rows and selected numeric columns."),
+          tags$li("2) Impute missing values (if enabled)."),
+          tags$li("3) Compute ratio variables (numerator / denominator)."),
+          tags$li("4) Apply transformation (None, Log, Z-score, etc.)."),
+          tags$li("5) Run PCA / UMAP / LDA on the final numeric set."),
+          tags$li(tags$strong("Append to selected elements"), ": uses original selected elements plus ratio variables."),
+          tags$li(tags$strong("Use ratios only"), ": uses only ratio variables for downstream analyses.")
+        )
+      ),
+      fluidRow(
+        column(4, selectInput("ratioNumerator", "Numerator element", choices = choices, selected = default_num)),
+        column(4, selectInput("ratioDenominator", "Denominator element", choices = choices, selected = default_den)),
+        column(4, textInput("ratioName", "Ratio name", value = if (nzchar(default_num) && nzchar(default_den)) paste0(default_num, "_over_", default_den) else ""))
+      ),
+      fluidRow(
+        column(6, actionButton("addRatioSpec", "Add Ratio", class = "mybtn")),
+        column(6, actionButton("removeRatioSpec", "Remove Selected Ratio", class = "mybtn"))
+      ),
+      fluidRow(
+        column(
+          6,
+          selectInput(
+            "ratioRemoveChoice",
+            "Selected ratio",
+            choices = ratio_specs_tbl()$ratio,
+            selected = if (nrow(ratio_specs_tbl()) > 0) ratio_specs_tbl()$ratio[[1]] else ""
+          )
+        ),
+        column(
+          6,
+          radioButtons(
+            "ratioMode",
+            "How to use ratios in analyses",
+            choices = c("Append to selected elements" = "append", "Use ratios only" = "only"),
+            selected = if (is.null(rvals$ratioMode)) "append" else rvals$ratioMode
+          )
+        )
+      ),
+      h4("Current ratio variables"),
+      tableOutput("ratioSpecsPreview"),
+      footer = tagList(
+        modalButton("Close")
+      ),
+      size = "l",
+      easyClose = TRUE
+    ))
+  })
+
+  observeEvent(input$ratioNumerator, {
+    req(input$ratioNumerator)
+    choices <- ratio_source_choices()
+    if (length(choices) == 0) return(NULL)
+    den_choices <- setdiff(choices, input$ratioNumerator)
+    if (length(den_choices) == 0) den_choices <- choices
+    selected_den <- if (!is.null(input$ratioDenominator) && input$ratioDenominator %in% den_choices) input$ratioDenominator else den_choices[[1]]
+    updateSelectInput(session, "ratioDenominator", choices = den_choices, selected = selected_den)
+    ratio_name <- normalize_ratio_name(input$ratioNumerator, selected_den, input$ratioName)
+    updateTextInput(session, "ratioName", value = ratio_name)
+  })
+
+  observeEvent(input$ratioDenominator, {
+    req(input$ratioNumerator, input$ratioDenominator)
+    ratio_name <- normalize_ratio_name(input$ratioNumerator, input$ratioDenominator, input$ratioName)
+    updateTextInput(session, "ratioName", value = ratio_name)
+  })
+
+  observeEvent(input$addRatioSpec, {
+    req(input$ratioNumerator, input$ratioDenominator)
+    if (identical(input$ratioNumerator, input$ratioDenominator)) {
+      mynotification("Choose different elements for numerator and denominator.", type = "warning")
+      return(invisible(NULL))
+    }
+    ratio_name <- normalize_ratio_name(input$ratioNumerator, input$ratioDenominator, input$ratioName)
+    if (!nzchar(ratio_name)) {
+      mynotification("Ratio name cannot be empty.", type = "warning")
+      return(invisible(NULL))
+    }
+    specs <- ratio_specs_tbl()
+    new_row <- tibble::tibble(
+      ratio = ratio_name,
+      numerator = as.character(input$ratioNumerator),
+      denominator = as.character(input$ratioDenominator)
+    )
+    specs <- specs %>%
+      dplyr::filter(.data$ratio != ratio_name) %>%
+      dplyr::bind_rows(new_row) %>%
+      dplyr::arrange(.data$ratio)
+    rvals$ratioSpecs <- specs
+    updateSelectInput(session, "ratioRemoveChoice", choices = specs$ratio, selected = ratio_name)
+    mynotification(paste0("Ratio variable added: ", ratio_name), type = "message")
+  })
+
+  observeEvent(input$removeRatioSpec, {
+    req(input$ratioRemoveChoice)
+    specs <- ratio_specs_tbl()
+    specs <- specs %>% dplyr::filter(.data$ratio != as.character(input$ratioRemoveChoice))
+    rvals$ratioSpecs <- specs
+    next_selected <- if (nrow(specs) > 0) specs$ratio[[1]] else ""
+    updateSelectInput(session, "ratioRemoveChoice", choices = specs$ratio, selected = next_selected)
+    mynotification("Removed selected ratio variable.", type = "message")
+  })
+
+  observeEvent(input$ratioMode, {
+    req(input$ratioMode)
+    rvals$ratioMode <- as.character(input$ratioMode)
+  }, ignoreInit = TRUE)
 
   # Render button to update datatable based on variable selections
   output$actionUI <- renderUI({
@@ -961,7 +1191,17 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       transformation_name <- defaultTransformationName()
     }
 
-    rvals$chem = input$chem
+    base_chem <- as.character(input$chem)
+    ratio_specs <- build_valid_ratio_specs(rvals$importedData, ratio_specs_tbl())
+    rvals$ratioSpecs <- ratio_specs
+    if (is.null(rvals$ratioMode) || !rvals$ratioMode %in% c("append", "only")) {
+      rvals$ratioMode <- "append"
+    }
+
+    ratio_source_cols <- unique(c(as.character(ratio_specs$numerator), as.character(ratio_specs$denominator)))
+    chem_for_selection <- unique(c(base_chem, ratio_source_cols))
+
+    rvals$chem = base_chem
     rvals$attrGroups = input$attrGroups
     rvals$attr = input$attr
     rvals$attrs = unique(c(rvals$attr,rvals$attrGroups,"imputation","transformation"))
@@ -984,7 +1224,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       tryCatch(rvals$importedData %>%
                  dplyr::select(
                    tidyselect::any_of(rvals$attrGroups),
-                   tidyselect::any_of(rvals$chem),
+                   tidyselect::any_of(chem_for_selection),
                    tidyselect::any_of(rvals$attr)
                  ) %>%
                  dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
@@ -1023,6 +1263,21 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         }
       }
     })
+
+    if (nrow(ratio_specs) > 0) {
+      rvals$selectedData <- add_ratio_columns(rvals$selectedData, ratio_specs)
+    }
+
+    final_chem <- resolve_final_chem(
+      base_chem = base_chem,
+      specs = ratio_specs,
+      ratio_mode = rvals$ratioMode
+    )
+    if (identical(rvals$ratioMode, "only") && nrow(ratio_specs) == 0) {
+      mynotification("Ratio-only mode selected, but no valid ratios are defined. Using selected elements.", type = "warning")
+      final_chem <- base_chem
+    }
+    rvals$chem <- final_chem
 
     rvals$chem = rvals$chem[which(rvals$chem %in% colnames(rvals$selectedData))]
 

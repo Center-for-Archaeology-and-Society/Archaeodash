@@ -11,6 +11,29 @@ split_transform_values <- function(x) {
   strsplit(x, transformation_sep, fixed = TRUE)[[1]]
 }
 
+encode_ratio_specs <- function(specs) {
+  if (!inherits(specs, "data.frame") || nrow(specs) == 0) return("")
+  required <- c("ratio", "numerator", "denominator")
+  if (!all(required %in% names(specs))) return("")
+  rows <- apply(specs[, required, drop = FALSE], 1, function(r) {
+    paste(as.character(r), collapse = "|")
+  })
+  paste(rows, collapse = transformation_sep)
+}
+
+decode_ratio_specs <- function(x) {
+  if (is.null(x) || !nzchar(x)) return(tibble::tibble())
+  rows <- strsplit(x, transformation_sep, fixed = TRUE)[[1]]
+  parsed <- lapply(rows, function(row) strsplit(row, "|", fixed = TRUE)[[1]])
+  parsed <- parsed[vapply(parsed, length, integer(1)) == 3]
+  if (length(parsed) == 0) return(tibble::tibble())
+  tibble::tibble(
+    ratio = vapply(parsed, `[[`, character(1), 1),
+    numerator = vapply(parsed, `[[`, character(1), 2),
+    denominator = vapply(parsed, `[[`, character(1), 3)
+  )
+}
+
 safe_table_name <- function(x, max_len = 63) {
   cleaned <- janitor::make_clean_names(as.character(x))
   substr(cleaned, 1, max_len)
@@ -92,7 +115,7 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
     field = c(
       "dataset_key", "transformation_name", "created", "attrGroups",
       "transform.method", "impute.method", "runPCA", "runUMAP", "runLDA",
-      "chem", "attr", "attrs", "attrGroupsSub"
+      "chem", "attr", "attrs", "attrGroupsSub", "ratioMode", "ratioSpecs"
     ),
     value = c(
       dataset_key,
@@ -107,7 +130,9 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       collapse_transform_values(snapshot$chem),
       collapse_transform_values(snapshot$attr),
       collapse_transform_values(snapshot$attrs),
-      collapse_transform_values(snapshot$attrGroupsSub)
+      collapse_transform_values(snapshot$attrGroupsSub),
+      opt_chr(snapshot$ratioMode, "append"),
+      encode_ratio_specs(snapshot$ratioSpecs)
     )
   )
   DBI::dbWriteTable(con, meta_tbl, meta, overwrite = TRUE, row.names = FALSE)
@@ -184,6 +209,8 @@ load_transformations_db <- function(con, username, dataset_key) {
       runPCA = identical(get_meta("runPCA", "FALSE"), "TRUE"),
       runUMAP = identical(get_meta("runUMAP", "FALSE"), "TRUE"),
       runLDA = identical(get_meta("runLDA", "FALSE"), "TRUE"),
+      ratioMode = get_meta("ratioMode", "append"),
+      ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
       selectedData = selected_data,
       pcadf = pcadf,
       umapdf = umapdf,
