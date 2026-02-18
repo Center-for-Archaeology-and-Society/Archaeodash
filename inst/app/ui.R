@@ -44,7 +44,8 @@ shinyUI(
                      "Dark" = "dark"
                    ),
                    selected = "light",
-                   width = "100%"
+                   width = "100%",
+                   selectize = FALSE
                  )
                ),
                shinyjs::hidden(actionButton('logoutUI','logout')),

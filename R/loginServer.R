@@ -70,10 +70,23 @@ loginServer = function(con, input = input, output = output, session = session, c
       return(NULL)
     }
     removeModal()
-    username <- tolower(isolate(input$username))
+    username <- tolower(trimws(isolate(input$username)))
     password <- isolate(input$password)
-    query <- sprintf("SELECT * FROM users WHERE username = '%s'", username)
-    credentials$res <- DBI::dbGetQuery(con, query)
+    if (!nzchar(username) || !nzchar(password)) {
+      mynotification("Login Failed: username and password are required.", type = "error")
+      credentials$res = tibble::tibble(username = NA)
+      credentials$status = FALSE
+      return(NULL)
+    }
+    username_sql <- DBI::dbQuoteString(con, username)
+    query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
+    credentials$res <- tryCatch(
+      DBI::dbGetQuery(con, query),
+      error = function(e) {
+        mynotification(paste0("Login failed due to database query error: ", e$message), type = "error")
+        tibble::tibble()
+      }
+    )
     if (nrow(credentials$res) == 1 && sodium::password_verify(credentials$res$password[1], password)) {
       credentials$status = TRUE
       if (isTRUE(input$rememberLogin)) {
@@ -81,7 +94,7 @@ loginServer = function(con, input = input, output = output, session = session, c
       }
       mynotification("Login Successful")
     } else {
-      mynotification("Login Failed", type = "error")
+      mynotification("Login Failed: invalid username or password.", type = "error")
       credentials$res = tibble::tibble(username = NA)
       credentials$status = FALSE
     }
@@ -119,17 +132,31 @@ loginServer = function(con, input = input, output = output, session = session, c
       return(NULL)
     }
     removeModal()
-    username <- tolower(isolate(input$username))
+    username <- tolower(trimws(isolate(input$username)))
     password <- isolate(input$password)
     email <- tolower(isolate(input$email))
+    if (!nzchar(username) || !nzchar(password)) {
+      mynotification("Registration Failed: username and password are required.", type = "error")
+      credentials$res = tibble::tibble(username = NA)
+      credentials$status = FALSE
+      return(NULL)
+    }
     hashed_password <- sodium::password_store(password)
     # Query to insert new user
-    query <- sprintf("INSERT INTO users (username, password, email) VALUES ('%s', '%s','%s')", username, hashed_password, email)
+    username_sql <- DBI::dbQuoteString(con, username)
+    password_sql <- DBI::dbQuoteString(con, hashed_password)
+    email_sql <- DBI::dbQuoteString(con, email)
+    query <- sprintf(
+      "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
+      username_sql,
+      password_sql,
+      email_sql
+    )
     tryCatch({
       DBI::dbExecute(con, query)
       mynotification("Registration Successful")
 
-      query <- sprintf("SELECT * FROM users WHERE username = '%s'", username)
+      query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
       credentials$res <- DBI::dbGetQuery(con, query)
       credentials$status = TRUE
       if (isTRUE(input$rememberLogin)) {
@@ -156,7 +183,8 @@ loginServer = function(con, input = input, output = output, session = session, c
     if (!nzchar(username)) {
       return(NULL)
     }
-    query <- sprintf("SELECT * FROM users WHERE username = '%s'", username)
+    username_sql <- DBI::dbQuoteString(con, username)
+    query <- sprintf("SELECT * FROM users WHERE username = %s", username_sql)
     remembered_res <- tryCatch(DBI::dbGetQuery(con, query), error = function(e) NULL)
     if (is.data.frame(remembered_res) && nrow(remembered_res) == 1) {
       credentials$res <- remembered_res
