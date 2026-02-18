@@ -7,21 +7,16 @@
 #' @param Conf whether to draw confidence ellipses
 #' @param int.set confidence level
 #' @param theme color theme
+#' @param use_symbols whether to draw group symbols
+#' @param show_point_labels whether to show point labels
+#' @param label_col column used for point labels
 #'
 #' @return plotly object
 #' @export
 #'
 #' @examples
 #' mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
-mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis"){
-  message("main plot")
-  i = 1
-  # print(head(plotdf))
-  # print(xvar)
-  # print(yvar)
-  # print(attrGroups)
-  # print(Conf)
-  # print(int.set)
+mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis", use_symbols = TRUE, show_point_labels = FALSE, label_col = NULL){
   if(xvar == yvar) return(NULL)
 
   plot_data = plotdf
@@ -30,45 +25,48 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   }
   plot_data = plot_data %>% dplyr::mutate(.plot_key = as.character(rowid))
   group_values <- as.character(plot_data[[attrGroups]])
-  group_levels <- if (is.factor(plot_data[[attrGroups]])) {
-    levels(plot_data[[attrGroups]])
-  } else {
-    sort(unique(group_values[!is.na(group_values)]))
-  }
-  plot_data[[attrGroups]] <- factor(group_values, levels = group_levels)
+  group_values[is.na(group_values) | !nzchar(trimws(group_values))] <- "[NA]"
+  group_levels <- sort(unique(group_values))
+  plot_data$.plot_group <- factor(group_values, levels = group_levels)
 
-  nfac = length(group_levels)
-  if(nfac > 6) mynotification("Too many groups to show symbols", type = "warning")
+  symbol_pool <- c(
+    "circle", "square", "diamond", "cross", "x",
+    "triangle-up", "triangle-down", "triangle-left", "triangle-right",
+    "pentagon", "hexagon", "hexagon2", "star", "star-square",
+    "star-diamond", "diamond-wide", "hourglass", "bowtie"
+  )
+  symbol_map <- stats::setNames(rep(symbol_pool, length.out = length(group_levels)), group_levels)
+  plot_data$.plot_symbol <- as.character(symbol_map[as.character(plot_data$.plot_group)])
+  plot_data$.plot_symbol[is.na(plot_data$.plot_symbol)] <- "circle"
 
-  if(nfac < 7) {
-    print(i); i = i + 1
-    gg = ggplot2::ggplot(
-      plot_data,
-      ggplot2::aes(
-        x = !!as.name(xvar),
-        y = !!as.name(yvar),
-        shape = !!as.name(attrGroups),
-        color = !!as.name(attrGroups),
-        text = .plot_key
-      )
-    ) +
-      ggplot2::geom_point()
+  if (!is.character(label_col) || length(label_col) == 0 || is.na(label_col[[1]]) || !(label_col[[1]] %in% names(plot_data))) {
+    label_col <- "rowid"
   } else {
-    print(i); i = i + 1
-    gg = ggplot2::ggplot(
-      plot_data,
-      ggplot2::aes(
-        x = !!as.name(xvar),
-        y = !!as.name(yvar),
-        color = !!as.name(attrGroups),
-        text = .plot_key
-      )
-    ) +
-      ggplot2::geom_point()
+    label_col <- label_col[[1]]
   }
+  plot_data$.label_value <- as.character(plot_data[[label_col]])
+  plot_data$.label_value[is.na(plot_data$.label_value)] <- ""
+  plot_data$.hover_text <- glue::glue(
+    "{as.character(plot_data$.plot_group)}<br>rowid: {plot_data$.plot_key}<br>{label_col}: {plot_data$.label_value}<br>{xvar}: {plot_data[[xvar]]}<br>{yvar}: {plot_data[[yvar]]}<br>"
+  )
+
+  gg = ggplot2::ggplot(
+    plot_data,
+    ggplot2::aes(
+      x = !!as.name(xvar),
+      y = !!as.name(yvar),
+      color = .plot_group,
+      text = .plot_key
+    )
+  ) +
+    ggplot2::geom_point()
+
+  palette_vals <- NULL
   if(theme == "viridis"){
     gg = gg +
       ggplot2::scale_color_viridis_d()
+    palette_vals <- grDevices::hcl.colors(length(group_levels), palette = "viridis")
+    names(palette_vals) <- group_levels
   } else {
     if (length(group_levels) > 0) {
       palette_vals <- grDevices::hcl.colors(length(group_levels), palette = "Dark 3")
@@ -77,131 +75,103 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
     }
   }
   if(Conf){
-    print(i); i = i + 1
     gg = gg +
       ggplot2::stat_ellipse(
         data = plot_data,
         ggplot2::aes(
           x = !!as.name(xvar),
           y = !!as.name(yvar),
-          color = !!as.name(attrGroups)
+          color = .plot_group
         ),
         inherit.aes = F,
         level = int.set,
         show.legend = F
       )
   }
-  # Convert ggplot to plotly1
-  print(i); i = i + 1
-  pSymbolsF = function(x) {
-    psymbols = c(
-      "circle",
-      "square",
-      "diamond",
-      "cross",
-      "triangle-up",
-      "hexagon"
-    )
-    if (length(unique(x)) > length(psymbols))
-      psymbols = 'circle'
-    dict = data.frame(x = unique(x), symbol = psymbols[1:length(unique(x))]) %>%
-      dplyr::mutate(symbol = dplyr::case_when(is.na(symbol)~'circle',TRUE~symbol))
-    x = data.frame(x = x) %>% dplyr::left_join(dict, by = "x")
-    return(x$symbol)
-  }
-  print(i); i = i + 1
-  # Extract the data used by ggplot
-  gg_data <- ggplot2::ggplot_build(gg)$data[[1]] %>%
-    dplyr::rename(rowid = text) %>%
-    dplyr::mutate(rowid = as.character(rowid)) %>%
-    dplyr::left_join(
-      plot_data %>%
-        dplyr::select(.plot_key, tidyselect::all_of(attrGroups)) %>%
-        dplyr::rename(rowid = .plot_key) %>%
-        dplyr::mutate(rowid = as.character(rowid)),
-      by = "rowid"
-    )  %>%
-    dplyr::rename(
-      name = !!as.name(attrGroups)
-    ) %>%
-    dplyr::mutate(
-      shape = pSymbolsF(shape)
-    ) %>%
-    dplyr::mutate_at(dplyr::vars(colour,shape,name),factor)
-  print(i); i = i + 1
-  if(Conf){
-    print(i); i = i + 1
-    gg_data_ellipse <- ggplot2::ggplot_build(gg)$data[[2]]
-    if("colour" %in% names(gg_data_ellipse)){
-      gg_data_ellipse = gg_data_ellipse %>%
-        dplyr::left_join(
-          gg_data %>% dplyr::select(colour, name) %>% dplyr::distinct_all(),
-          by = 'colour'
-        ) %>%
-        dplyr::mutate_at(dplyr::vars(colour,name),factor)
+  built <- ggplot2::ggplot_build(gg)
+  gg_data_ellipse <- NULL
+  if (isTRUE(Conf) && length(built$data) > 1) {
+    gg_data_points <- built$data[[1]] %>%
+      dplyr::rename(rowid = text) %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
+      dplyr::left_join(
+        plot_data %>%
+          dplyr::select(.plot_key, .plot_group) %>%
+          dplyr::rename(rowid = .plot_key),
+        by = "rowid"
+      ) %>%
+      dplyr::rename(name = .plot_group) %>%
+      dplyr::select(colour, name) %>%
+      dplyr::distinct()
+    gg_data_ellipse <- built$data[[2]]
+    if ("colour" %in% names(gg_data_ellipse)) {
+      gg_data_ellipse <- gg_data_ellipse %>%
+        dplyr::left_join(gg_data_points, by = "colour")
     } else {
-      gg_data_ellipse = NULL
+      gg_data_ellipse <- NULL
     }
-  } else {
-    gg_data_ellipse = NULL
   }
-  print(i); i = i + 1
-  # Add scatter plot trace
-  ggP <-
-    plotly::plot_ly() %>%
-    plotly::add_trace(data = gg_data,
-                      x = ~ x,
-                      y = ~ y,
-                      type = 'scatter',
-                      mode = 'markers',
-                      name = ~ name,
-                      color = ~colour,
-                      colors = ~levels(colour),
-                      symbol = ~shape,
-                      symbols = ~levels(shape),
-                      legendgroup = ~ name,
-                      key = ~ rowid,
-                      marker = list(
-                        size = ~ size * 7,
-                        stroke = ~ stroke,
-                        line = list(color = "black", width = .1)
-                      ),
-                      text = ~ glue::glue(
-                        "{name}<br>rowid: {rowid}<br>{xvar}: {x}<br>{yvar}: {y}<br>"
-                      ),
-                      hoverinfo = 'text'
-    )
-  print(i); i = i + 1
-  if(shiny::isTruthy(inherits(gg_data_ellipse,"data.frame"))){
-    print(i); i = i + 1
-    ggP = ggP %>%
+
+  point_mode <- if (isTRUE(show_point_labels)) "markers+text" else "markers"
+  ggP <- plotly::plot_ly()
+  for (grp in group_levels) {
+    grp_df <- plot_data %>% dplyr::filter(as.character(.plot_group) == grp)
+    if (nrow(grp_df) == 0) next
+    trace_symbol <- if (isTRUE(use_symbols)) grp_df$.plot_symbol else rep("circle", nrow(grp_df))
+    trace_text <- if (isTRUE(show_point_labels)) grp_df$.label_value else NULL
+    ggP <- ggP %>%
       plotly::add_trace(
-        data = gg_data_ellipse,
-        x = ~ x,
-        y = ~ y,
-        legendgroup = ~name,
-        type = 'scatter',
-        mode = 'lines',
-        name = ~ name,
-        color = ~colour,
-        colors = ~levels(colour),
-        showlegend = F,
-        line = list(
-          color = ~colour
-        ),
-        inherit = F,
-        hoverinfo = 'text',
-        text = ~ glue::glue("{name}<br>color:{colour}")
+        data = grp_df,
+        x = as.formula(paste0("~", xvar)),
+        y = as.formula(paste0("~", yvar)),
+        type = "scatter",
+        mode = point_mode,
+        name = grp,
+        legendgroup = grp,
+        key = ~.plot_key,
+        text = trace_text,
+        textposition = "top center",
+        textfont = list(size = 10),
+        hovertext = ~.hover_text,
+        hoverinfo = "text",
+        marker = list(
+          size = 7,
+          symbol = trace_symbol,
+          color = palette_vals[[grp]],
+          line = list(color = "black", width = 0.1)
+        )
       )
   }
-  print(i); i = i + 1
+  if (inherits(gg_data_ellipse, "data.frame") && nrow(gg_data_ellipse) > 0 && "name" %in% names(gg_data_ellipse)) {
+    ellipse_groups <- unique(as.character(gg_data_ellipse$name))
+    for (grp in ellipse_groups) {
+      if (is.na(grp) || !nzchar(grp)) next
+      grp_df <- gg_data_ellipse %>% dplyr::filter(as.character(name) == grp)
+      if (nrow(grp_df) == 0) next
+      line_col <- if ("colour" %in% names(grp_df)) as.character(grp_df$colour[[1]]) else palette_vals[[grp]]
+      ggP <- ggP %>%
+        plotly::add_trace(
+          data = grp_df,
+          x = ~x,
+          y = ~y,
+          legendgroup = grp,
+          type = "scatter",
+          mode = "lines",
+          name = grp,
+          showlegend = FALSE,
+          line = list(color = line_col),
+          inherit = FALSE,
+          hoverinfo = "text",
+          text = ~glue::glue("{grp} ellipse")
+        )
+    }
+  }
   ggP = ggP %>%
     plotly::layout(
       xaxis = list(title = xvar),
       yaxis = list(title = yvar),
       dragmode = 'lasso'
     )
-  print(i); i = i + 1
   ggP
 }
 

@@ -140,9 +140,12 @@ Use this tab to visualize data (elements, PCA, UMAP, LDA) and reassign selected 
 In *visualize and select*:
 
 1. Choose data source and x/y variables.
-2. Select points using lasso/box select.
-3. Enter a new group designation.
-4. Click *Change Group Assignment*.
+2. Keep *Use group symbols* enabled to distinguish groups by marker type (symbols repeat automatically for large group counts).
+3. Toggle *Show point labels* and choose a *Label column* (defaults to ANID when available).
+4. Optionally enable *Data Ellipse* and adjust ellipse level.
+5. Select points using lasso/box select.
+6. Enter a new group designation.
+7. Click *Change Group Assignment*.
 
 In *multiplots*:
 

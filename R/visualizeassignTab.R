@@ -42,6 +42,31 @@ visualizeassignTab = function() {
             offset = 0.5,
             checkboxInput('Conf', 'Data Ellipse',
                           value = TRUE),
+            checkboxInput(
+              "use_symbols",
+              label = bslib::popover(
+                tagList(
+                  "Use group symbols",
+                  trigger = bsicons::bs_icon("info-circle", title = "Help")
+                ),
+                title = "Group symbols",
+                "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
+              ),
+              value = TRUE
+            ),
+            checkboxInput(
+              "show_point_labels",
+              label = bslib::popover(
+                tagList(
+                  "Show point labels",
+                  trigger = bsicons::bs_icon("info-circle", title = "Help")
+                ),
+                title = "Point labels",
+                "Shows a text label next to each point using the selected label column."
+              ),
+              value = FALSE
+            ),
+            uiOutput("pointLabelColumnUI"),
             sliderInput(
               'int.set',
               label = bslib::popover(
@@ -244,6 +269,38 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     selectInput('yvar', 'y', rvals$plotVarChoices, selected = selected_y)
   })
 
+  output$pointLabelColumnUI = renderUI({
+    req(inherits(rvals$plotdf, "data.frame"))
+    choices <- names(rvals$plotdf)
+    choices <- choices[!is.na(choices) & nzchar(choices)]
+    if (length(choices) == 0) return(NULL)
+    anid_matches <- choices[tolower(choices) == "anid"]
+    default_col <- if (!is.null(rvals$pointLabelColumn) && as.character(rvals$pointLabelColumn) %in% choices) {
+      as.character(rvals$pointLabelColumn)
+    } else if (length(anid_matches) > 0) {
+      anid_matches[[1]]
+    } else if (!is.null(rvals$sampleID) && as.character(rvals$sampleID) %in% choices) {
+      as.character(rvals$sampleID)
+    } else if ("rowid" %in% choices) {
+      "rowid"
+    } else {
+      choices[[1]]
+    }
+    selectInput(
+      "pointLabelColumn",
+      label = bslib::popover(
+        tagList(
+          "Label column",
+          trigger = bsicons::bs_icon("info-circle", title = "Help")
+        ),
+        title = "Label column",
+        "Select which column to display when point labels are enabled. Defaults to ANID when present."
+      ),
+      choices = choices,
+      selected = default_col
+    )
+  })
+
   output$xvar2UI = renderUI({
     req(rvals$chem)
     selectInput('xvar2', 'X', rvals$chem, multiple = T)
@@ -297,7 +354,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       }
       mynotification(glue::glue("Updated {length(rowid)} row(s) to group '{target_group}'."), type = "message")
     })
-    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set")
+    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set","use_symbols","show_point_labels","pointLabelColumn")
     for(i in inputList){
       rvals[[i]] = tryCatch(input[[i]],error = function(e)return(NULL))
     }
@@ -311,7 +368,18 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     req(input$yvar %in% names(rvals$plotdf))
     req(rvals$attrGroups)
     # quietly(label = "plotting data",{
-    p =  mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set, theme = input$plot_theme)
+    p =  mainPlot(
+      plotdf = rvals$plotdf,
+      xvar = input$xvar,
+      yvar = input$yvar,
+      attrGroups = rvals$attrGroups,
+      Conf = input$Conf,
+      int.set = input$int.set,
+      theme = input$plot_theme,
+      use_symbols = isTRUE(input$use_symbols),
+      show_point_labels = isTRUE(input$show_point_labels),
+      label_col = input$pointLabelColumn
+    )
     # })
     req(p)
     p

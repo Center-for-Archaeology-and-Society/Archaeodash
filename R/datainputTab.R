@@ -761,6 +761,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!is.null(snapshot$plot_theme) && nzchar(as.character(snapshot$plot_theme))) {
       try(updateSelectInput(session, "plot_theme", selected = as.character(snapshot$plot_theme)), silent = TRUE)
     }
+    if (!is.null(snapshot$use_symbols)) {
+      try(updateCheckboxInput(session, "use_symbols", value = isTRUE(snapshot$use_symbols)), silent = TRUE)
+    }
+    if (!is.null(snapshot$show_point_labels)) {
+      try(updateCheckboxInput(session, "show_point_labels", value = isTRUE(snapshot$show_point_labels)), silent = TRUE)
+    }
+    if (!is.null(snapshot$pointLabelColumn) && nzchar(as.character(snapshot$pointLabelColumn))) {
+      try(updateSelectInput(session, "pointLabelColumn", selected = as.character(snapshot$pointLabelColumn)), silent = TRUE)
+    }
     if (!is.null(input$groupSelectionMode) && !identical(input$groupSelectionMode, "all")) {
       try(updateRadioButtons(session, "groupSelectionMode", selected = "all"), silent = TRUE)
     }
@@ -1319,6 +1328,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$Conf = tryCatch(input$Conf,error = function(e)return(NULL))
     rvals$int.set = tryCatch(input$int.set,error = function(e)return(NULL))
     rvals$plot_theme = tryCatch(input$plot_theme,error = function(e)return(NULL))
+    rvals$use_symbols = tryCatch(isTRUE(input$use_symbols),error = function(e)TRUE)
+    rvals$show_point_labels = tryCatch(isTRUE(input$show_point_labels),error = function(e)FALSE)
+    rvals$pointLabelColumn = tryCatch(as.character(input$pointLabelColumn),error = function(e)return(NULL))
     rvals$transform.method = input$transform.method
     rvals$impute.method = input$impute.method
 

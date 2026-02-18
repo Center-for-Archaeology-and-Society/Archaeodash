@@ -18,6 +18,8 @@
 - User requested streamlined PCA labels and help; changed PC-count option labels to `First N PCs (variance%/cumulative%)`, added info-icon popovers in both Probabilities/Distances and Euclidean Distance controls, re-tested, installed to `archaeodashbeta`, and restarted container.
 - User requested file-import metadata blank handling; added an optional (default-on) Data Loader setting to replace empty/NA non-element fields with `[blank]`, implemented helper-backed normalization during file import, and added tests.
 - User requested release workflow; bumped package version to `2026.02.18.2319`, committed import-blank updates, tagged `v2026.02.18.2319`, and installed/restarted `archaeodashbeta`.
+- User requested richer plotting controls; expanded symbol pool with repeat-on-overflow behavior, added symbol on/off toggle (default on), added point-label on/off toggle plus configurable label column (default ANID-equivalent), and persisted these settings across transformation save/load.
+- User requested QA + optimization pass for plotting updates; added info popovers for symbol/label controls, removed residual debug noise, expanded docs/help text for new options, reran broader targeted tests for plot and transformation persistence paths, and validated no regressions.
 
 ## Related
 

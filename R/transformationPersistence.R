@@ -117,7 +117,8 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       "dataset_key", "transformation_name", "created", "attrGroups",
       "transform.method", "impute.method", "runPCA", "runUMAP", "runLDA",
       "chem", "attr", "attrs", "attrGroupsSub", "ratioMode", "ratioSpecs",
-      "data.src", "xvar", "yvar", "xvar2", "yvar2", "Conf", "int.set", "plot_theme"
+      "data.src", "xvar", "yvar", "xvar2", "yvar2", "Conf", "int.set", "plot_theme",
+      "use_symbols", "show_point_labels", "pointLabelColumn"
     ),
     value = c(
       dataset_key,
@@ -142,7 +143,10 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       collapse_transform_values(snapshot$yvar2),
       as.character(isTRUE(snapshot$Conf)),
       opt_chr(snapshot$int.set, "0.95"),
-      opt_chr(snapshot$plot_theme, "viridis")
+      opt_chr(snapshot$plot_theme, "viridis"),
+      as.character(isTRUE(snapshot$use_symbols)),
+      as.character(isTRUE(snapshot$show_point_labels)),
+      opt_chr(snapshot$pointLabelColumn, "")
     )
   )
   DBI::dbWriteTable(con, meta_tbl, meta, overwrite = TRUE, row.names = FALSE)
@@ -228,6 +232,9 @@ load_transformations_db <- function(con, username, dataset_key) {
       Conf = identical(get_meta("Conf", "FALSE"), "TRUE"),
       int.set = suppressWarnings(as.numeric(get_meta("int.set", "0.95"))),
       plot_theme = get_meta("plot_theme", "viridis"),
+      use_symbols = identical(get_meta("use_symbols", "TRUE"), "TRUE"),
+      show_point_labels = identical(get_meta("show_point_labels", "FALSE"), "TRUE"),
+      pointLabelColumn = get_meta("pointLabelColumn", ""),
       ratioMode = get_meta("ratioMode", "append"),
       ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
       selectedData = selected_data,

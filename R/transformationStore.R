@@ -66,6 +66,9 @@ buildTransformationSnapshot <- function(rvals, name) {
     Conf = isTRUE(rvals$Conf),
     int.set = if (is.null(rvals$int.set)) 0.95 else as.numeric(rvals$int.set[[1]]),
     plot_theme = if (is.null(rvals$plot_theme)) "viridis" else as.character(rvals$plot_theme),
+    use_symbols = if (is.null(rvals$use_symbols)) TRUE else isTRUE(rvals$use_symbols),
+    show_point_labels = if (is.null(rvals$show_point_labels)) FALSE else isTRUE(rvals$show_point_labels),
+    pointLabelColumn = if (is.null(rvals$pointLabelColumn)) "" else as.character(rvals$pointLabelColumn),
     ratioSpecs = if (inherits(rvals$ratioSpecs, "data.frame")) rvals$ratioSpecs else tibble::tibble(),
     ratioMode = if (is.null(rvals$ratioMode)) "append" else as.character(rvals$ratioMode),
     selectedData = rvals$selectedData,
@@ -103,6 +106,9 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
   rvals$Conf <- isTRUE(snapshot$Conf)
   rvals$int.set <- if (is.null(snapshot$int.set) || !is.finite(as.numeric(snapshot$int.set[[1]]))) NULL else as.numeric(snapshot$int.set[[1]])
   rvals$plot_theme <- if (is.null(snapshot$plot_theme) || !nzchar(as.character(snapshot$plot_theme))) NULL else as.character(snapshot$plot_theme)
+  rvals$use_symbols <- if (is.null(snapshot$use_symbols)) TRUE else isTRUE(snapshot$use_symbols)
+  rvals$show_point_labels <- if (is.null(snapshot$show_point_labels)) FALSE else isTRUE(snapshot$show_point_labels)
+  rvals$pointLabelColumn <- if (is.null(snapshot$pointLabelColumn) || !nzchar(as.character(snapshot$pointLabelColumn))) NULL else as.character(snapshot$pointLabelColumn)
   rvals$ratioSpecs <- if (inherits(snapshot$ratioSpecs, "data.frame")) snapshot$ratioSpecs else tibble::tibble()
   rvals$ratioMode <- if (is.null(snapshot$ratioMode) || !snapshot$ratioMode %in% c("append", "only")) "append" else snapshot$ratioMode
   rvals$selectedData <- snapshot$selectedData
