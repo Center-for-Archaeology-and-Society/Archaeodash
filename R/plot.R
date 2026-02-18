@@ -29,8 +29,15 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
     plot_data$rowid = seq_len(nrow(plot_data))
   }
   plot_data = plot_data %>% dplyr::mutate(.plot_key = as.character(rowid))
+  group_values <- as.character(plot_data[[attrGroups]])
+  group_levels <- if (is.factor(plot_data[[attrGroups]])) {
+    levels(plot_data[[attrGroups]])
+  } else {
+    sort(unique(group_values[!is.na(group_values)]))
+  }
+  plot_data[[attrGroups]] <- factor(group_values, levels = group_levels)
 
-  nfac = nlevels(plot_data[[attrGroups]])
+  nfac = length(group_levels)
   if(nfac > 6) mynotification("Too many groups to show symbols", type = "warning")
 
   if(nfac < 7) {
@@ -63,17 +70,17 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
     gg = gg +
       ggplot2::scale_color_viridis_d()
   } else {
-    groups = unique(plotdf[[attrGroups]])
-    colors <- setNames(object = sapply(1:length(groups), function(x) {
-      rgb(runif(1), runif(1), runif(1))
-    }), nm = groups)
-    gg = gg + ggplot2::scale_color_manual(values = colors)
+    if (length(group_levels) > 0) {
+      palette_vals <- grDevices::hcl.colors(length(group_levels), palette = "Dark 3")
+      names(palette_vals) <- group_levels
+      gg = gg + ggplot2::scale_color_manual(values = palette_vals, drop = FALSE)
+    }
   }
   if(Conf){
     print(i); i = i + 1
     gg = gg +
       ggplot2::stat_ellipse(
-        data = plotdf,
+        data = plot_data,
         ggplot2::aes(
           x = !!as.name(xvar),
           y = !!as.name(yvar),

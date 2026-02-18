@@ -666,12 +666,37 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(length(rvals$transformations) > 0)
     snapshot <- rvals$transformations[[name]]
     req(!is.null(snapshot))
+
+    normalize_group_factor <- function(df, group_col, preferred_levels = NULL) {
+      if (!inherits(df, "data.frame")) return(df)
+      if (is.null(group_col) || !nzchar(as.character(group_col)) || !(group_col %in% names(df))) return(df)
+      vals <- as.character(df[[group_col]])
+      vals_clean <- vals[!is.na(vals) & nzchar(vals)]
+      if (!is.null(preferred_levels) && length(preferred_levels) > 0) {
+        lvls <- unique(as.character(preferred_levels))
+      } else {
+        lvls <- sort(unique(vals_clean))
+      }
+      if (length(lvls) == 0) return(df)
+      df[[group_col]] <- factor(vals, levels = lvls)
+      df
+    }
+
     applyTransformationSnapshot(rvals, snapshot)
     # Ensure metadata always comes from canonical imported data.
     rvals$selectedData <- refreshNonElementMetadata(rvals$selectedData, rvals$importedData, rvals$chem)
     rvals$pcadf <- refreshNonElementMetadata(rvals$pcadf, rvals$importedData, rvals$chem)
     rvals$umapdf <- refreshNonElementMetadata(rvals$umapdf, rvals$importedData, rvals$chem)
     rvals$LDAdf <- refreshNonElementMetadata(rvals$LDAdf, rvals$importedData, rvals$chem)
+    # Persisted datasets load metadata as character; re-apply stable group factors after merge.
+    grp_col <- as.character(snapshot$attrGroups)
+    grp_lvls <- as.character(snapshot$attrGroupsSub)
+    if (nzchar(grp_col)) {
+      rvals$selectedData <- normalize_group_factor(rvals$selectedData, grp_col, grp_lvls)
+      rvals$pcadf <- normalize_group_factor(rvals$pcadf, grp_col, grp_lvls)
+      rvals$umapdf <- normalize_group_factor(rvals$umapdf, grp_col, grp_lvls)
+      rvals$LDAdf <- normalize_group_factor(rvals$LDAdf, grp_col, grp_lvls)
+    }
     if (isTRUE(snapshot$runPCA) && (is.null(rvals$pca) || !inherits(rvals$pca, "prcomp"))) {
       rvals$pca <- tryCatch(stats::prcomp(rvals$selectedData[, rvals$chem]), error = function(e) NULL)
       if (is.null(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
