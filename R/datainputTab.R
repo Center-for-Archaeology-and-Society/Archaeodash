@@ -48,6 +48,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   suppress_group_reset <- shiny::reactiveVal(FALSE)
   transformation_loading_active <- shiny::reactiveVal(FALSE)
   dataset_loading_active <- shiny::reactiveVal(FALSE)
+  numeric_columns_cache <- shiny::reactiveVal(character())
 
   show_transformation_loading <- function() {
     transformation_loading_active(TRUE)
@@ -281,11 +282,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }
 
   numeric_columns <- function(df) {
-    if (!is.data.frame(df) || nrow(df) == 0) return(character())
-    suppressWarnings({
-      numeric_df <- df %>% dplyr::mutate_all(as.numeric) %>% janitor::remove_empty("cols")
-    })
-    cols <- setdiff(names(numeric_df), "rowid")
+    cols <- guess_numeric_columns_fast(df, exclude = "rowid", sample_n = 1500L, min_parse_rate = 0.95)
     cols[!is.na(cols) & nzchar(cols)]
   }
 
@@ -415,6 +412,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (is.null(con)) return(invisible(NULL))
     rvals$tbls <- get_user_dataset_tables()
   }, ignoreInit = TRUE)
+
+  observeEvent(rvals$importedData, {
+    df <- tryCatch(rvals$importedData, error = function(e) NULL)
+    if (!inherits(df, "data.frame") || nrow(df) == 0) {
+      numeric_columns_cache(character())
+      return(invisible(NULL))
+    }
+    numeric_columns_cache(numeric_columns(df))
+  }, ignoreInit = FALSE)
 
   output$confirmPriorUI = renderUI({
     if(isTruthy(credentials$status) && nzchar(safe_username()) && length(rvals$tbls) > 0){
@@ -869,10 +875,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     print("attr")
     quietly(label = "attr",{
       df <- rvals$importedData
-      dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
-                                 janitor::remove_empty("cols"))
-      # Remove numeric columns from default selection
-      nums1 <- names(dfNum)
+      # Remove numeric columns from default selection.
+      nums1 <- numeric_columns_cache()
+      if (length(nums1) == 0) nums1 <- numeric_columns(df)
       items = names(df[,which(!names(df) %in% nums1)])
       # hide columns with all unique values
       n = nrow(df)
@@ -1049,10 +1054,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     print("existing rvals$chem:")
     print(rvals$chem)
     df <- rvals$importedData
-    dfNum = suppressWarnings(df %>% dplyr::mutate_all(as.numeric) %>%
-                               janitor::remove_empty("cols"))
+    nums1 <- numeric_columns_cache()
+    if (length(nums1) == 0) nums1 <- numeric_columns(df)
     # Remove non-numeric columns from default selection
-    nums1 <- names(dfNum)
     quietly(label = "chem",{
       all = nums1[which(nums1 != 'rowid')]
       ratio_cols <- ratio_specs_tbl()$ratio
