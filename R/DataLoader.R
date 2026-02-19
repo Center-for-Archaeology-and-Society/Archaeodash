@@ -71,6 +71,32 @@ replace_non_element_blanks <- function(data, chem_cols, blank_label = "[blank]")
     )
 }
 
+merge_loaded_data <- function(existing_data, incoming_data, mode = c("replace", "add")) {
+  mode <- match.arg(mode)
+  if (!inherits(incoming_data, "data.frame")) return(incoming_data)
+  if (identical(mode, "replace") || !inherits(existing_data, "data.frame") || nrow(existing_data) == 0) {
+    out <- incoming_data
+    out <- ensure_rowid_column(
+      data = out,
+      table_name = "loadedData",
+      require_unique = TRUE,
+      allow_long = FALSE
+    )
+    return(out)
+  }
+
+  existing_tbl <- existing_data %>% dplyr::select(-tidyselect::any_of("rowid"))
+  incoming_tbl <- incoming_data %>% dplyr::select(-tidyselect::any_of("rowid"))
+  out <- dplyr::bind_rows(existing_tbl, incoming_tbl)
+  out <- ensure_rowid_column(
+    data = out,
+    table_name = "loadedData",
+    require_unique = TRUE,
+    allow_long = FALSE
+  )
+  out
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -165,7 +191,15 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
   })
 
   output$loadOptionsUI = renderUI({
+    has_existing <- inherits(rvals$importedData, "data.frame") && nrow(rvals$importedData) > 0
     tagList(
+      radioButtons(
+        "loadMode",
+        "When loading this file",
+        choices = c("Replace existing workspace data" = "replace", "Add rows to existing workspace data" = "add"),
+        selected = if (isTRUE(has_existing)) "add" else "replace",
+        inline = FALSE
+      ),
       checkboxInput("loadBlankNonElement", "Replace empty/NA non-element fields with [blank]", value = TRUE),
       checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = FALSE),
       checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = FALSE),
@@ -208,15 +242,28 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         data_loaded <- replace_non_element_blanks(data_loaded, chem_cols = input$loadchem)
       }
 
+      load_mode <- if (isTruthy(input$loadMode)) as.character(input$loadMode[[1]]) else "replace"
+      data_loaded <- merge_loaded_data(
+        existing_data = rvals$importedData,
+        incoming_data = data_loaded,
+        mode = load_mode
+      )
+
       rvals$importedData = data_loaded
       rvals$selectedData = data_loaded
       ensure_core_rowids(rvals)
-      rvals$chem = intersect(input$loadchem, names(data_loaded))
+      prior_chem <- tryCatch(as.character(rvals$chem), error = function(e) character())
+      if (identical(load_mode, "add")) {
+        rvals$chem = intersect(unique(c(prior_chem, as.character(input$loadchem))), names(data_loaded))
+      } else {
+        rvals$chem = intersect(input$loadchem, names(data_loaded))
+      }
       rvals$initialChem = rvals$chem
       rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
       rvals$loadNegativeAsNA = isTRUE(input$loadNegativeAsNA)
       rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
       rvals$loadBlankNonElement = isTRUE(input$loadBlankNonElement)
+      rvals$currentDatasetRowMap <- NULL
 
       if(isTruthy(credentials$status) && !is.null(con)){
         if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {

@@ -58,3 +58,18 @@ test_that("replace_non_element_blanks leaves data unchanged when no metadata col
   out <- replace_non_element_blanks(df, chem_cols = c("Fe"))
   expect_identical(out, df)
 })
+
+test_that("merge_loaded_data replaces or appends based on mode", {
+  existing <- tibble::tibble(rowid = c("1", "2"), grp = c("A", "B"), Fe = c(1, 2))
+  incoming <- tibble::tibble(rowid = c("1", "2"), grp = c("C", "D"), Fe = c(3, 4))
+
+  replaced <- merge_loaded_data(existing, incoming, mode = "replace")
+  expect_equal(nrow(replaced), 2)
+  expect_equal(as.character(replaced$rowid), c("1", "2"))
+  expect_equal(as.character(replaced$grp), c("C", "D"))
+
+  added <- merge_loaded_data(existing, incoming, mode = "add")
+  expect_equal(nrow(added), 4)
+  expect_equal(as.character(added$rowid), c("1", "2", "3", "4"))
+  expect_equal(as.character(added$grp), c("A", "B", "C", "D"))
+})

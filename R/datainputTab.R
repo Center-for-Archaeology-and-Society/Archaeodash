@@ -443,8 +443,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
 
     pref_selection <- safe_scalar_chr(get_last_opened_dataset())
-    current_selection <- safe_scalar_chr(tryCatch(rvals$currentDatasetName, error = function(e) ""))
-    selection <- if (isTRUE(nzchar(current_selection)) && isTRUE(current_selection %in% rvals$tbls)) {
+    current_selection <- tryCatch(as.character(rvals$currentDatasetName), error = function(e) character())
+    current_selection <- current_selection[!is.na(current_selection) & nzchar(current_selection) & current_selection %in% rvals$tbls]
+    selection <- if (length(current_selection) > 0) {
       current_selection
     } else if (isTRUE(nzchar(pref_selection)) && isTRUE(pref_selection %in% rvals$tbls)) {
       pref_selection
@@ -457,19 +458,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
     show_dataset_loading()
-    selected_dataset <- as.character(input$selectedDatasets[[1]])
-    if (length(input$selectedDatasets) > 1) {
-      mynotification(
-        paste0("Multiple datasets selected; loading only ", selected_dataset, " for analysis."),
-        type = "warning"
-      )
-    }
+    selected_datasets <- unique(as.character(input$selectedDatasets))
+    selected_datasets <- selected_datasets[!is.na(selected_datasets) & nzchar(selected_datasets)]
     tryCatch({
       with_dataset_load_timeout({
         reset_transformation_store()
-        rvals$currentDatasetName <- selected_dataset
-        rvals$currentDatasetKey <- build_dataset_key(selected_dataset)
-        set_last_opened_dataset(selected_dataset)
+        rvals$currentDatasetName <- selected_datasets
+        rvals$currentDatasetKey <- build_dataset_key(selected_datasets)
+        set_last_opened_dataset(selected_datasets[[1]])
+        rvals$currentDatasetRowMap <- NULL
 
         null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
                        "xvar", "xvar2", "yvar", "yvar2", "data.src", "Conf",
@@ -480,17 +477,38 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           rvals[[var]] <- NULL
         }
 
-        imported_tbl <- dplyr::tbl(con, selected_dataset) %>%
-          dplyr::collect() %>%
-          dplyr::mutate_all(as.character)
+        loaded_tbls <- list()
+        for (dataset_name in selected_datasets) {
+          tbl <- dplyr::tbl(con, dataset_name) %>%
+            dplyr::collect() %>%
+            dplyr::mutate_all(as.character)
+          tbl <- ensure_rowid_column(
+            data = tbl,
+            table_name = dataset_name,
+            require_unique = TRUE,
+            allow_long = FALSE
+          )
+          tbl <- tbl %>% dplyr::mutate(`.__source_dataset` = dataset_name)
+          loaded_tbls[[dataset_name]] <- tbl
+        }
+        imported_tbl <- dplyr::bind_rows(loaded_tbls)
+        imported_tbl <- imported_tbl %>%
+          dplyr::mutate(
+            `.__source_rowid` = as.character(.data$rowid),
+            rowid = as.character(seq_len(dplyr::n()))
+          )
+        rvals$currentDatasetRowMap <- imported_tbl %>%
+          dplyr::transmute(
+            rowid = as.character(.data$rowid),
+            dataset_name = as.character(.data$`.__source_dataset`),
+            source_rowid = as.character(.data$`.__source_rowid`)
+          )
         rvals$importedData = imported_tbl %>%
-          dplyr::select(-tidyselect::any_of('rowid')) %>%
-          dplyr::distinct_all() %>%
-          tibble::rowid_to_column()
+          dplyr::select(-tidyselect::any_of(c('.__source_dataset', '.__source_rowid')))
         rvals$selectedData = rvals$importedData
         ensure_core_rowids(rvals)
 
-        filenames = paste0(selected_dataset, "_metadata")
+        filenames = paste0(selected_datasets, "_metadata")
 
         # get metadata
         tblsmd = list()
@@ -513,9 +531,14 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
       if (is_dataset_load_timeout_error(e)) {
+        failed_label <- if (length(selected_datasets) > 1) {
+          paste0(length(selected_datasets), " selected datasets")
+        } else {
+          selected_datasets[[1]]
+        }
         mynotification(
           paste0(
-            "Loading dataset '", selected_dataset, "' timed out after ",
+            "Loading dataset '", failed_label, "' timed out after ",
             dataset_load_timeout_seconds(), " seconds and was cancelled."
           ),
           type = "error"

@@ -241,3 +241,80 @@ test_that("confirm prior dataset load completes with persisted legacy transforma
     }
   )
 })
+
+test_that("confirm prior with multiple datasets combines rows and stores source mapping", {
+  skip_if_not_installed("RSQLite")
+  skip_if_not_installed("shiny")
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  DBI::dbWriteTable(
+    con,
+    "demo_user_dataset_a",
+    data.frame(rowid = c("1", "2"), grp = c("A", "A"), al = c("1.1", "1.2"), stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    "demo_user_dataset_b",
+    data.frame(rowid = c("1", "2"), grp = c("B", "B"), al = c("2.1", "2.2"), stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    "demo_user_dataset_a_metadata",
+    data.frame(field = "variable", value = "al", stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    "demo_user_dataset_b_metadata",
+    data.frame(field = "variable", value = "al", stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+
+  rvals <- shiny::reactiveValues(
+    importedData = tibble::tibble(),
+    selectedData = tibble::tibble(),
+    transformations = list(),
+    activeTransformation = NULL,
+    currentDatasetName = NULL,
+    currentDatasetKey = NULL,
+    currentDatasetRowMap = NULL,
+    tbls = character()
+  )
+  credentials <- shiny::reactiveValues(
+    status = TRUE,
+    res = tibble::tibble(username = "demo_user")
+  )
+  server_fun <- function(input, output, session) {
+    ArchaeoDash::dataInputServer(
+      input = input,
+      output = output,
+      session = session,
+      rvals = rvals,
+      con = con,
+      credentials = credentials
+    )
+  }
+
+  shiny::testServer(
+    server_fun,
+    {
+      session$flushReact()
+      session$setInputs(selectedDatasets = c("demo_user_dataset_a", "demo_user_dataset_b"))
+      expect_no_error(session$setInputs(confirmPrior = 1))
+      session$flushReact()
+
+      expect_equal(nrow(isolate(rvals$importedData)), 4)
+      expect_equal(nrow(isolate(rvals$selectedData)), 4)
+      expect_equal(length(isolate(rvals$currentDatasetName)), 2)
+
+      row_map <- isolate(rvals$currentDatasetRowMap)
+      expect_true(inherits(row_map, "data.frame"))
+      expect_equal(nrow(row_map), 4)
+      expect_setequal(unique(as.character(row_map$dataset_name)), c("demo_user_dataset_a", "demo_user_dataset_b"))
+    }
+  )
+})
