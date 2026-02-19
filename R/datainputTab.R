@@ -460,6 +460,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     show_dataset_loading()
     selected_datasets <- unique(as.character(input$selectedDatasets))
     selected_datasets <- selected_datasets[!is.na(selected_datasets) & nzchar(selected_datasets)]
+    req(length(selected_datasets) > 0)
     tryCatch({
       with_dataset_load_timeout({
         reset_transformation_store()
@@ -527,7 +528,14 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
         }
 
-        load_persisted_transformations()
+        # Persisted transformations are dataset-keyed snapshots for a single base table.
+        # Skipping them for combined multi-dataset workspaces avoids heavy/colliding loads.
+        if (length(selected_datasets) == 1) {
+          load_persisted_transformations()
+        } else {
+          rvals$transformations <- list()
+          rvals$activeTransformation <- NULL
+        }
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
       if (is_dataset_load_timeout_error(e)) {

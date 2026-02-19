@@ -318,3 +318,90 @@ test_that("confirm prior with multiple datasets combines rows and stores source 
     }
   )
 })
+
+test_that("confirm prior with multiple datasets does not load persisted transformations", {
+  skip_if_not_installed("RSQLite")
+  skip_if_not_installed("shiny")
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  ds_a <- "demo_user_dataset_a"
+  ds_b <- "demo_user_dataset_b"
+  DBI::dbWriteTable(con, ds_a, data.frame(rowid = c("1", "2"), grp = c("A", "A"), al = c("1.1", "1.2"), stringsAsFactors = FALSE), row.names = FALSE)
+  DBI::dbWriteTable(con, ds_b, data.frame(rowid = c("1", "2"), grp = c("B", "B"), al = c("2.1", "2.2"), stringsAsFactors = FALSE), row.names = FALSE)
+  DBI::dbWriteTable(con, paste0(ds_a, "_metadata"), data.frame(field = "variable", value = "al", stringsAsFactors = FALSE), row.names = FALSE)
+  DBI::dbWriteTable(con, paste0(ds_b, "_metadata"), data.frame(field = "variable", value = "al", stringsAsFactors = FALSE), row.names = FALSE)
+
+  combo_key <- ArchaeoDash:::build_dataset_key(c(ds_a, ds_b))
+  tx_index <- ArchaeoDash:::transform_index_table("demo_user")
+  tx_name <- "should_not_load_for_combo"
+  tx_prefix <- ArchaeoDash:::transform_prefix("demo_user", combo_key, tx_name)
+
+  DBI::dbWriteTable(
+    con,
+    tx_index,
+    data.frame(
+      dataset_key = combo_key,
+      transformation_name = tx_name,
+      table_prefix = tx_prefix,
+      created = as.character(Sys.time()),
+      stringsAsFactors = FALSE
+    ),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    paste0(tx_prefix, "_selected"),
+    data.frame(rowid = c("1", "2"), grp = c("A", "B"), al = c(1.1, 2.1), stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    paste0(tx_prefix, "_meta"),
+    data.frame(
+      field = c("created", "attrGroups", "chem", "runPCA", "runUMAP", "runLDA"),
+      value = c(as.character(Sys.time()), "grp", "al", "FALSE", "FALSE", "FALSE"),
+      stringsAsFactors = FALSE
+    ),
+    row.names = FALSE
+  )
+
+  rvals <- shiny::reactiveValues(
+    importedData = tibble::tibble(),
+    selectedData = tibble::tibble(),
+    transformations = list(),
+    activeTransformation = NULL,
+    currentDatasetName = NULL,
+    currentDatasetKey = NULL,
+    currentDatasetRowMap = NULL,
+    tbls = character()
+  )
+  credentials <- shiny::reactiveValues(
+    status = TRUE,
+    res = tibble::tibble(username = "demo_user")
+  )
+  server_fun <- function(input, output, session) {
+    ArchaeoDash::dataInputServer(
+      input = input,
+      output = output,
+      session = session,
+      rvals = rvals,
+      con = con,
+      credentials = credentials
+    )
+  }
+
+  shiny::testServer(
+    server_fun,
+    {
+      session$flushReact()
+      session$setInputs(selectedDatasets = c(ds_a, ds_b))
+      expect_no_error(session$setInputs(confirmPrior = 1))
+      session$flushReact()
+
+      expect_equal(length(isolate(rvals$transformations)), 0)
+      expect_null(isolate(rvals$activeTransformation))
+    }
+  )
+})

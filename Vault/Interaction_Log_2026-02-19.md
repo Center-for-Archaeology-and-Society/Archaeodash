@@ -6,6 +6,7 @@
 - User requested commit and install for the multi-dataset write-back/import-mode update; committed code/tests/vault notes and installed the package in the running container.
 - User reported Visualize & Assign runtime error (UMAP with Data Ellipse enabled); hardened `mainPlot()` against missing theme/ellipse inputs and non-ellipse-eligible data, then added regression tests for these cases.
 - User requested commit, install, and version-tag update for the ellipse robustness fix; bumped package version, committed changes, created a release tag, and installed/restarted the container.
+- User reported app hang when confirming multiple datasets; diagnosed heavy persisted-transformation load on combined dataset keys, skipped persisted transformation loading for multi-dataset workspaces, and added regression coverage.
 
 ## Related
 
