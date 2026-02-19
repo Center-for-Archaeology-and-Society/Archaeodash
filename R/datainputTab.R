@@ -104,6 +104,20 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     as.character(x[[1]])
   }
 
+  get_user_dataset_tables <- function() {
+    if (is.null(con)) return(character())
+    username <- safe_username()
+    if (!nzchar(username)) return(character())
+    tbls <- DBI::dbListTables(con)
+    tbls <- tbls[which(stringr::str_detect(tbls, paste0("^", username, "_")))]
+    tbls <- tbls[which(!stringr::str_detect(tbls, "_metadata"))]
+    tbls <- tbls[which(!stringr::str_detect(tbls, "_tx_"))]
+    tbls <- tbls[which(!stringr::str_detect(tbls, "_transformations$"))]
+    tbls <- tbls[which(!stringr::str_detect(tbls, "_preferences$"))]
+    tbls <- tbls[which(!stringr::str_detect(tbls, "_current$"))]
+    tbls
+  }
+
   get_last_opened_dataset <- function() {
     if (!isTruthy(credentials$status) || is.null(con)) return("")
     username <- safe_username()
@@ -389,25 +403,18 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
 
   observe({
-    if(is.null(con)){
-      shiny::invalidateLater(1000, session)
-      rvals$tbls = NULL
-    } else {
-    username <- safe_username()
-    if (!nzchar(username)) {
-      rvals$tbls <- character()
+    shiny::invalidateLater(1500, session)
+    if (is.null(con)) {
+      rvals$tbls <- NULL
       return(invisible(NULL))
     }
-    tbls = DBI::dbListTables(con)
-    tbls = tbls[which(stringr::str_detect(tbls,paste0("^",username,"_")))]
-    tbls = tbls[which(!stringr::str_detect(tbls,"_metadata"))]
-    tbls = tbls[which(!stringr::str_detect(tbls,"_tx_"))]
-    tbls = tbls[which(!stringr::str_detect(tbls,"_transformations$"))]
-    tbls = tbls[which(!stringr::str_detect(tbls,"_preferences$"))]
-    tbls = tbls[which(!stringr::str_detect(tbls,"_current$"))]
-    rvals$tbls = tbls
-    }
+    rvals$tbls <- get_user_dataset_tables()
   })
+
+  observeEvent(rvals$currentDatasetName, {
+    if (is.null(con)) return(invisible(NULL))
+    rvals$tbls <- get_user_dataset_tables()
+  }, ignoreInit = TRUE)
 
   output$confirmPriorUI = renderUI({
     if(isTruthy(credentials$status) && nzchar(safe_username()) && length(rvals$tbls) > 0){
@@ -429,7 +436,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           "selectedDatasets",
           "Choose dataset",
           choices = character(),
-          multiple = FALSE,
+          multiple = TRUE,
           selected = character()
         )
       )
@@ -444,13 +451,19 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     } else {
       rvals$tbls[[1]]
     }
-    selectInput("selectedDatasets", "Choose dataset", choices = rvals$tbls, multiple = FALSE, selected = selection)
+    selectInput("selectedDatasets", "Choose dataset", choices = rvals$tbls, multiple = TRUE, selected = selection)
   })
 
   observeEvent(input$confirmPrior,{
     req(input$selectedDatasets)
     show_dataset_loading()
     selected_dataset <- as.character(input$selectedDatasets[[1]])
+    if (length(input$selectedDatasets) > 1) {
+      mynotification(
+        paste0("Multiple datasets selected; loading only ", selected_dataset, " for analysis."),
+        type = "warning"
+      )
+    }
     tryCatch({
       with_dataset_load_timeout({
         reset_transformation_store()
