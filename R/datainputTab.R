@@ -484,54 +484,16 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           rvals[[var]] <- NULL
         }
 
-        loaded_tbls <- list()
-        for (dataset_name in selected_datasets) {
-          tbl <- dplyr::tbl(con, dataset_name) %>%
-            dplyr::collect() %>%
-            dplyr::mutate_all(as.character)
-          tbl <- ensure_rowid_column(
-            data = tbl,
-            table_name = dataset_name,
-            require_unique = TRUE,
-            allow_long = FALSE
-          )
-          tbl <- tbl %>% dplyr::mutate(`.__source_dataset` = dataset_name)
-          loaded_tbls[[dataset_name]] <- tbl
-        }
-        imported_tbl <- dplyr::bind_rows(loaded_tbls)
-        imported_tbl <- imported_tbl %>%
-          dplyr::mutate(
-            `.__source_rowid` = as.character(.data$rowid),
-            rowid = as.character(seq_len(dplyr::n()))
-          )
-        rvals$currentDatasetRowMap <- imported_tbl %>%
-          dplyr::transmute(
-            rowid = as.character(.data$rowid),
-            dataset_name = as.character(.data$`.__source_dataset`),
-            source_rowid = as.character(.data$`.__source_rowid`)
-          )
-        rvals$importedData = imported_tbl %>%
-          dplyr::select(-tidyselect::any_of(c('.__source_dataset', '.__source_rowid')))
+        workspace_loaded <- load_selected_datasets_workspace(con, selected_datasets)
+        rvals$currentDatasetRowMap <- workspace_loaded$currentDatasetRowMap
+        rvals$importedData <- workspace_loaded$importedData
         rvals$selectedData = rvals$importedData
         ensure_core_rowids(rvals)
 
-        filenames = paste0(selected_datasets, "_metadata")
-
-        # get metadata
-        tblsmd = list()
-        for(tbl in filenames){
-          if(db_table_exists_safe(con, tbl)){
-            tblsmd[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
-              dplyr::mutate_all(as.character)
-          }
-        }
+        tblsmd <- load_selected_dataset_metadata_variables(con, selected_datasets)
         if(length(tblsmd) > 0){
-          tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
-            dplyr::distinct_all() %>%
-            dplyr::filter(field == "variable") %>%
-            dplyr::pull(value)
-          rvals$chem = tblsmd
-          rvals$initialChem = tblsmd[tblsmd %in% names(rvals$importedData)]
+          rvals$chem <- tblsmd
+          rvals$initialChem <- tblsmd[tblsmd %in% names(rvals$importedData)]
         }
 
         # Persisted transformations are dataset-keyed snapshots for a single base table.
@@ -541,6 +503,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         } else {
           rvals$transformations <- list()
           rvals$activeTransformation <- NULL
+          mynotification("Multiple datasets loaded. Saved transformations are not loaded; create a new transformation for this combined workspace.", type = "message")
         }
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
@@ -593,7 +556,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   observeEvent(input$deleteDatasetsconfirm,{
     removeModal()
     req(input$selectedDatasets)
-    print('deleting datasets')
+    app_log("deleting datasets")
     username <- safe_username()
     for(tbl in input$selectedDatasets){
       if (nzchar(username)) {
@@ -622,7 +585,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     removeModal()
     req(input$selectedDatasets)
     req(input$mergeName %>% length() > 0)
-    print("merging datasets")
+    app_log("merging datasets")
     tryCatch({
       tbls = list()
       for(tbl in input$selectedDatasets){
@@ -692,7 +655,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(input$file1, {
     req(input$file1)
-    print("importing file")
+    app_log("importing file")
     if (!is.null(input$file1)) {
       reset_transformation_store()
       null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
@@ -872,7 +835,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # Render multi-select lookup for choosing attribute columns
   output$attr <- renderUI({
     req(nrow(rvals$importedData) > 0)
-    print("attr")
+    app_log("attr")
     quietly(label = "attr",{
       df <- rvals$importedData
       # Remove numeric columns from default selection.
@@ -919,12 +882,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   output$subSelect <- renderUI({
     req(nrow(rvals$importedData) > 0)
     req(input$attrGroups)
-    print("subselect")
+    app_log("subselect")
     quietly(label = "subselect", {
       df <- rvals$importedData
       items.all <- quietly(label = "items.all", df %>%
         dplyr::select(tidyselect::any_of(input$attrGroups)) %>% dplyr::pull() %>% unique() %>% sort())
-      print("subSelect")
+      app_log("subSelect")
       items.all <- as.character(items.all)
       items.all <- items.all[!is.na(items.all)]
       available_group_values(items.all)
@@ -1050,9 +1013,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # Render multi-select lookup for choosing chemical concentration columns
   output$chemUI <- renderUI({
     req(nrow(rvals$importedData) > 0)
-    print("chem")
-    print("existing rvals$chem:")
-    print(rvals$chem)
+    app_log("chem")
+    app_log("existing rvals$chem:")
+    app_log(paste(capture.output(str(rvals$chem)), collapse = " "))
     df <- rvals$importedData
     nums1 <- numeric_columns_cache()
     if (length(nums1) == 0) nums1 <- numeric_columns(df)
@@ -1235,7 +1198,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # Render button to update datatable based on variable selections
   output$actionUI <- renderUI({
     req(rvals$importedData)
-    print("actionUI")
+    app_log("actionUI")
     quietly(label = "actionUI",{
       tagList(
         uiOutput("impute.options"),
@@ -1253,7 +1216,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # Render options for data imputation
   output$impute.options <- renderUI({
     req(nrow(rvals$importedData) > 0)
-    print("impute.options")
+    app_log("impute.options")
     if(is.null(rvals$impute.method)){
       sel = "none"
     } else {
@@ -1277,7 +1240,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # Render options for data transformation
   output$transform.options <- renderUI({
     req(req(nrow(rvals$importedData) > 0))
-    print("transform.options")
+    app_log("transform.options")
     if(is.null(rvals$transform.method)){
       sel = "none"
     } else {
@@ -1300,7 +1263,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   output$resetUI <- renderUI({
     req(nrow(rvals$importedData) > 0)
-    print("resetUI")
+    app_log("resetUI")
     quietly(label = "resetUI",{
       tagList(
         actionButton("resetElements", "Reset elements to original", class = "mybtn"),
@@ -1312,7 +1275,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$resetElements,{
-    print("resetElements")
+    app_log("resetElements")
     rvals$selectedData[,rvals$chem] = rvals$importedData[,rvals$chem]
   })
 
@@ -1334,18 +1297,18 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   # })
 
   observeEvent(input$resetClear,{
-    print("resetClear")
+    app_log("resetClear")
     showModal(modalDialog(title = "Confirm",shiny::p("Press to confirm. All data will be lost"),footer = tagList(actionButton("confirmResetClear","confirm"),modalButton("cancel")),easyClose = T))
   })
 
   observeEvent(input$confirmResetClear,{
-    print("confirmResetClear")
+    app_log("confirmResetClear")
     removeModal()
     session$reload()
   })
 
   run_confirmed_transformation <- function(transformation_name) {
-    print("action")
+    app_log("action")
     req(nrow(rvals$importedData) > 0)
     req(input$attr)
     req(input$chem)
@@ -1394,7 +1357,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$transform.method = input$transform.method
     rvals$impute.method = input$impute.method
 
-    message("subsetting data")
+    app_log("subsetting data")
     rvals$selectedData =
       tryCatch(rvals$importedData %>%
                  dplyr::select(
@@ -1558,7 +1521,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(rvals$selectedData,{
     req(nrow(rvals$importedData) > 0)
-    print("restoring state")
+    app_log("restoring state")
     restoreState(rvals = rvals,input = input,session = session)
   })
 
@@ -1568,7 +1531,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$addNewCol, {
-    print("adding new column")
+    app_log("adding new column")
     showModal(modalDialog(
       textInput('createGroup', "New Group Name", value = "cluster"),
       textInput('createGroupVal', "New Group Default Value", value = "1"),
@@ -1580,7 +1543,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$createSubmit,{
-    print("adding column")
+    app_log("adding column")
     if(isTRUE(is.null(input$createGroup))) newCol = "cluster" else newCol = input$createGroup
     if(isTRUE(is.null(input$createGroupVal))) val = "1" else val = input$createGroupVal
     removeModal()

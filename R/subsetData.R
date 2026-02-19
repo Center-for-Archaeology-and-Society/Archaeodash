@@ -80,7 +80,7 @@ subsetDataServer = function(input,output,session,rvals){
   output$subsetChoicesUI = renderUI({
     req(rvals$df)
     choices = tryCatch(rvals$df[[input$subsetDF]]$attrData %>% dplyr::pull(input$subsetGroup) %>% unique() %>% sort(),error = function(e){
-      print("subsetChoicesUI error")
+      app_log("subsetChoicesUI error")
       return("")
     })
     selectInput("subsetChoice","Choose the groups you wish to include:",

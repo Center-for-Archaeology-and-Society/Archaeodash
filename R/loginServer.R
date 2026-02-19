@@ -9,7 +9,7 @@
 #' loginUI(input)
 loginUI = function(input){
   observeEvent(input$loginUI,{
-    message("login server")
+    app_log("login server")
 
     showModal(modalDialog(
       title = "Login or Register",

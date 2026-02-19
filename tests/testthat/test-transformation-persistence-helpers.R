@@ -10,6 +10,10 @@ test_that("safe table naming and keys are deterministic", {
   key2 <- build_dataset_key(c("user_a", "user_b"))
   expect_equal(key1, key2)
   expect_true(nchar(key1) <= 40)
+  expect_match(key1, "^dsk_")
+
+  key3 <- build_dataset_key(c("user_a", "user_c"))
+  expect_false(identical(key1, key3))
 
   tbl <- safe_table_name("User Name--Very Long Table Name!", max_len = 20)
   expect_true(nchar(tbl) <= 20)

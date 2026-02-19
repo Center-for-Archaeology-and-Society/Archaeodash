@@ -207,7 +207,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
 #' @examples
 #' multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
 multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = F,theme){
-  message("multiplot")
+  app_log("multiplot")
   plot_data = selectedData
   if(!("rowid" %in% names(plot_data))){
     plot_data$rowid = seq_len(nrow(plot_data))

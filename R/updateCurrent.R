@@ -18,7 +18,7 @@ updateCurrent = function(rvals,
                          input,
                          output,
   session) {
-  if (!isTruthy(credentials$status) || is.null(con)) return(NULL)
+  if (!shiny::isTruthy(credentials$status) || is.null(con)) return(NULL)
   if (!app_require_packages("DBI", feature = "Saving current dataset")) {
     return(NULL)
   }

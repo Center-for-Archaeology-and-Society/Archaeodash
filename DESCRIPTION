@@ -1,6 +1,6 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 2026.02.19.1501
+Version: 2026.02.19.1622
 Authors@R: 
     person("Robert", "Bischoff", , "rbischoff@asu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8708-9041"))

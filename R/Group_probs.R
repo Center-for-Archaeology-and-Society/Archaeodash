@@ -47,8 +47,8 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
   }, error = function(e){
     if (identical(method, "Hotellings")) {
       mynotification(glue::glue("Hotellings failed ({e$message}); falling back to Mahalanobis."), type = "warning")
-      probsAlldf <<- group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID)
-      return(invisible(NULL))
+      probsAlldf <- group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID)
+      return(probsAlldf)
     }
     mynotification(glue::glue("unable to return group membership probabilities: {e}"), type = "error")
   })

@@ -41,7 +41,18 @@ safe_table_name <- function(x, max_len = 63) {
 
 build_dataset_key <- function(dataset_names) {
   if (is.null(dataset_names) || length(dataset_names) == 0) return("")
-  safe_table_name(paste(sort(unique(as.character(dataset_names))), collapse = "__"), max_len = 40)
+  normalized <- sort(unique(as.character(dataset_names)))
+  canonical <- paste(normalized, collapse = "__")
+  tf <- tempfile("archaeodash_dataset_key_")
+  on.exit(unlink(tf), add = TRUE)
+  writeBin(charToRaw(enc2utf8(canonical)), tf)
+  hash <- as.character(tools::md5sum(tf)[[1]])
+  label <- if (length(normalized) == 1) {
+    safe_table_name(normalized[[1]], max_len = 18)
+  } else {
+    paste0("multi", length(normalized))
+  }
+  safe_table_name(paste0("dsk_", label, "_", substr(hash, 1, 16)), max_len = 40)
 }
 
 transform_index_table <- function(username) {
@@ -55,16 +66,17 @@ transform_prefix <- function(username, dataset_key, transformation_name) {
 ensure_transform_index_table <- function(con, username) {
   idx <- transform_index_table(username)
   if (!DBI::dbExistsTable(con, idx)) {
-    DBI::dbWriteTable(
-      con,
-      idx,
-      tibble::tibble(
+    db_write_table_safe(
+      con = con,
+      table_name = idx,
+      value = tibble::tibble(
         dataset_key = character(),
         transformation_name = character(),
         table_prefix = character(),
         created = character()
       ),
-      row.names = FALSE
+      row.names = FALSE,
+      context = "creating transformation index table"
     )
   }
 }
@@ -92,24 +104,52 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
   idx_tbl <- transform_index_table(username)
   idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
 
-  DBI::dbWriteTable(con, selected_tbl, snapshot$selectedData, overwrite = TRUE, row.names = FALSE)
+  if (!db_write_table_safe(
+    con = con,
+    table_name = selected_tbl,
+    value = snapshot$selectedData,
+    overwrite = TRUE,
+    row.names = FALSE,
+    context = "persisting selected transformation dataset"
+  )) return(invisible(FALSE))
 
   if (inherits(snapshot$pcadf, "data.frame") && nrow(snapshot$pcadf) > 0) {
-    DBI::dbWriteTable(con, pca_tbl, snapshot$pcadf, overwrite = TRUE, row.names = FALSE)
+    if (!db_write_table_safe(
+      con = con,
+      table_name = pca_tbl,
+      value = snapshot$pcadf,
+      overwrite = TRUE,
+      row.names = FALSE,
+      context = "persisting PCA transformation dataset"
+    )) return(invisible(FALSE))
   } else if (DBI::dbExistsTable(con, pca_tbl)) {
-    DBI::dbRemoveTable(con, pca_tbl)
+    if (!db_remove_table_safe(con, pca_tbl, context = "removing prior PCA transformation dataset")) return(invisible(FALSE))
   }
 
   if (inherits(snapshot$umapdf, "data.frame") && nrow(snapshot$umapdf) > 0) {
-    DBI::dbWriteTable(con, umap_tbl, snapshot$umapdf, overwrite = TRUE, row.names = FALSE)
+    if (!db_write_table_safe(
+      con = con,
+      table_name = umap_tbl,
+      value = snapshot$umapdf,
+      overwrite = TRUE,
+      row.names = FALSE,
+      context = "persisting UMAP transformation dataset"
+    )) return(invisible(FALSE))
   } else if (DBI::dbExistsTable(con, umap_tbl)) {
-    DBI::dbRemoveTable(con, umap_tbl)
+    if (!db_remove_table_safe(con, umap_tbl, context = "removing prior UMAP transformation dataset")) return(invisible(FALSE))
   }
 
   if (inherits(snapshot$LDAdf, "data.frame") && nrow(snapshot$LDAdf) > 0) {
-    DBI::dbWriteTable(con, lda_tbl, snapshot$LDAdf, overwrite = TRUE, row.names = FALSE)
+    if (!db_write_table_safe(
+      con = con,
+      table_name = lda_tbl,
+      value = snapshot$LDAdf,
+      overwrite = TRUE,
+      row.names = FALSE,
+      context = "persisting LDA transformation dataset"
+    )) return(invisible(FALSE))
   } else if (DBI::dbExistsTable(con, lda_tbl)) {
-    DBI::dbRemoveTable(con, lda_tbl)
+    if (!db_remove_table_safe(con, lda_tbl, context = "removing prior LDA transformation dataset")) return(invisible(FALSE))
   }
 
   meta <- tibble::tibble(
@@ -149,7 +189,14 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       opt_chr(snapshot$pointLabelColumn, "")
     )
   )
-  DBI::dbWriteTable(con, meta_tbl, meta, overwrite = TRUE, row.names = FALSE)
+  if (!db_write_table_safe(
+    con = con,
+    table_name = meta_tbl,
+    value = meta,
+    overwrite = TRUE,
+    row.names = FALSE,
+    context = "persisting transformation metadata"
+  )) return(invisible(FALSE))
 
   quoted_name <- DBI::dbQuoteString(con, tx_name)
   quoted_key <- DBI::dbQuoteString(con, dataset_key)
@@ -161,18 +208,19 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
       " AND transformation_name = ", quoted_name
     )
   )
-  DBI::dbWriteTable(
-    con,
-    idx_tbl,
-    tibble::tibble(
+  if (!db_write_table_safe(
+    con = con,
+    table_name = idx_tbl,
+    value = tibble::tibble(
       dataset_key = dataset_key,
       transformation_name = tx_name,
       table_prefix = prefix,
       created = opt_chr(snapshot$created, as.character(Sys.time()))
     ),
     append = TRUE,
-    row.names = FALSE
-  )
+    row.names = FALSE,
+    context = "updating transformation index"
+  )) return(invisible(FALSE))
   invisible(TRUE)
 }
 
@@ -268,7 +316,11 @@ delete_transformation_db <- function(con, username, dataset_key, transformation_
     paste0(prefix, "_meta")
   )
   for (tbl in candidate_tables) {
-    if (DBI::dbExistsTable(con, tbl)) DBI::dbRemoveTable(con, tbl)
+    if (DBI::dbExistsTable(con, tbl)) {
+      if (!db_remove_table_safe(con, tbl, context = "deleting persisted transformation table")) {
+        return(invisible(FALSE))
+      }
+    }
   }
 
   quoted_name <- DBI::dbQuoteString(con, transformation_name)

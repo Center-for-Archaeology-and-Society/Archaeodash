@@ -20,10 +20,10 @@ ensure_rowid_column <- function(data,
   if (!("rowid" %in% names(data))) {
     if (has_valid_reference) {
       data$rowid <- as.character(reference_rowid)
-      message(glue::glue("added missing rowid to {table_name} from reference rowid"))
+      app_log(glue::glue("added missing rowid to {table_name} from reference rowid"))
     } else {
       data <- tibble::rowid_to_column(data, var = "rowid")
-      message(glue::glue("added missing rowid to {table_name} using row index"))
+      app_log(glue::glue("added missing rowid to {table_name} using row index"))
     }
   } else {
     data$rowid <- as.character(data$rowid)
@@ -33,13 +33,13 @@ ensure_rowid_column <- function(data,
   invalid_idx <- which(is.na(data$rowid) | !nzchar(data$rowid))
   if (length(invalid_idx) > 0) {
     data$rowid[invalid_idx] <- as.character(invalid_idx)
-    message(glue::glue("repaired {length(invalid_idx)} invalid rowid values in {table_name}"))
+    app_log(glue::glue("repaired {length(invalid_idx)} invalid rowid values in {table_name}"))
   }
 
   if (isTRUE(require_unique) && !isTRUE(allow_long)) {
     if (anyDuplicated(data$rowid) > 0) {
       data$rowid <- as.character(seq_len(nrow(data)))
-      message(glue::glue("rowid was not unique in {table_name}; reassigned sequential unique rowid"))
+      app_log(glue::glue("rowid was not unique in {table_name}; reassigned sequential unique rowid"))
     }
   }
 

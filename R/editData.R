@@ -11,22 +11,22 @@
 #' @examples
 #' replaceCell(rvals,rowid,col,value)
 replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,session) {
-  message("replacing data")
+  app_log("replacing data")
   tryCatch({
   ensure_core_rowids(rvals)
   assigned_values <- as.character(value)
   assigned_values <- assigned_values[!is.na(assigned_values) & nzchar(assigned_values)]
   for(df in c("importedData","selectedData","membershipProbs","edistance","pcadf","LDAdf","umapdf")){
-    message(glue::glue("checking if {df} exists"))
+    app_log(glue::glue("checking if {df} exists"))
     if (df == "membershipProbs"){
       colnm = "GroupVal"
     } else {
       colnm = col
     }
     if(isTruthy(!is.null(rvals[[df]]))){
-      message(glue::glue("replacing {df} {colnm} with {paste(value,collapse = ',')}"))
+      app_log(glue::glue("replacing {df} {colnm} with {paste(value,collapse = ',')}"))
     } else {
-      message(glue::glue("{df} does not exist"))
+      app_log(glue::glue("{df} does not exist"))
       next
     }
     if(!("rowid" %in% names(rvals[[df]]))){
@@ -43,19 +43,19 @@ replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,
       )
     }
     if(!(colnm %in% names(rvals[[df]]))){
-      message(glue::glue("{df} has no {colnm} column; skipping"))
+      app_log(glue::glue("{df} has no {colnm} column; skipping"))
       next
     }
 
     rvals[[df]]$rowid = as.character(rvals[[df]]$rowid)
     rowid = as.character(rowid)
-    print("rowid")
-    print(rowid)
+    app_log("rowid")
+    app_log(paste(rowid, collapse = ","))
     indx = which(rvals[[df]]$rowid %in% rowid)
-    print("indx")
-    print(indx)
+    app_log("indx")
+    app_log(paste(indx, collapse = ","))
     if(length(indx) == 0){
-      message(glue::glue("no matching rows in {df}; skipping"))
+      app_log(glue::glue("no matching rows in {df}; skipping"))
       next
     }
     if(isTruthy(isFALSE(length(indx) == length(value) | length(value) == 1))){
@@ -66,7 +66,7 @@ replaceCell = function(rowid, col, value, rvals, con, credentials, input,output,
       rvals[[df]][[colnm]] = factor(rvals[[df]][[colnm]])
     }
   }
-    print("updating current")
+    app_log("updating current")
   if (inherits(rvals$selectedData, "data.frame") && col %in% names(rvals$selectedData)) {
     current_groups <- unique(as.character(rvals$selectedData[[col]]))
     current_groups <- current_groups[!is.na(current_groups) & nzchar(current_groups)]

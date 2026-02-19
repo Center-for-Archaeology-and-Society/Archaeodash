@@ -8,6 +8,9 @@
 - User requested commit, install, and version-tag update for the ellipse robustness fix; bumped package version, committed changes, created a release tag, and installed/restarted the container.
 - User reported app hang when confirming multiple datasets; diagnosed heavy persisted-transformation load on combined dataset keys, skipped persisted transformation loading for multi-dataset workspaces, and added regression coverage.
 - User reported multi-dataset confirm still hanging; optimized expensive full-data numeric type inference in Data Input UI paths by adding sampled/cached numeric-column hints, and added tests for the new helper.
+- User requested full code-structure sanity check; reviewed architecture/reactive/persistence/test paths and ran the full test suite (all passing), then documented structural risk hotspots and cleanup priorities.
+- User requested implementation of all structural recommendations plus explicit multi-dataset transformation behavior and verbose logging control; added hashed dataset keys, extracted dataset load helpers, removed global assignment, gated debug logs behind `runArchaeoDash(verbose)`, tightened persistence write safety, and passed full test suite.
+- User requested commit, tag, and install for structural hardening updates; bumped package version, committed changes, created release tag, and installed/restarted container.
 
 ## Related
 
