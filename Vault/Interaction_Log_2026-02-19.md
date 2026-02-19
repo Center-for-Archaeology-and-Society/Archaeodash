@@ -4,6 +4,8 @@
 - User requested commit and install of dataset-selector updates; committed code/vault changes and installed the updated package in the running container.
 - User requested true multi-dataset workspace behavior with write-back to original tables plus browse-import replace/add mode; implemented row-source mapping for combined dataset loads, split autosave writes back per source dataset, added load-mode controls for file import, and added/ran targeted tests.
 - User requested commit and install for the multi-dataset write-back/import-mode update; committed code/tests/vault notes and installed the package in the running container.
+- User reported Visualize & Assign runtime error (UMAP with Data Ellipse enabled); hardened `mainPlot()` against missing theme/ellipse inputs and non-ellipse-eligible data, then added regression tests for these cases.
+- User requested commit, install, and version-tag update for the ellipse robustness fix; bumped package version, committed changes, created a release tag, and installed/restarted the container.
 
 ## Related
 

@@ -86,3 +86,49 @@ test_that("mainPlot supports many groups with repeating symbols and optional lab
     expect_s3_class(p2, "plotly")
   })
 })
+
+test_that("mainPlot tolerates missing theme and ellipse level inputs", {
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(10)),
+    grp = rep(c("A", "B"), each = 5),
+    V1 = rnorm(10),
+    V2 = rnorm(10),
+    stringsAsFactors = FALSE
+  )
+
+  expect_no_error({
+    p <- mainPlot(
+      plotdf = plotdf,
+      xvar = "V1",
+      yvar = "V2",
+      attrGroups = "grp",
+      Conf = TRUE,
+      int.set = NULL,
+      theme = NULL
+    )
+    expect_s3_class(p, "plotly")
+  })
+})
+
+test_that("mainPlot skips ellipse gracefully when data are not ellipse-eligible", {
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(6)),
+    grp = c("A", "A", "B", "B", "C", "C"),
+    V1 = c("1", "1", "2", "2", "3", "3"),
+    V2 = c("4", "4", "5", "5", "6", "6"),
+    stringsAsFactors = FALSE
+  )
+
+  expect_no_error({
+    p <- mainPlot(
+      plotdf = plotdf,
+      xvar = "V1",
+      yvar = "V2",
+      attrGroups = "grp",
+      Conf = TRUE,
+      int.set = 0.9,
+      theme = "viridis"
+    )
+    expect_s3_class(p, "plotly")
+  })
+})

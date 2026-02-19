@@ -18,6 +18,8 @@
 #' mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
 mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis", use_symbols = TRUE, show_point_labels = FALSE, label_col = NULL){
   if(xvar == yvar) return(NULL)
+  if (!inherits(plotdf, "data.frame")) return(NULL)
+  if (!(xvar %in% names(plotdf)) || !(yvar %in% names(plotdf)) || !(attrGroups %in% names(plotdf))) return(NULL)
 
   plot_data = plotdf
   if(!("rowid" %in% names(plot_data))){
@@ -61,8 +63,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   ) +
     ggplot2::geom_point()
 
+  theme_name <- if (!is.character(theme) || length(theme) == 0 || is.na(theme[[1]])) {
+    "viridis"
+  } else {
+    as.character(theme[[1]])
+  }
+
   palette_vals <- NULL
-  if(theme == "viridis"){
+  if(identical(theme_name, "viridis")){
     gg = gg +
       ggplot2::scale_color_viridis_d()
     palette_vals <- grDevices::hcl.colors(length(group_levels), palette = "viridis")
@@ -74,41 +82,50 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
       gg = gg + ggplot2::scale_color_manual(values = palette_vals, drop = FALSE)
     }
   }
-  if(Conf){
-    gg = gg +
-      ggplot2::stat_ellipse(
-        data = plot_data,
-        ggplot2::aes(
-          x = !!as.name(xvar),
-          y = !!as.name(yvar),
-          color = .plot_group
-        ),
-        inherit.aes = F,
-        level = int.set,
-        show.legend = F
-      )
+
+  ellipse_level <- suppressWarnings(as.numeric(int.set[[1]]))
+  if (length(ellipse_level) == 0 || !is.finite(ellipse_level[[1]])) {
+    ellipse_level <- 0.9
+  } else {
+    ellipse_level <- ellipse_level[[1]]
   }
-  built <- ggplot2::ggplot_build(gg)
+  ellipse_level <- min(max(ellipse_level, 0.50), 0.99)
+
   gg_data_ellipse <- NULL
-  if (isTRUE(Conf) && length(built$data) > 1) {
-    gg_data_points <- built$data[[1]] %>%
-      dplyr::rename(rowid = text) %>%
-      dplyr::mutate(rowid = as.character(rowid)) %>%
-      dplyr::left_join(
-        plot_data %>%
-          dplyr::select(.plot_key, .plot_group) %>%
-          dplyr::rename(rowid = .plot_key),
-        by = "rowid"
+  if (isTRUE(Conf)) {
+    ellipse_data <- plot_data %>%
+      dplyr::mutate(
+        .ellipse_x = suppressWarnings(as.numeric(.data[[xvar]])),
+        .ellipse_y = suppressWarnings(as.numeric(.data[[yvar]]))
       ) %>%
-      dplyr::rename(name = .plot_group) %>%
-      dplyr::select(colour, name) %>%
-      dplyr::distinct()
-    gg_data_ellipse <- built$data[[2]]
-    if ("colour" %in% names(gg_data_ellipse)) {
-      gg_data_ellipse <- gg_data_ellipse %>%
-        dplyr::left_join(gg_data_points, by = "colour")
-    } else {
-      gg_data_ellipse <- NULL
+      dplyr::filter(is.finite(.ellipse_x), is.finite(.ellipse_y))
+    if (nrow(ellipse_data) > 0) {
+      ellipse_data <- ellipse_data %>%
+        dplyr::group_by(.plot_group) %>%
+        dplyr::filter(dplyr::n() >= 3, dplyr::n_distinct(.ellipse_x) > 1, dplyr::n_distinct(.ellipse_y) > 1) %>%
+        dplyr::ungroup()
+      if (nrow(ellipse_data) > 0) {
+        ellipse_gg <- ggplot2::ggplot(
+          ellipse_data,
+          ggplot2::aes(x = .ellipse_x, y = .ellipse_y, color = .plot_group)
+        ) +
+          ggplot2::stat_ellipse(level = ellipse_level, show.legend = FALSE)
+        built_ellipse <- tryCatch(ggplot2::ggplot_build(ellipse_gg), error = function(e) NULL)
+        if (!is.null(built_ellipse) && length(built_ellipse$data) > 0) {
+          group_map <- ellipse_data %>%
+            dplyr::transmute(.plot_group, .group_idx = as.integer(.plot_group)) %>%
+            dplyr::distinct()
+          gg_data_ellipse <- built_ellipse$data[[1]]
+          if ("group" %in% names(gg_data_ellipse)) {
+            gg_data_ellipse <- gg_data_ellipse %>%
+              dplyr::mutate(.group_idx = as.integer(.data$group)) %>%
+              dplyr::left_join(group_map, by = ".group_idx") %>%
+              dplyr::rename(name = .plot_group)
+          } else {
+            gg_data_ellipse <- NULL
+          }
+        }
+      }
     }
   }
 
