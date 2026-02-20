@@ -25,6 +25,7 @@
 - Requested Visualize & Assign layout/filter improvements; moved controls to a right-side sidebar, added metadata-field visualization filter with multi-select values (display-only via rowid intersection), hardened selection sync under filtering, and prepared commit/tag/install steps.
 - Reported unspecified visualization-filter error; traced to `vizMetaFilterFieldUI` NA handling (`if: missing value where TRUE/FALSE needed`), hardened NA/empty guards for both metadata field/value UI renderers, reinstalled and restarted `archaeodashbeta`, and verified the error no longer appears in fresh logs.
 - Requested release promotion to live; prepared release commit/tag in beta repo, synchronized current tree into `../Archaeodash`, installed package into `archaeodash` container, and restarted live service.
+- Requested a responsive filter placement option in Visualize & Assign; replaced fixed layout with dynamic rendering that supports right-side or below-plot controls, added a `filters_below_plot` toggle, and defaulted to below-plot for mobile-width clients via one-time client-width detection.
 
 ## Related
 
