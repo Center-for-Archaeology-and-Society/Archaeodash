@@ -16,6 +16,8 @@ Quality guardrails, tests, and known risks.
 - [[Security_Hardening_Implementation_2026-02-20]]
 - [[Apache_Sites_Config_Review_2026-02-20]]
 - [[Upload_Append_Type_Harmonization_Fix_2026-02-20]]
+- [[Upload_Append_E2E_Test_Coverage_2026-02-20]]
+- [[Multiplot_Interactive_Performance_and_Cancel_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

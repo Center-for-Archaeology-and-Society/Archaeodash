@@ -15,6 +15,9 @@
 - User requested commit/tag/install for `archaeodashbeta`; prepared release commit for security hardening updates, created timestamp release tag, installed package into beta container, and restarted beta only.
 - User requested another external-only security audit (plus SQLi sanity check); executed black-box endpoint/header/method/path/SockJS probes against beta, verified SQL parameterization patterns in DB code, and delivered prioritized attack-vector recommendations without code changes.
 - User reported upload append failure due to `bind_rows()` character-vs-numeric column mismatch; added pre-append type harmonization in `merge_loaded_data()` (numeric-like to numeric, otherwise character), added regression tests, then installed and committed to beta (no tag).
+- User asked whether upload append type-mismatch failures are automatable; reviewed current unit and shinytest2 coverage, confirmed this class is testable via automation, and identified remaining e2e gap for two-upload append workflow assertions.
+- User asked to close the upload-append automation gap; added a shinytest2 e2e test for two sequential uploads with intentional shared-column type mismatch and verified append success by table row growth (2 to 4), then validated test pass.
+- User reported interactive multiplot hangs and requested cancel option; optimized interactive multiplot generation/conversion safeguards, added cancel control/state handling to multiplot loading modal, added regression tests, and prepared commit/tag/install for beta.
 
 ## Related
 

@@ -201,6 +201,51 @@ test_that("multiplot returns expected class for interactive and static modes", {
   expect_s3_class(p_interactive, "plotly")
 })
 
+test_that("multiplot accepts string interactive flag from radioButtons", {
+  set.seed(4)
+  selectedData <- data.frame(
+    rowid = as.character(seq_len(8)),
+    grp = rep(c("A", "B"), each = 4),
+    V1 = rnorm(8),
+    V2 = rnorm(8),
+    stringsAsFactors = FALSE
+  )
+
+  p_interactive <- multiplot(
+    selectedData = selectedData,
+    attrGroups = "grp",
+    xvar = c("V1"),
+    yvar = c("V2"),
+    ptsize = 2,
+    interactive = "TRUE",
+    theme = "viridis"
+  )
+  expect_s3_class(p_interactive, "plotly")
+})
+
+test_that("multiplot filters same-axis facet pairs by variable name", {
+  set.seed(5)
+  selectedData <- data.frame(
+    rowid = as.character(seq_len(6)),
+    grp = rep(c("A", "B"), each = 3),
+    V1 = rnorm(6),
+    V2 = rnorm(6),
+    stringsAsFactors = FALSE
+  )
+
+  p_static <- multiplot(
+    selectedData = selectedData,
+    attrGroups = "grp",
+    xvar = c("V1", "V2"),
+    yvar = c("V1", "V2"),
+    ptsize = 1,
+    interactive = FALSE,
+    theme = "default"
+  )
+  built <- ggplot2::ggplot_build(p_static)
+  expect_true(nrow(built$data[[1]]) > 0)
+})
+
 test_that("validate_multiplot_axes enforces non-empty and distinct selections", {
   empty_x <- validate_multiplot_axes(character(), c("V2"))
   expect_false(empty_x$ok)

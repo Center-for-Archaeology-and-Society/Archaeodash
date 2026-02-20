@@ -165,6 +165,7 @@ validate_multiplot_axes <- function(x_vars, y_vars) {
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
+  multiplot_cancel_requested <- shiny::reactiveVal(FALSE)
 
   pick_selected_value <- function(candidate, choices, fallback = "") {
     if (is.null(candidate) || length(candidate) == 0) return(fallback)
@@ -178,7 +179,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     multiplot_loading_active(TRUE)
     showModal(modalDialog(
       title = NULL,
-      footer = NULL,
+      footer = tagList(
+        actionButton("cancelMultiplotBuild", "Cancel")
+      ),
       class = "transformation-loading-modal",
       easyClose = FALSE,
       tags$div(
@@ -195,6 +198,10 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     removeModal()
     multiplot_loading_active(FALSE)
     invisible(NULL)
+  }
+
+  interactive_mode <- function(x) {
+    isTRUE(suppressWarnings(as.logical(x)))
   }
 
   build_brush_display_table <- function(brush_df) {
@@ -470,7 +477,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   #### multiplots ####
 
+  observeEvent(input$cancelMultiplotBuild, {
+    multiplot_cancel_requested(TRUE)
+    hide_multiplot_loading()
+    mynotification("Cancelled multiplot build request.", type = "message")
+  }, ignoreInit = TRUE)
+
   observeEvent(input$updateMultiplot, {
+    multiplot_cancel_requested(FALSE)
     show_multiplot_loading()
     ok <- tryCatch({
       if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
@@ -484,7 +498,15 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       }
 
       quietly(label = "multiplot",{
-        rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = axis_check$x, yvar = axis_check$y,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
+        rvals$multiplot = multiplot(
+          selectedData = rvals$selectedData,
+          attrGroups = rvals$attrGroups,
+          xvar  = axis_check$x,
+          yvar = axis_check$y,
+          ptsize = input$ptsize,
+          interactive = interactive_mode(input$interactive),
+          theme = input$plot_theme
+        )
       })
       TRUE
     }, error = function(e) {
@@ -494,11 +516,15 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     }, finally = {
       hide_multiplot_loading()
     })
+    if (isTRUE(multiplot_cancel_requested())) {
+      rvals$multiplot <- NULL
+      return(invisible(NULL))
+    }
     if (!isTRUE(ok)) return(invisible(NULL))
 
     output$multiplotUI = renderUI({
       req(rvals$multiplot)
-      if (isTRUE(input$interactive)) {
+      if (interactive_mode(input$interactive)) {
         plotly::plotlyOutput("multiplotPlotly", width = "100%", height = paste0(input$plotHeight, "px"))
       } else {
         plotOutput("multiplotStatic", width = "100%", height = paste0(input$plotHeight, "px"))
@@ -507,14 +533,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
     output$multiplotPlotly = plotly::renderPlotly({
       req(rvals$multiplot)
-      req(isTRUE(input$interactive))
+      req(interactive_mode(input$interactive))
       req(inherits(rvals$multiplot, "plotly"))
       rvals$multiplot
     })
 
     output$multiplotStatic = renderPlot({
       req(rvals$multiplot)
-      req(!isTRUE(input$interactive))
+      req(!interactive_mode(input$interactive))
       req(inherits(rvals$multiplot, "ggplot"))
       rvals$multiplot
     }, width = "auto", height = function() input$plotHeight)

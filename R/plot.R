@@ -209,8 +209,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
 #'
 #' @examples
 #' multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
-multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = F,theme){
+multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = FALSE, theme){
   app_log("multiplot")
+  interactive_mode <- isTRUE(suppressWarnings(as.logical(interactive)))
   plot_data = selectedData
   if(!("rowid" %in% names(plot_data))){
     plot_data$rowid = seq_len(nrow(plot_data))
@@ -218,14 +219,33 @@ multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = 
 
   pdf1 = plot_data %>%
     dplyr::select(rowid,tidyselect::all_of(c(attrGroups,xvar))) %>%
-    tidyr::pivot_longer(tidyselect::all_of(xvar), names_to = "xvar", values_to = "elem1") %>%
-    tidyr::unite(id, c('rowid',tidyselect::all_of(attrGroups)), sep = "_", remove = F)
+    tidyr::pivot_longer(tidyselect::all_of(xvar), names_to = "xvar", values_to = "elem1")
   pdf2 = plot_data %>%
     dplyr::select(rowid,tidyselect::all_of(c(attrGroups,yvar))) %>%
-    tidyr::pivot_longer(tidyselect::all_of(yvar), names_to = "yvar", values_to = "elem2") %>%
-    tidyr::unite(id, c('rowid',tidyselect::all_of(attrGroups)), sep = "_", remove = F)
-  p = dplyr::full_join(pdf1,pdf2 %>% dplyr::select(-tidyselect::all_of(c('rowid',attrGroups))), by = 'id', relationship = "many-to-many") %>%
-    dplyr::filter(elem1 != elem2) %>%
+    tidyr::pivot_longer(tidyselect::all_of(yvar), names_to = "yvar", values_to = "elem2")
+
+  plot_pairs <- dplyr::inner_join(
+    pdf1,
+    pdf2,
+    by = c("rowid", attrGroups),
+    relationship = "many-to-many"
+  ) %>%
+    dplyr::filter(.data$xvar != .data$yvar)
+
+  # Interactive plotly conversion can hang on very large pair expansions.
+  # Downsample per facet/group to keep a responsive upper bound.
+  if (interactive_mode && nrow(plot_pairs) > 0) {
+    facet_count <- max(1L, length(unique(plot_pairs$xvar)) * length(unique(plot_pairs$yvar)))
+    group_count <- max(1L, length(unique(as.character(plot_pairs[[attrGroups]]))))
+    max_points_total <- 100000L
+    max_points_per_group_facet <- max(25L, as.integer(floor(max_points_total / (facet_count * group_count))))
+    plot_pairs <- plot_pairs %>%
+      dplyr::group_by(.data$xvar, .data$yvar, !!as.name(attrGroups)) %>%
+      dplyr::slice_head(n = max_points_per_group_facet) %>%
+      dplyr::ungroup()
+  }
+
+  p = plot_pairs %>%
     ggplot2::ggplot(ggplot2::aes(
       x = elem1,
       y = elem2,
@@ -251,8 +271,8 @@ multiplot = function(selectedData,attrGroups, xvar, yvar, ptsize, interactive = 
       ggplot2::facet_wrap(~yvar, scales = 'free',strip.position = "left") +
       ggplot2::xlab(xvar)
   }
-  if(interactive){
-    return(plotly::ggplotly(p))
+  if(interactive_mode){
+    return(plotly::ggplotly(p) %>% plotly::toWebGL())
   } else {
     return(p)
   }
