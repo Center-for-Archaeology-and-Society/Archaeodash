@@ -24,6 +24,7 @@
 - Reported `accessTokens.php` blocked by `X-Content-Type-Options: nosniff` with `text/html`; provided root-cause triage and fix guidance to return the correct MIME type (or correct the caller/resource type) instead of weakening `nosniff`.
 - Requested Visualize & Assign layout/filter improvements; moved controls to a right-side sidebar, added metadata-field visualization filter with multi-select values (display-only via rowid intersection), hardened selection sync under filtering, and prepared commit/tag/install steps.
 - Reported unspecified visualization-filter error; traced to `vizMetaFilterFieldUI` NA handling (`if: missing value where TRUE/FALSE needed`), hardened NA/empty guards for both metadata field/value UI renderers, reinstalled and restarted `archaeodashbeta`, and verified the error no longer appears in fresh logs.
+- Requested release promotion to live; prepared release commit/tag in beta repo, synchronized current tree into `../Archaeodash`, installed package into `archaeodash` container, and restarted live service.
 
 ## Related
 
