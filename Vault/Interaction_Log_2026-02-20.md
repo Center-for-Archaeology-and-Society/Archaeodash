@@ -18,6 +18,10 @@
 - User asked whether upload append type-mismatch failures are automatable; reviewed current unit and shinytest2 coverage, confirmed this class is testable via automation, and identified remaining e2e gap for two-upload append workflow assertions.
 - User asked to close the upload-append automation gap; added a shinytest2 e2e test for two sequential uploads with intentional shared-column type mismatch and verified append success by table row growth (2 to 4), then validated test pass.
 - User reported interactive multiplot hangs and requested cancel option; optimized interactive multiplot generation/conversion safeguards, added cancel control/state handling to multiplot loading modal, added regression tests, and prepared commit/tag/install for beta.
+- Asked whether Heurist login timeout can be increased and users kept logged in; confirmed app already defaults to persistent login (30 days) and identified exact code points to extend token/cookie lifetime.
+- Requested transformation metadata synchronization across saved transformations; implemented canonical metadata sync from `importedData`, added unfiltered snapshot base (`selectedDataAll`) plus per-snapshot group-filter derivation, updated load/persistence paths, and validated targeted transformation/data-input tests.
+- Reported CSP report-only violations blocking Heurist external JS/CSS dependencies under strict `script-src/style-src`; provided targeted Apache CSP allowlist updates for required CDN hosts plus a safer migration path toward self-hosted assets and reduced `unsafe-*`.
+- Reported `accessTokens.php` blocked by `X-Content-Type-Options: nosniff` with `text/html`; provided root-cause triage and fix guidance to return the correct MIME type (or correct the caller/resource type) instead of weakening `nosniff`.
 
 ## Related
 

@@ -97,6 +97,7 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
   tx_name <- as.character(snapshot$name[[1]])
   prefix <- transform_prefix(username, dataset_key, tx_name)
   selected_tbl <- paste0(prefix, "_selected")
+  selected_all_tbl <- paste0(prefix, "_selected_all")
   pca_tbl <- paste0(prefix, "_pca")
   umap_tbl <- paste0(prefix, "_umap")
   lda_tbl <- paste0(prefix, "_lda")
@@ -112,6 +113,19 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
     row.names = FALSE,
     context = "persisting selected transformation dataset"
   )) return(invisible(FALSE))
+
+  if (inherits(snapshot$selectedDataAll, "data.frame") && nrow(snapshot$selectedDataAll) > 0) {
+    if (!db_write_table_safe(
+      con = con,
+      table_name = selected_all_tbl,
+      value = snapshot$selectedDataAll,
+      overwrite = TRUE,
+      row.names = FALSE,
+      context = "persisting unfiltered transformation dataset"
+    )) return(invisible(FALSE))
+  } else if (DBI::dbExistsTable(con, selected_all_tbl)) {
+    if (!db_remove_table_safe(con, selected_all_tbl, context = "removing prior unfiltered transformation dataset")) return(invisible(FALSE))
+  }
 
   if (inherits(snapshot$pcadf, "data.frame") && nrow(snapshot$pcadf) > 0) {
     if (!db_write_table_safe(
@@ -245,10 +259,12 @@ load_transformations_db <- function(con, username, dataset_key) {
     tx_name <- as.character(rows$transformation_name[[i]])
     prefix <- as.character(rows$table_prefix[[i]])
     selected_tbl <- paste0(prefix, "_selected")
+    selected_all_tbl <- paste0(prefix, "_selected_all")
     meta_tbl <- paste0(prefix, "_meta")
     if (!DBI::dbExistsTable(con, selected_tbl)) next
 
     selected_data <- dplyr::tbl(con, selected_tbl) %>% dplyr::collect()
+    selected_data_all <- if (DBI::dbExistsTable(con, selected_all_tbl)) dplyr::tbl(con, selected_all_tbl) %>% dplyr::collect() else selected_data
     pcadf <- if (DBI::dbExistsTable(con, paste0(prefix, "_pca"))) dplyr::tbl(con, paste0(prefix, "_pca")) %>% dplyr::collect() else tibble::tibble()
     umapdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_umap"))) dplyr::tbl(con, paste0(prefix, "_umap")) %>% dplyr::collect() else tibble::tibble()
     LDAdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_lda"))) dplyr::tbl(con, paste0(prefix, "_lda")) %>% dplyr::collect() else tibble::tibble()
@@ -285,6 +301,7 @@ load_transformations_db <- function(con, username, dataset_key) {
       pointLabelColumn = get_meta("pointLabelColumn", ""),
       ratioMode = get_meta("ratioMode", "append"),
       ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
+      selectedDataAll = selected_data_all,
       selectedData = selected_data,
       pcadf = pcadf,
       umapdf = umapdf,
@@ -310,6 +327,7 @@ delete_transformation_db <- function(con, username, dataset_key, transformation_
   prefix <- transform_prefix(username, dataset_key, transformation_name)
   candidate_tables <- c(
     paste0(prefix, "_selected"),
+    paste0(prefix, "_selected_all"),
     paste0(prefix, "_pca"),
     paste0(prefix, "_umap"),
     paste0(prefix, "_lda"),

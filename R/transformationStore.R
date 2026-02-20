@@ -71,6 +71,7 @@ buildTransformationSnapshot <- function(rvals, name) {
     pointLabelColumn = if (is.null(rvals$pointLabelColumn)) "" else as.character(rvals$pointLabelColumn),
     ratioSpecs = if (inherits(rvals$ratioSpecs, "data.frame")) rvals$ratioSpecs else tibble::tibble(),
     ratioMode = if (is.null(rvals$ratioMode)) "append" else as.character(rvals$ratioMode),
+    selectedDataAll = if (inherits(rvals$selectedDataAll, "data.frame")) rvals$selectedDataAll else rvals$selectedData,
     selectedData = rvals$selectedData,
     pcadf = rvals$pcadf,
     umapdf = rvals$umapdf,
@@ -111,6 +112,7 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
   rvals$pointLabelColumn <- if (is.null(snapshot$pointLabelColumn) || !nzchar(as.character(snapshot$pointLabelColumn))) NULL else as.character(snapshot$pointLabelColumn)
   rvals$ratioSpecs <- if (inherits(snapshot$ratioSpecs, "data.frame")) snapshot$ratioSpecs else tibble::tibble()
   rvals$ratioMode <- if (is.null(snapshot$ratioMode) || !snapshot$ratioMode %in% c("append", "only")) "append" else snapshot$ratioMode
+  rvals$selectedDataAll <- if (inherits(snapshot$selectedDataAll, "data.frame")) snapshot$selectedDataAll else snapshot$selectedData
   rvals$selectedData <- snapshot$selectedData
   rvals$pcadf <- snapshot$pcadf
   rvals$umapdf <- snapshot$umapdf
@@ -119,6 +121,47 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
   rvals$LDAmod <- snapshot$LDAmod
   rvals$activeTransformation <- snapshot$name
   invisible(NULL)
+}
+
+applyTransformationGroupFilter <- function(snapshot) {
+  if (is.null(snapshot) || !is.list(snapshot)) return(snapshot)
+  base_df <- if (inherits(snapshot$selectedDataAll, "data.frame")) snapshot$selectedDataAll else snapshot$selectedData
+  if (!inherits(base_df, "data.frame")) return(snapshot)
+
+  if (!("rowid" %in% names(base_df))) {
+    snapshot$selectedData <- base_df
+    return(snapshot)
+  }
+
+  base_df$rowid <- as.character(base_df$rowid)
+  group_col <- as.character(snapshot$attrGroups)
+  selected_groups <- as.character(snapshot$attrGroupsSub)
+  selected_groups <- selected_groups[!is.na(selected_groups) & nzchar(selected_groups)]
+
+  if (nzchar(group_col) && group_col %in% names(base_df) && length(selected_groups) > 0) {
+    keep_rowids <- base_df %>%
+      dplyr::mutate(.group_value = as.character(.data[[group_col]])) %>%
+      dplyr::filter(.data$.group_value %in% selected_groups) %>%
+      dplyr::pull(.data$rowid) %>%
+      as.character() %>%
+      unique()
+  } else {
+    keep_rowids <- as.character(base_df$rowid)
+  }
+
+  snapshot$selectedData <- base_df %>%
+    dplyr::filter(.data$rowid %in% keep_rowids)
+
+  filter_by_rowid <- function(df) {
+    if (!inherits(df, "data.frame") || !("rowid" %in% names(df))) return(df)
+    df %>%
+      dplyr::mutate(rowid = as.character(.data$rowid)) %>%
+      dplyr::filter(.data$rowid %in% keep_rowids)
+  }
+  snapshot$pcadf <- filter_by_rowid(snapshot$pcadf)
+  snapshot$umapdf <- filter_by_rowid(snapshot$umapdf)
+  snapshot$LDAdf <- filter_by_rowid(snapshot$LDAdf)
+  snapshot
 }
 
 #' Refresh metadata in all stored transformations
@@ -131,18 +174,17 @@ applyTransformationSnapshot <- function(rvals, snapshot) {
 refreshTransformationMetadata <- function(transformations, imported_data, chem) {
   if (is.null(transformations) || length(transformations) == 0) return(list())
   lapply(transformations, function(snapshot) {
-    if (is.null(snapshot$selectedData)) return(snapshot)
-    keep_cols <- unique(c(as.character(snapshot$attrGroups)))
-    keep_cols <- keep_cols[!is.na(keep_cols) & nzchar(keep_cols)]
-    if (length(keep_cols) == 0 && inherits(snapshot$selectedData, "data.frame")) {
-      if ("GroupVal" %in% names(snapshot$selectedData)) {
-        keep_cols <- "GroupVal"
-      }
-    }
-    snapshot$selectedData <- refreshNonElementMetadata(snapshot$selectedData, imported_data, chem, preserve_cols = keep_cols)
-    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, imported_data, chem, preserve_cols = keep_cols)
-    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, imported_data, chem, preserve_cols = keep_cols)
-    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, imported_data, chem, preserve_cols = keep_cols)
+    if (is.null(snapshot$selectedData) && is.null(snapshot$selectedDataAll)) return(snapshot)
+    snapshot$selectedDataAll <- refreshNonElementMetadata(
+      transformed = if (inherits(snapshot$selectedDataAll, "data.frame")) snapshot$selectedDataAll else snapshot$selectedData,
+      imported_data = imported_data,
+      chem = chem,
+      preserve_cols = character()
+    )
+    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, imported_data, chem, preserve_cols = character())
+    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, imported_data, chem, preserve_cols = character())
+    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, imported_data, chem, preserve_cols = character())
+    snapshot <- applyTransformationGroupFilter(snapshot)
     snapshot
   })
 }

@@ -714,13 +714,16 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       df
     }
 
+    synced_snapshot <- refreshTransformationMetadata(
+      transformations = list(tmp = snapshot),
+      imported_data = rvals$importedData,
+      chem = snapshot$chem
+    )
+    if (length(synced_snapshot) == 1) {
+      snapshot <- synced_snapshot[[1]]
+      rvals$transformations[[name]] <- snapshot
+    }
     applyTransformationSnapshot(rvals, snapshot)
-    # Ensure metadata always comes from canonical imported data.
-    preserve_group_col <- as.character(snapshot$attrGroups)
-    rvals$selectedData <- refreshNonElementMetadata(rvals$selectedData, rvals$importedData, rvals$chem, preserve_cols = preserve_group_col)
-    rvals$pcadf <- refreshNonElementMetadata(rvals$pcadf, rvals$importedData, rvals$chem, preserve_cols = preserve_group_col)
-    rvals$umapdf <- refreshNonElementMetadata(rvals$umapdf, rvals$importedData, rvals$chem, preserve_cols = preserve_group_col)
-    rvals$LDAdf <- refreshNonElementMetadata(rvals$LDAdf, rvals$importedData, rvals$chem, preserve_cols = preserve_group_col)
     # Persisted datasets load metadata as character; re-apply stable group factors after merge.
     grp_col <- as.character(snapshot$attrGroups)
     grp_lvls <- as.character(snapshot$attrGroupsSub)
@@ -730,28 +733,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       rvals$umapdf <- normalize_group_factor(rvals$umapdf, grp_col, grp_lvls)
       rvals$LDAdf <- normalize_group_factor(rvals$LDAdf, grp_col, grp_lvls)
     }
-    if (isTRUE(snapshot$runPCA) && (is.null(rvals$pca) || !inherits(rvals$pca, "prcomp"))) {
-      rvals$pca <- tryCatch(stats::prcomp(rvals$selectedData[, rvals$chem]), error = function(e) NULL)
-      if (is.null(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
-        rvals$pcadf <- tryCatch(
-          dplyr::bind_cols(
-            rvals$selectedData %>% dplyr::select(-tidyselect::any_of(rvals$chem)),
-            as.data.frame(rvals$pca$x)
-          ),
-          error = function(e) tibble::tibble()
-        )
-      }
-    }
-    if (isTRUE(snapshot$runLDA) && is.null(rvals$LDAmod)) {
-      lda_result <- tryCatch(
-        getLDA(df = rvals$selectedData, chem = rvals$chem, attrGroups = rvals$attrGroups),
-        error = function(e) list(LDAdf = tibble::tibble(), mod = NULL)
-      )
-      if (nrow(rvals$LDAdf) == 0) {
-        rvals$LDAdf <- lda_result$LDAdf
-      }
-      rvals$LDAmod <- lda_result$mod
-    }
+    compute_ordinations(
+      run_pca = isTRUE(snapshot$runPCA),
+      run_umap = isTRUE(snapshot$runUMAP),
+      run_lda = isTRUE(snapshot$runLDA)
+    )
     suppress_group_reset(TRUE)
     on.exit(suppress_group_reset(FALSE), add = TRUE)
     if (!is.null(snapshot$attrGroups) && nzchar(as.character(snapshot$attrGroups))) {
@@ -1449,6 +1435,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       }
     })
 
+    rvals$selectedDataAll <- rvals$selectedData
+
     quietly(label = "keep",{rvals$selectedData = rvals$selectedData %>%
       dplyr::filter(!!as.name(input$attrGroups) %in% input$attrGroupsSub)})
 
@@ -1473,10 +1461,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                   session)
 
     snapshot <- buildTransformationSnapshot(rvals = rvals, name = transformation_name)
-    snapshot$selectedData <- refreshNonElementMetadata(snapshot$selectedData, rvals$importedData, snapshot$chem, preserve_cols = snapshot$attrGroups)
-    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, rvals$importedData, snapshot$chem, preserve_cols = snapshot$attrGroups)
-    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, rvals$importedData, snapshot$chem, preserve_cols = snapshot$attrGroups)
-    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, rvals$importedData, snapshot$chem, preserve_cols = snapshot$attrGroups)
+    snapshot$selectedDataAll <- refreshNonElementMetadata(snapshot$selectedDataAll, rvals$importedData, snapshot$chem, preserve_cols = character())
+    snapshot$pcadf <- refreshNonElementMetadata(snapshot$pcadf, rvals$importedData, snapshot$chem, preserve_cols = character())
+    snapshot$umapdf <- refreshNonElementMetadata(snapshot$umapdf, rvals$importedData, snapshot$chem, preserve_cols = character())
+    snapshot$LDAdf <- refreshNonElementMetadata(snapshot$LDAdf, rvals$importedData, snapshot$chem, preserve_cols = character())
+    snapshot <- applyTransformationGroupFilter(snapshot)
     rvals$transformations[[transformation_name]] <- snapshot
     rvals$activeTransformation <- transformation_name
     if (isTruthy(credentials$status) && !is.null(con)) {

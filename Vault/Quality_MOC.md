@@ -15,6 +15,7 @@ Quality guardrails, tests, and known risks.
 - [[Security_Audit_External_Attack_Surface_2026-02-20]]
 - [[Security_Hardening_Implementation_2026-02-20]]
 - [[Apache_Sites_Config_Review_2026-02-20]]
+- [[Apache_CSP_Heurist_Allowlist_2026-02-20]]
 - [[Upload_Append_Type_Harmonization_Fix_2026-02-20]]
 - [[Upload_Append_E2E_Test_Coverage_2026-02-20]]
 - [[Multiplot_Interactive_Performance_and_Cancel_2026-02-20]]
