@@ -17,6 +17,12 @@ clusterTab = function(){
                                         "k-means" = "kmeans",
                                         "k-medoids" = "kmedoids"),
                             selected = "nClust"),
+               selectInput(
+                 "cluster.dataset",
+                 "Select dataset to use",
+                 choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+                 selected = "elements"
+               ),
                uiOutput("cluster.options"),
                uiOutput("cluster.column.text"),
                uiOutput("cluster.buttonUI"),
@@ -25,6 +31,7 @@ clusterTab = function(){
              ), # end sidebarPanel
 
              mainPanel(
+               actionButton("clusterPlotExpand", "Expand Plot", class = "mybtn"),
                plotOutput("clusterPlot"),
                DT::dataTableOutput("clusterDT")
              ) # end mainPanel PCA
@@ -46,16 +53,78 @@ clusterTab = function(){
 #' clusterServer(input,output,session,rvals)
 clusterServer = function(input,output,session,rvals, credentials, con){
   pending_cluster_assignment <- shiny::reactiveVal(NULL)
+  cluster_plot_gg <- shiny::reactiveVal(NULL)
+
+  get_cluster_source_features <- function(df, source) {
+    if (!is.data.frame(df) || nrow(df) == 0) return(character())
+    if (identical(source, "principal components")) {
+      cols <- grep("^PC[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "UMAP")) {
+      cols <- grep("^V[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "linear discriminants")) {
+      cols <- grep("^LD[0-9]+$", names(df), value = TRUE)
+    } else {
+      cols <- intersect(rvals$chem, names(df))
+    }
+    if (length(cols) == 0) {
+      meta_cols <- unique(c(rvals$attrs, rvals$attrGroups, "rowid"))
+      candidate_cols <- setdiff(names(df), meta_cols)
+      numeric_cols <- candidate_cols[vapply(df[candidate_cols], is.numeric, logical(1))]
+      cols <- numeric_cols
+    }
+    cols
+  }
+
+  get_cluster_data <- function(source) {
+    if (identical(source, "principal components")) {
+      if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+        mynotification("No PCA results available. Run confirm selections with PCA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$pcadf
+    } else if (identical(source, "UMAP")) {
+      if (!is.data.frame(rvals$umapdf) || nrow(rvals$umapdf) == 0) {
+        mynotification("No UMAP results available. Run confirm selections with UMAP enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$umapdf
+    } else if (identical(source, "linear discriminants")) {
+      if (!is.data.frame(rvals$LDAdf) || nrow(rvals$LDAdf) == 0) {
+        mynotification("No LDA results available. Run confirm selections with LDA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$LDAdf
+    } else {
+      df <- rvals$selectedData
+    }
+    if (!"rowid" %in% names(df)) {
+      df <- tibble::rowid_to_column(df, var = "rowid")
+    }
+    feature_cols <- get_cluster_source_features(df, source)
+    if (length(feature_cols) == 0) {
+      mynotification("No numeric clustering columns found for this dataset source.", type = "error")
+      return(NULL)
+    }
+    numeric_df <- suppressWarnings(df %>% dplyr::mutate_at(dplyr::vars(feature_cols), as.numeric))
+    list(df = numeric_df, features = feature_cols)
+  }
 
   apply_cluster_assignment <- function(assignment_columns, assignment_data) {
+    req("rowid" %in% names(assignment_data))
+    join_data <- assignment_data %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
+      dplyr::distinct(rowid, .keep_all = TRUE)
+
     rvals$selectedData =
       rvals$selectedData %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
       dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
-      dplyr::bind_cols(assignment_data)
+      dplyr::left_join(join_data, by = "rowid")
     rvals$importedData =
       rvals$importedData %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
       dplyr::select(-tidyselect::any_of(assignment_columns)) %>%
-      dplyr::bind_cols(assignment_data)
+      dplyr::left_join(join_data, by = "rowid")
 
     if(length(assignment_columns) > 0){
       rvals$attrGroups = assignment_columns[[1]]
@@ -91,9 +160,20 @@ clusterServer = function(input,output,session,rvals, credentials, con){
   # Render WSS and Silhouette graphs for optimal number of clusters for each method
 
   observeEvent(input$cluster.button, {
-    req(rvals$chem)
+    req(nrow(rvals$selectedData) > 0)
     try({
       if(isTruthy(input$cluster.column.text == "")) clusterName = "cluster" else clusterName = input$cluster.column.text
+      data_source <- get_cluster_data(input$cluster.dataset)
+      if (is.null(data_source)) return(invisible(NULL))
+      analysis_df <- data_source$df
+      feature_cols <- data_source$features
+      feature_data <- analysis_df %>% dplyr::select(tidyselect::any_of(feature_cols))
+      rownames(feature_data) <- as.character(analysis_df$rowid)
+      if (ncol(feature_data) < 2) {
+        mynotification("Clustering requires at least two numeric analysis columns.", type = "error")
+        return(invisible(NULL))
+      }
+
       required_pkgs = switch(
         input$cluster.parent,
         nClust = c("factoextra", "cowplot"),
@@ -108,23 +188,28 @@ clusterServer = function(input,output,session,rvals, credentials, con){
       }
       if (input$cluster.parent == "nClust") {
         kmeans_wss <-
-          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "wss") +
+          factoextra::fviz_nbclust(feature_data, kmeans, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Elbow Method")
         kmeans_sil <-
-          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], kmeans, method = "silhouette") +
+          factoextra::fviz_nbclust(feature_data, kmeans, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmeans Silhouette Method")
         kmedoids_wss <-
-          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], cluster::pam, method = "wss") +
+          factoextra::fviz_nbclust(feature_data, cluster::pam, method = "wss") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids Elbow Method")
         kmedoids_sil <-
-          factoextra::fviz_nbclust(rvals$selectedData[,rvals$chem], cluster::pam, method = "silhouette") +
+          factoextra::fviz_nbclust(feature_data, cluster::pam, method = "silhouette") +
           ggplot2::labs(title = "Optimal # of Cluster, Kmedoids ")
 
-        rvals$clusterPlot = function(){cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)}
+        plot_obj <- cowplot::plot_grid(kmeans_wss, kmeans_sil, kmedoids_wss, kmedoids_sil)
+        cluster_plot_gg(plot_obj)
+        rvals$clusterPlot = function(){print(plot_obj)}
       } else if (input$cluster.parent == "hca") {
+        cluster_plot_gg(NULL)
+        m <- as.matrix(feature_data)
+        rownames(m) <- as.character(analysis_df$rowid)
         hc = as.dendrogram(
           hclust(
-            dist(rvals$selectedData[,rvals$chem], method = input$clust.dist.method),
+            dist(m, method = input$clust.dist.method),
             method = input$hclust.method
           )
         )
@@ -153,8 +238,11 @@ clusterServer = function(input,output,session,rvals, credentials, con){
         colnames(rvals$clusterDT) <-
           c("Sample", clusterName)
       } else if (input$cluster.parent == "hdca") {
+        cluster_plot_gg(NULL)
+        m <- as.matrix(feature_data)
+        rownames(m) <- as.character(analysis_df$rowid)
         hc = as.dendrogram(
-          cluster::diana(rvals$selectedData[,rvals$chem], metric = input$hdca.dist.method)
+          cluster::diana(m, metric = input$hdca.dist.method)
         )
         rvals$clusterPlot = function(){plot(
           dendextend::color_branches(hc,
@@ -177,31 +265,102 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           c("Sample", clusterName)
       } else if (input$cluster.parent == "kmeans") {
         kmeans_solution = kmeans(
-          rvals$selectedData[,rvals$chem],
+          feature_data,
           centers = input$kmeans.centers,
           iter.max = input$kmeans.iter.max,
           nstart = input$kmeans.nstart
         )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(
-          kmeans_solution, data = rvals$selectedData[,rvals$chem]
-        ) +
-            ggplot2::theme_bw()}
+        color_mode <- tryCatch(as.character(input$clusterColorMode), error = function(e) "clusters")
+        can_color_by_group <- identical(color_mode, "groups") &&
+          isTruthy(rvals$attrGroups) &&
+          rvals$attrGroups %in% names(analysis_df)
+        if (can_color_by_group) {
+          group_col <- rvals$attrGroups
+          plot_df <- feature_data %>%
+            tibble::as_tibble() %>%
+            dplyr::mutate(
+              .cluster = as.factor(kmeans_solution$cluster),
+              .group = as.factor(analysis_df[[group_col]])
+            )
+          x_col <- names(feature_data)[1]
+          y_col <- names(feature_data)[2]
+          plot_obj <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+              ggplot2::geom_point(size = 2.2, alpha = 0.88) +
+              ggplot2::theme_bw() +
+              ggplot2::labs(
+                title = "k-means clustering",
+                subtitle = paste0("Color: ", group_col, " | Shape: cluster"),
+                color = group_col,
+                shape = "Cluster"
+              )
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
+        } else {
+          if (identical(color_mode, "groups")) {
+            mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
+          }
+          plot_obj <- factoextra::fviz_cluster(
+            kmeans_solution, data = feature_data
+          ) + ggplot2::theme_bw()
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
+        }
         rvals$clusterDT = kmeans_solution$cluster
         rvals$clusterDT <-
-          tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample")
+          tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample") %>%
+          dplyr::mutate(Sample = as.character(Sample))
+        if (all(rvals$clusterDT$Sample %in% as.character(seq_len(nrow(analysis_df))))) {
+          rvals$clusterDT$Sample <- as.character(analysis_df$rowid[as.integer(rvals$clusterDT$Sample)])
+        }
         colnames(rvals$clusterDT) <-
           c("Sample", clusterName)
       } else if (input$cluster.parent == "kmedoids") {
         pam_solution =
           cluster::pam(
-            rvals$selectedData[,rvals$chem],
+            feature_data,
             k = input$kmedoids.k,
             metric = input$kmedoids.dist.method
           )
-        rvals$clusterPlot = function(){factoextra::fviz_cluster(pam_solution, data = rvals$selectedData[,rvals$chem]) + ggplot2::theme_bw()}
+        color_mode <- tryCatch(as.character(input$clusterColorMode), error = function(e) "clusters")
+        can_color_by_group <- identical(color_mode, "groups") &&
+          isTruthy(rvals$attrGroups) &&
+          rvals$attrGroups %in% names(analysis_df)
+        if (can_color_by_group) {
+          group_col <- rvals$attrGroups
+          plot_df <- feature_data %>%
+            tibble::as_tibble() %>%
+            dplyr::mutate(
+              .cluster = as.factor(pam_solution$cluster),
+              .group = as.factor(analysis_df[[group_col]])
+            )
+          x_col <- names(feature_data)[1]
+          y_col <- names(feature_data)[2]
+          plot_obj <- ggplot2::ggplot(plot_df, ggplot2::aes_string(x = x_col, y = y_col, color = ".group", shape = ".cluster")) +
+              ggplot2::geom_point(size = 2.2, alpha = 0.88) +
+              ggplot2::theme_bw() +
+              ggplot2::labs(
+                title = "k-medoids clustering",
+                subtitle = paste0("Color: ", group_col, " | Shape: cluster"),
+                color = group_col,
+                shape = "Cluster"
+              )
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
+        } else {
+          if (identical(color_mode, "groups")) {
+            mynotification("Group column not available for this dataset source. Coloring by clusters.", type = "warning")
+          }
+          plot_obj <- factoextra::fviz_cluster(pam_solution, data = feature_data) + ggplot2::theme_bw()
+          cluster_plot_gg(plot_obj)
+          rvals$clusterPlot = function(){print(plot_obj)}
+        }
         rvals$clusterDT <- pam_solution$cluster
         rvals$clusterDT <-
-          tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample")
+          tibble::rownames_to_column(as.data.frame(rvals$clusterDT), var = "Sample") %>%
+          dplyr::mutate(Sample = as.character(Sample))
+        if (all(rvals$clusterDT$Sample %in% as.character(seq_len(nrow(analysis_df))))) {
+          rvals$clusterDT$Sample <- as.character(analysis_df$rowid[as.integer(rvals$clusterDT$Sample)])
+        }
         colnames(rvals$clusterDT) <-
           c("Sample", clusterName)
       }
@@ -213,15 +372,44 @@ clusterServer = function(input,output,session,rvals, credentials, con){
     rvals$clusterPlot()
   })
 
+  output$clusterPlotModalPlotly <- plotly::renderPlotly({
+    req(cluster_plot_gg())
+    plotly::ggplotly(cluster_plot_gg())
+  })
+
+  output$clusterPlotModalStatic <- renderPlot({
+    req(rvals$clusterPlot)
+    p <- rvals$clusterPlot()
+    if (!inherits(p, "ggplot") && !inherits(p, "plotly")) {
+      rvals$clusterPlot()
+    }
+  })
+
+  observeEvent(input$clusterPlotExpand, {
+    req(rvals$clusterPlot)
+    use_plotly <- isTRUE(input$cluster.parent %in% c("kmeans", "kmedoids")) &&
+      inherits(cluster_plot_gg(), "ggplot")
+    showModal(modalDialog(
+      title = "Cluster Plot",
+      size = "l",
+      easyClose = TRUE,
+      if (use_plotly) {
+        plotly::plotlyOutput("clusterPlotModalPlotly", height = "78vh")
+      } else {
+        plotOutput("clusterPlotModalStatic", height = "78vh")
+      }
+    ))
+  })
+
   output$clusterDT<- DT::renderDataTable({
     req(rvals$clusterDT)
-    DT::datatable(rvals$clusterDT, rownames = F)
+    DT::datatable(rvals$clusterDT, rownames = F, class = "membership-plain-table nowrap")
   })
 
 
   # Render UI options for cluster analysis
   output$cluster.options <- renderUI({
-    req(rvals$chem)
+    req(nrow(rvals$selectedData) > 0)
     # Output of options if HCA chosen
     if (input$cluster.parent == "hca") {
       cluster_input_selections <- list(
@@ -331,6 +519,12 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           min = 1,
           max = 200,
           step = 1
+        ),
+        radioButtons(
+          "clusterColorMode",
+          "Color plot points by",
+          choices = c("New clusters" = "clusters", "Existing groups" = "groups"),
+          selected = "clusters"
         )
       )
     } else if (input$cluster.parent == "kmedoids") {
@@ -352,6 +546,12 @@ clusterServer = function(input,output,session,rvals, credentials, con){
           min = 1,
           max = 20,
           step = 1
+        ),
+        radioButtons(
+          "clusterColorMode",
+          "Color plot points by",
+          choices = c("New clusters" = "clusters", "Existing groups" = "groups"),
+          selected = "clusters"
         )
       )
     } else {
@@ -365,13 +565,13 @@ clusterServer = function(input,output,session,rvals, credentials, con){
   # Assign cluster assignments based on cluster solution
 
   observeEvent(input$cluster.assign.button,{
-    req(rvals$chem)
     req(rvals$clusterDT)
     quietly({
       assignment_columns = rvals$clusterDT %>% names()
       assignment_columns = setdiff(assignment_columns,'Sample')
       assignment_data = rvals$clusterDT %>%
-        dplyr::select(-Sample) %>%
+        dplyr::rename(rowid = Sample) %>%
+        dplyr::select(rowid, tidyselect::any_of(assignment_columns)) %>%
         dplyr::mutate_at(dplyr::vars(assignment_columns),factor)
 
       existing_columns = intersect(assignment_columns, names(rvals$selectedData))

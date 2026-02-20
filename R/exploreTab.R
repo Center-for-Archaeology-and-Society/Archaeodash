@@ -112,7 +112,12 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   # Render datatable of imputed chemical data
   output$datasetDT <- DT::renderDataTable({
     req(rvals$selectedData)
-    quietly(DT::datatable(rvals$selectedData, rownames = F,editable = TRUE))
+    quietly(DT::datatable(
+      rvals$selectedData,
+      rownames = F,
+      editable = TRUE,
+      class = "membership-plain-table nowrap"
+    ))
   })
 
   observeEvent(input$datasetDT_cell_edit, {
@@ -167,13 +172,19 @@ exploreServer = function(input, output, session, rvals, con, credentials) {
   output$crosstabsDT = DT::renderDT({
     req(rvals$selectedData, input$crosstab1, input$crosstab2, input$crosstab3)
     quietly({
-      tryCatch(
-        compute_crosstab_summary(
+      tryCatch({
+        result_tbl <- compute_crosstab_summary(
           data = rvals$selectedData,
           group_column = input$crosstab1,
           value_column = input$crosstab2,
           summary_method = input$crosstab3
-        ),
+        )
+        DT::datatable(
+          result_tbl,
+          rownames = FALSE,
+          class = "membership-plain-table nowrap"
+        )
+      },
         error = function(e) {
           validate(need(FALSE, e$message))
         }

@@ -53,10 +53,12 @@ quietly <- function(.expr, label = NULL) {
 #' mynotification("hello world")
 mynotification <- function(message, type = c("default", "message", "warning", "error", "success"), duration = 5) {
   type <- match.arg(type)
-  if(type %in% c("warning", "error")) {
-    warning(message)
-  } else {
-    message(message)
+  if (app_is_verbose()) {
+    if(type %in% c("warning", "error")) {
+      warning(message, call. = FALSE)
+    } else {
+      app_log(message)
+    }
   }
   try(showNotification(message, type = type, duration = duration),silent = T)
 }

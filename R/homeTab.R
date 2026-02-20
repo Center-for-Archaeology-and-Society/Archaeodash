@@ -25,6 +25,16 @@ homeTab = function() {
                  6,
                  p(
                    class = "lead",
+                   strong("Help Guide: "),
+                   shiny::a(
+                     href = "help.html",
+                     target = "_blank",
+                     rel = "noopener noreferrer",
+                     "Open the ArchaeoDash Help documentation"
+                   )
+                 ),
+                 p(
+                   class = "lead",
                    "Welcome to",
                    strong("ArchaeoDash"),
                    "- ",
@@ -34,9 +44,9 @@ homeTab = function() {
                    class = "lead",
                    "Online version hosted at ",
                    shiny::a(
-                     href="https://collectiveaccess.rc.asu.edu/app/Archaeodash/",
+                     href="https://cas.rc.asu.edu/app/Archaeodash/",
                      target = "0",
-                     "collectiveaccess.rc.asu.edu/app/Archaeodash/"
+                     "cas.rc.asu.edu/app/Archaeodash/"
                             ),
                    " and supported by the Center for Archaeology and Society at Arizona State University."
                  ),

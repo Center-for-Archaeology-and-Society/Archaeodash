@@ -9,50 +9,76 @@
 #'
 #' @examples
 #' getLDA(df,chem,attrGroups)
+lda_failure_result <- function() {
+  list(mod = NULL, LDAdf = tibble::tibble())
+}
+
+# Internal helper for user-facing LDA eligibility checks.
+validate_lda_groups <- function(df, attrGroups, min_groups = 3, notify = TRUE) {
+  if (!is.data.frame(df) || nrow(df) == 0 || !attrGroups %in% names(df)) {
+    if (isTRUE(notify)) {
+      mynotification("LDA is unavailable because grouping data is missing.", type = "warning")
+    }
+    return(FALSE)
+  }
+
+  group_values <- as.character(df[[attrGroups]])
+  group_values <- group_values[!is.na(group_values) & nzchar(group_values)]
+  n_groups <- length(unique(group_values))
+  if (n_groups < min_groups) {
+    if (isTRUE(notify)) {
+      mynotification(
+        glue::glue("LDA requires at least {min_groups} groups. Current selection has {n_groups}. Please include more groups and rerun."),
+        type = "warning"
+      )
+    }
+    return(FALSE)
+  }
+  TRUE
+}
+
 getLDA = function(df = rvals$selectedData,
                   chem = rvals$chem,
                   attrGroups = rvals$attrGroups) {
   if (!app_require_packages("MASS", feature = "Linear Discriminant Analysis")) {
-    return(NULL)
+    return(lda_failure_result())
+  }
+  if (!validate_lda_groups(df = df, attrGroups = attrGroups, min_groups = 3, notify = TRUE)) {
+    return(lda_failure_result())
   }
   mdl = as.formula(glue::glue("`{attrGroups}` ~ ."))
   mdl_lda = tryCatch(
     MASS::lda(mdl, data = df[, c(attrGroups, chem)]),
     error = function(e) {
-      mynotification(glue::glue("unable to return LDA: {e}"))
+      mynotification("LDA could not be computed for the current selection.", type = "warning")
       return(NULL)
     }
   )
 
-  if (!is.null(mdl_lda)) {
-    pred_lda = predict(mdl_lda)
-    coefficients <- mdl_lda$scaling
-    means <- mdl_lda$means
-    centered_data <-
-      scale(df[, chem], center = colMeans(df[, chem]))
-    discriminant_scores <-
-      centered_data %*% coefficients - matrix(
-        colMeans(centered_data %*% coefficients),
-        ncol = ncol(coefficients),
-        nrow = nrow(centered_data),
-        byrow = TRUE
-      )
+  if (is.null(mdl_lda)) return(lda_failure_result())
 
-    result = tryCatch(
-      list(
-        mod = mdl_lda,
-        LDAdf = dplyr::bind_cols(
-          df %>% dplyr::select(-tidyselect::any_of(chem)),
-          discriminant_scores
-        )
-      ),
-      error = function(e)
-        return(NULL)
+  coefficients <- mdl_lda$scaling
+  centered_data <-
+    scale(df[, chem], center = colMeans(df[, chem]))
+  discriminant_scores <-
+    centered_data %*% coefficients - matrix(
+      colMeans(centered_data %*% coefficients),
+      ncol = ncol(coefficients),
+      nrow = nrow(centered_data),
+      byrow = TRUE
     )
-    return(result)
-  } else {
-    return(NULL)
-  }
+
+  result = tryCatch(
+    list(
+      mod = mdl_lda,
+      LDAdf = dplyr::bind_cols(
+        df %>% dplyr::select(-tidyselect::any_of(chem)),
+        discriminant_scores
+      )
+    ),
+    error = function(e) lda_failure_result()
+  )
+  return(result)
 }
 
 

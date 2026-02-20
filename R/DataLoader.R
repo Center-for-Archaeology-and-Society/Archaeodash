@@ -54,6 +54,73 @@ resolve_id_column <- function(selected_id_column, column_names) {
   selected_id_column
 }
 
+replace_non_element_blanks <- function(data, chem_cols, blank_label = "[blank]") {
+  if (!inherits(data, "data.frame")) return(data)
+  non_element_cols <- setdiff(names(data), c("rowid", chem_cols))
+  if (length(non_element_cols) == 0) return(data)
+  data %>%
+    dplyr::mutate(
+      dplyr::across(
+        tidyselect::any_of(non_element_cols),
+        ~ {
+          values <- as.character(.)
+          values[is.na(values) | !nzchar(trimws(values))] <- blank_label
+          values
+        }
+      )
+    )
+}
+
+merge_loaded_data <- function(existing_data, incoming_data, mode = c("replace", "add")) {
+  mode <- match.arg(mode)
+  if (!inherits(incoming_data, "data.frame")) return(incoming_data)
+  if (identical(mode, "replace") || !inherits(existing_data, "data.frame") || nrow(existing_data) == 0) {
+    out <- incoming_data
+    out <- ensure_rowid_column(
+      data = out,
+      table_name = "loadedData",
+      require_unique = TRUE,
+      allow_long = FALSE
+    )
+    return(out)
+  }
+
+  existing_tbl <- existing_data %>% dplyr::select(-tidyselect::any_of("rowid"))
+  incoming_tbl <- incoming_data %>% dplyr::select(-tidyselect::any_of("rowid"))
+  shared_cols <- intersect(names(existing_tbl), names(incoming_tbl))
+  for (col_name in shared_cols) {
+    existing_col <- existing_tbl[[col_name]]
+    incoming_col <- incoming_tbl[[col_name]]
+    if (identical(typeof(existing_col), typeof(incoming_col))) next
+
+    existing_chr <- as.character(existing_col)
+    incoming_chr <- as.character(incoming_col)
+    existing_num <- suppressWarnings(as.numeric(existing_chr))
+    incoming_num <- suppressWarnings(as.numeric(incoming_chr))
+
+    existing_nonblank <- !is.na(existing_chr) & nzchar(trimws(existing_chr))
+    incoming_nonblank <- !is.na(incoming_chr) & nzchar(trimws(incoming_chr))
+    existing_numeric_like <- !any(is.na(existing_num[existing_nonblank]))
+    incoming_numeric_like <- !any(is.na(incoming_num[incoming_nonblank]))
+
+    if (isTRUE(existing_numeric_like) && isTRUE(incoming_numeric_like)) {
+      existing_tbl[[col_name]] <- existing_num
+      incoming_tbl[[col_name]] <- incoming_num
+    } else {
+      existing_tbl[[col_name]] <- existing_chr
+      incoming_tbl[[col_name]] <- incoming_chr
+    }
+  }
+  out <- dplyr::bind_rows(existing_tbl, incoming_tbl)
+  out <- ensure_rowid_column(
+    data = out,
+    table_name = "loadedData",
+    require_unique = TRUE,
+    allow_long = FALSE
+  )
+  out
+}
+
 #' dataLoaderUI
 #'
 #' @return NULL
@@ -148,7 +215,16 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
   })
 
   output$loadOptionsUI = renderUI({
+    has_existing <- inherits(rvals$importedData, "data.frame") && nrow(rvals$importedData) > 0
     tagList(
+      radioButtons(
+        "loadMode",
+        "When loading this file",
+        choices = c("Replace existing workspace data" = "replace", "Add rows to existing workspace data" = "add"),
+        selected = if (isTRUE(has_existing)) "add" else "replace",
+        inline = FALSE
+      ),
+      checkboxInput("loadBlankNonElement", "Replace empty/NA non-element fields with [blank]", value = TRUE),
       checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = FALSE),
       checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = FALSE),
       checkboxInput("loadNAAsZero", "Replace NA values with 0", value = FALSE)
@@ -167,6 +243,12 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       data_loaded = rvals$data %>%
         dplyr::select(tidyselect::all_of(selected_cols)) %>%
         dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ suppressWarnings(as.numeric(as.character(.)))))
+      data_loaded <- ensure_rowid_column(
+        data = data_loaded,
+        table_name = "loadedData",
+        require_unique = TRUE,
+        allow_long = FALSE
+      )
 
       if(isTRUE(input$loadZeroAsNA)){
         data_loaded = data_loaded %>%
@@ -180,14 +262,32 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         data_loaded = data_loaded %>%
           dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ tidyr::replace_na(., 0)))
       }
+      if (isTRUE(input$loadBlankNonElement)) {
+        data_loaded <- replace_non_element_blanks(data_loaded, chem_cols = input$loadchem)
+      }
+
+      load_mode <- if (isTruthy(input$loadMode)) as.character(input$loadMode[[1]]) else "replace"
+      data_loaded <- merge_loaded_data(
+        existing_data = rvals$importedData,
+        incoming_data = data_loaded,
+        mode = load_mode
+      )
 
       rvals$importedData = data_loaded
       rvals$selectedData = data_loaded
-      rvals$chem = intersect(input$loadchem, names(data_loaded))
+      ensure_core_rowids(rvals)
+      prior_chem <- tryCatch(as.character(rvals$chem), error = function(e) character())
+      if (identical(load_mode, "add")) {
+        rvals$chem = intersect(unique(c(prior_chem, as.character(input$loadchem))), names(data_loaded))
+      } else {
+        rvals$chem = intersect(input$loadchem, names(data_loaded))
+      }
       rvals$initialChem = rvals$chem
       rvals$loadZeroAsNA = isTRUE(input$loadZeroAsNA)
       rvals$loadNegativeAsNA = isTRUE(input$loadNegativeAsNA)
       rvals$loadNAAsZero = isTRUE(input$loadNAAsZero)
+      rvals$loadBlankNonElement = isTRUE(input$loadBlankNonElement)
+      rvals$currentDatasetRowMap <- NULL
 
       if(isTruthy(credentials$status) && !is.null(con)){
         if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
@@ -208,10 +308,45 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           mynotification("This dataset already exists. Please choose a different name.", type = "error")
           return(NULL)
         }
-        DBI::dbWriteTable(conn = con, name = datasetname, value = data_loaded, row.names = F)
-        DBI::dbWriteTable(conn = con, name = paste0(datasetname,"_metadata"), value = data_metadata, row.names = F)
+        ok_data <- db_write_table_safe(con, datasetname, data_loaded, row.names = FALSE, context = "saving uploaded dataset")
+        ok_meta <- db_write_table_safe(con, paste0(datasetname, "_metadata"), data_metadata, row.names = FALSE, context = "saving uploaded dataset metadata")
+        if (!isTRUE(ok_data) || !isTRUE(ok_meta)) {
+          return(NULL)
+        }
+        username <- as.character(credentials$res$username[[1]])
+        pref_tbl <- paste0(username, "_preferences")
+        prefs <- if (db_table_exists_safe(con, pref_tbl)) {
+          tryCatch(
+            dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
+            error = function(e) tibble::tibble(field = character(), value = character())
+          )
+        } else {
+          tibble::tibble(field = character(), value = character())
+        }
+        if (!all(c("field", "value") %in% names(prefs))) {
+          prefs <- tibble::tibble(field = character(), value = character())
+        }
+        prefs <- prefs %>%
+          dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value)) %>%
+          dplyr::filter(.data$field != "lastOpenedDataset") %>%
+          dplyr::bind_rows(tibble::tibble(field = "lastOpenedDataset", value = datasetname))
+        ok_pref <- db_write_table_safe(
+          con = con,
+          table_name = pref_tbl,
+          value = prefs,
+          row.names = FALSE,
+          overwrite = TRUE,
+          context = "saving user dataset preference"
+        )
+        if (!isTRUE(ok_pref)) {
+          return(NULL)
+        }
+        rvals$currentDatasetName <- datasetname
+        rvals$currentDatasetKey <- build_dataset_key(datasetname)
         mynotification("Data Loaded")
       } else {
+        rvals$currentDatasetName <- "local_upload"
+        rvals$currentDatasetKey <- build_dataset_key(paste0("local_upload_", format(Sys.time(), "%Y%m%d_%H%M%S")))
         mynotification("Data loaded locally")
       }
       removeModal()

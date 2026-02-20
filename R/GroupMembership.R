@@ -6,43 +6,67 @@
 #'
 #' @examples
 #' groupTab()
+
 groupTab = function(){
-  tabPanel(title = "Group Membership",
+  tabPanel(title = "Probabilities and Distances",
            id = "groupMembershiptab",
-           sidebarLayout(sidebarPanel(
-             uiOutput("eligibleGroupUI"),
-             uiOutput("sampleIDUI"),
-             selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
-             selectInput("membershipDataset","select dataset to use",choices =c('elements', 'principal components'), selected = 'elements'),
-             actionButton("membershipRun","Calculate", class = "mybtn"),
-           ),
-           mainPanel(
-             tabsetPanel(id = "GroupMembershipPanels",
-                         type = "pills",
-                         tabPanel(title = "Group Sizes",
-                                  id = "groupSizePanel",
-                                  uiOutput("grpSizeUI")
-                         ),
-                         tabPanel(
-                           title = "Membership Probabilities",
-                           id = "membershipProbs",
-                           wellPanel(
-                             fluidRow(
-                               column(4,
-                                      actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
-                               ),
-                               column(4, offset = 2,
-                                      actionButton("gChangeGroup","Change Group Assignment", class = "mybtn"),
-                                      textInput("gNewGroup","Enter new group designation")
-                               )
-                             )
-                           ),
-                           br(),
-                           DT::DTOutput('membershipTbl')
-                         )
-             ) # end tabset panel
-           ) # end main panel
-           ) # end sidebar layout
+           fluidPage(
+             fluidRow(
+               column(
+                 4,
+                 wellPanel(
+                   h4("Group Membership Controls"),
+                   uiOutput("eligibleGroupUI"),
+                   uiOutput("sampleIDUI"),
+                   selectInput("membershipMethod","Select method",choices = c("Hotellings T2"="Hotellings","Mahalanobis distances"="Mahalanobis")),
+                   selectInput(
+                     "membershipDataset",
+                     "select dataset to use",
+                     choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+                     selected = "elements"
+                   ),
+                   uiOutput("membershipPCCountUI"),
+                   actionButton("membershipRun","Calculate", class = "mybtn")
+                 )
+               ),
+               column(
+                 8,
+                 h4("Group Sizes"),
+                 DT::DTOutput("grpSizeTbl")
+               )
+             ),
+             br(),
+             h4("Membership Probabilities"),
+           wellPanel(
+               fluidRow(
+                 column(4,
+                        actionButton("gAssignBestGroup","Assign Best Group", class = "mybtn")
+                 ),
+                 column(4,
+                        actionButton("gChangeGroup","Change Group Assignment", class = "mybtn")
+                 ),
+                 column(4,
+                        tags$div(style = "margin-top: 10px;", uiOutput("gGroupAssignChoiceUI"))
+                 )
+               )
+             ),
+             br(),
+             fluidRow(
+               column(
+                 12,
+                 div(
+                   class = "membership-table-scroll-box",
+                   fluidRow(
+                     column(
+                       4,
+                       checkboxInput("membershipCompact", "Compact table", value = TRUE)
+                     )
+                   ),
+                   DT::DTOutput('membershipTbl')
+                 )
+               )
+             )
+           )
   ) # end group membership panel
 }
 
@@ -59,10 +83,73 @@ groupTab = function(){
 #' @examples
 #' groupServer(input,output,session,rvals)
 groupServer = function(input,output,session,rvals, credentials, con){
+  membership_proxy <- DT::dataTableProxy("membershipTbl")
+  selected_membership_rowids <- shiny::reactiveVal(character())
+
+  build_membership_display_table <- function(df) {
+    checked_rowids <- shiny::isolate(selected_membership_rowids())
+    add_checkbox_column(
+      df = df,
+      checked_rowids = checked_rowids,
+      rowid_col = "rowid",
+      checkbox_col = ".select",
+      checkbox_class = "membership-row-check"
+    )
+  }
+
+  get_source_features <- function(df, source) {
+    if (!is.data.frame(df) || nrow(df) == 0) return(character())
+    if (identical(source, "principal components")) {
+      cols <- pc_columns_sorted(grep("^PC[0-9]+$", names(df), value = TRUE))
+    } else if (identical(source, "UMAP")) {
+      cols <- grep("^V[0-9]+$", names(df), value = TRUE)
+    } else if (identical(source, "linear discriminants")) {
+      cols <- grep("^LD[0-9]+$", names(df), value = TRUE)
+    } else {
+      cols <- intersect(rvals$chem, names(df))
+    }
+    if (length(cols) == 0) {
+      meta_cols <- unique(c(rvals$attrs, rvals$attrGroups, "rowid", "ID", "BestGroup", "GroupVal"))
+      candidate_cols <- setdiff(names(df), meta_cols)
+      numeric_cols <- candidate_cols[vapply(df[candidate_cols], is.numeric, logical(1))]
+      cols <- numeric_cols
+    }
+    cols
+  }
+
+  get_membership_data <- function(source) {
+    if (identical(source, "principal components")) {
+      if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+        mynotification("No PCA results available. Run confirm selections with PCA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$pcadf
+    } else if (identical(source, "UMAP")) {
+      if (!is.data.frame(rvals$umapdf) || nrow(rvals$umapdf) == 0) {
+        mynotification("No UMAP results available. Run confirm selections with UMAP enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$umapdf
+    } else if (identical(source, "linear discriminants")) {
+      if (!is.data.frame(rvals$LDAdf) || nrow(rvals$LDAdf) == 0) {
+        mynotification("No LDA results available. Run confirm selections with LDA enabled.", type = "warning")
+        return(NULL)
+      }
+      df <- rvals$LDAdf
+    } else {
+      df <- rvals$selectedData
+    }
+    features <- get_source_features(df, source)
+    if (length(features) == 0) {
+      mynotification("No numeric analysis columns found for this dataset source.", type = "error")
+      return(NULL)
+    }
+    list(df = df, features = features)
+  }
 
   ##### UI Outputs for membership groups ####
 
-  output$grpSizeUI = renderUI({
+  output$grpSizeTbl = DT::renderDataTable({
     req(nrow(rvals$selectedData) > 0)
     tbl = NULL
     quietly(label = "render group size",{
@@ -70,13 +157,26 @@ groupServer = function(input,output,session,rvals, credentials, con){
         as.data.frame() %>%
         setNames(c("Group","Count"))
     })
-    DT::renderDataTable(tbl)
+    DT::datatable(tbl, rownames = FALSE, options = list(dom = "t"))
   })
 
   output$eligibleGroupUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
+    source <- if (is.null(input$membershipDataset)) "elements" else input$membershipDataset
+    source_df <- switch(
+      source,
+      "principal components" = rvals$pcadf,
+      "UMAP" = rvals$umapdf,
+      "linear discriminants" = rvals$LDAdf,
+      rvals$selectedData
+    )
+    if (!is.data.frame(source_df) || nrow(source_df) == 0) {
+      source_df <- rvals$selectedData
+      source <- "elements"
+    }
+    source_features <- get_source_features(source_df, source)
     if(isTruthy(!is.null(rvals$attrs))){
-      eligible = tryCatch(getEligible(rvals$selectedData, chem = rvals$chem, group = rvals$attrGroups),error = function(e) return(NULL))
+      eligible = tryCatch(getEligible(source_df, chem = source_features, group = rvals$attrGroups),error = function(e) return(NULL))
     } else {
       eligible = NULL
     }
@@ -90,14 +190,33 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$sampleIDUI = renderUI({
     req(nrow(rvals$selectedData) > 0)
-    choices = rvals$attrs
-    choiceLengths = sapply(choices,function(x) length(unique(rvals$selectedData[[x]])))
-    choices = choices[which(choiceLengths == nrow(rvals$selectedData))]
+    source <- if (is.null(input$membershipDataset)) "elements" else input$membershipDataset
+    source_df <- switch(
+      source,
+      "principal components" = rvals$pcadf,
+      "UMAP" = rvals$umapdf,
+      "linear discriminants" = rvals$LDAdf,
+      rvals$selectedData
+    )
+    if (!is.data.frame(source_df) || nrow(source_df) == 0) {
+      source_df <- rvals$selectedData
+    }
+    choices = intersect(rvals$attrs, names(source_df))
+    if ("rowid" %in% names(source_df)) {
+      choices <- unique(c("rowid", choices))
+    }
+    choiceLengths = sapply(choices,function(x) length(unique(source_df[[x]])))
+    choices = choices[which(choiceLengths == nrow(source_df))]
+    if (length(choices) == 0 && "rowid" %in% names(source_df)) {
+      choices <- "rowid"
+    }
     if(isTruthy(!is.null(rvals$sampleID))){
-      selected = rvals$sampleID
+      selected = as.character(rvals$sampleID[[1]])
     } else {
       if(isTruthy("anid" %in% tolower(choices))){
         selected = choices[which(tolower(choices) == "anid")]
+      } else if ("rowid" %in% choices) {
+        selected = "rowid"
       } else {
         selected = choices[1]
       }
@@ -105,33 +224,151 @@ groupServer = function(input,output,session,rvals, credentials, con){
     selectInput("sampleID","Choose sample ID Column",choices = choices,selected = selected)
   })
 
+  output$membershipPCCountUI = renderUI({
+    req(input$membershipDataset)
+    if (!identical(input$membershipDataset, "principal components")) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "PC count selector appears when dataset is set to principal components."
+        )
+      )
+    }
+    if (!is.data.frame(rvals$pcadf) || nrow(rvals$pcadf) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "Run Confirm Selections with PCA enabled to populate principal components."
+        )
+      )
+    }
+    pc_cols <- pc_columns_sorted(names(rvals$pcadf))
+    if (length(pc_cols) == 0) {
+      return(
+        tags$small(
+          class = "text-muted",
+          "No PC columns were found in the selected PCA dataset."
+        )
+      )
+    }
+    choices <- membership_pc_count_choices(rvals$pca, pc_cols)
+    default_count <- as.character(length(pc_cols))
+    if (!(default_count %in% unname(choices))) {
+      default_count <- unname(choices)[[length(choices)]]
+    }
+    selectInput(
+      "membershipPCCount",
+      label = bslib::popover(
+        tagList(
+          "Number of PCs to use",
+          trigger = bsicons::bs_icon("info-circle", title = "Help")
+        ),
+        title = "PC label format",
+        "Values are shown as (PC variance / cumulative variance)."
+      ),
+      choices = choices,
+      selected = default_count
+    )
+  })
+
+  output$gGroupAssignChoiceUI <- renderUI({
+    req(rvals$selectedData)
+    req(rvals$attrGroups)
+    groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
+    selected_choice <- tryCatch(as.character(input$gGroupAssignChoice[[1]]), error = function(e) "")
+    build_group_assignment_ui(
+      choice_input_id = "gGroupAssignChoice",
+      new_input_id = "gGroupAssignNew",
+      groups = groups,
+      selected_choice = selected_choice
+    )
+  })
+
   observeEvent(input$membershipRun,{
     req(rvals$attrGroups)
     mynotification("calculating membership")
-    rvals$eligibleGroups = input$eligibleGroups
-    rvals$sampleID = input$sampleID
-    if(isTruthy(input$membershipDataset == "elements")){
-      df = rvals$selectedData
-    } else {
-      req(rvals$pcadf)
-      df = rvals$pcadf
+    source_data <- get_membership_data(input$membershipDataset)
+    if (is.null(source_data)) return(invisible(NULL))
+    df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
+    feature_cols <- source_data$features
+    if (identical(input$membershipDataset, "principal components")) {
+      feature_cols <- limit_pc_features(feature_cols, input$membershipPCCount)
     }
+    eligible_groups <- tryCatch(as.character(input$eligibleGroups), error = function(e) character())
+    eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+    if (length(eligible_groups) == 0) {
+      eligible_groups <- tryCatch(
+        getEligible(df, chem = feature_cols, group = rvals$attrGroups),
+        error = function(e) character()
+      )
+      eligible_groups <- as.character(eligible_groups)
+      eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+    }
+    if (length(eligible_groups) == 0) {
+      eligible_groups <- sort(unique(as.character(df[[rvals$attrGroups]])))
+      eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
+      if (length(eligible_groups) > 0) {
+        mynotification("Eligible groups were not selected; using all groups.", type = "warning")
+      }
+    }
+    if (length(eligible_groups) == 0) {
+      mynotification("No eligible groups are available for membership calculation.", type = "error")
+      return(invisible(NULL))
+    }
+    rvals$eligibleGroups <- eligible_groups
+
+    sample_id_col <- tryCatch(as.character(input$sampleID[[1]]), error = function(e) "")
+    if (is.null(sample_id_col) || length(sample_id_col) == 0 || is.na(sample_id_col[[1]])) {
+      sample_id_col <- ""
+    } else {
+      sample_id_col <- sample_id_col[[1]]
+    }
+    if (!nzchar(sample_id_col) || !(sample_id_col %in% names(df))) {
+      if ("rowid" %in% names(df)) {
+        sample_id_col <- "rowid"
+        mynotification("Using rowid as sample ID for this dataset source.", type = "warning")
+      } else {
+        mynotification("Selected sample ID column is not available in this dataset source.", type = "error")
+        return(invisible(NULL))
+      }
+    }
+    rvals$sampleID <- sample_id_col
     selected_data_with_rowid <- rvals$selectedData
     if (!"rowid" %in% names(selected_data_with_rowid)) {
       selected_data_with_rowid <- tibble::rowid_to_column(selected_data_with_rowid, var = "rowid")
     }
-    rvals$membershipProbs = group.mem.probs(data = df,chem = rvals$chem, group = rvals$attrGroups,eligible = input$eligibleGroups,method = input$membershipMethod, ID = input$sampleID)
+    rvals$membershipProbs = group.mem.probs(
+      data = df,
+      chem = feature_cols,
+      group = rvals$attrGroups,
+      eligible = eligible_groups,
+      method = input$membershipMethod,
+      ID = sample_id_col
+    )
     if (inherits(rvals$membershipProbs,"data.frame")){
+      selected_membership_rowids(character())
       rvals$membershipProbs = rvals$membershipProbs %>%
         dplyr::mutate_at(dplyr::vars(ID), as.character) %>%
         dplyr::left_join(
-          selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(input$sampleID)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
-          by = dplyr::join_by("ID" == !!input$sampleID)
+          selected_data_with_rowid %>% dplyr::select(rowid, tidyselect::all_of(sample_id_col)) %>% dplyr::mutate_at(dplyr::vars(rowid), as.character),
+          by = dplyr::join_by("ID" == !!sample_id_col)
+        )
+      rvals$membershipProbs <- rvals$membershipProbs %>%
+        dplyr::mutate(
+          ProjectionIncluded = dplyr::if_else(
+            GroupVal %in% eligible_groups,
+            "yes",
+            "no"
+          ),
+          .after = "InGroup"
         )
       if(isTruthy(!"rowid" %in% names(rvals$membershipProbs))){
         rvals$membershipProbs = rvals$membershipProbs %>%
           dplyr::mutate(rowid = as.character(as.integer(ID)))
       }
+      priority_cols <- unique(c("ID", "GroupVal", "BestGroup", input$eligibleGroups))
+      rvals$membershipProbs <- rvals$membershipProbs %>%
+        dplyr::select(tidyselect::any_of(priority_cols), tidyselect::everything())
       if(isTruthy(!is.null(rvals$membershipProbs))){
         mynotification("completed calculation")
       }
@@ -143,63 +380,151 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$membershipTbl = DT::renderDataTable({
     req(rvals$membershipProbs)
-    if(isTruthy(is.null(rvals$membershipTbl_state_length))){
-      rvals$membershipTbl_state_length = 25
-    }
-    DT::datatable(
-      rvals$membershipProbs,
+    display_tbl <- build_membership_display_table(rvals$membershipProbs)
+    compact_mode <- isTRUE(input$membershipCompact)
+
+    hide_by_default <- which(names(rvals$membershipProbs) %in% c("Group", "rowid", "BestValue"))
+    right_align_cols <- which(names(rvals$membershipProbs) %in% c(input$eligibleGroups, "BestValue"))
+    numeric_cols <- names(rvals$membershipProbs)[vapply(rvals$membershipProbs, is.numeric, logical(1))]
+    # Shift hidden/right-aligned targets by one because .select is first.
+    hide_targets <- sort(unique(hide_by_default + 1))
+    right_align_targets <- right_align_cols + 1
+
+    dt <- DT::datatable(
+      display_tbl,
       filter = "top",
       rownames = F,
-      selection = 'multiple',
-      style = 'bootstrap',
+      selection = 'none',
+      style = 'default',
+      class = paste(
+        if (compact_mode) "compact" else "",
+        "membership-plain-table",
+        if (compact_mode) "membership-compact-table" else "membership-fullwidth-table",
+        "nowrap"
+      ),
+      extensions = c("Buttons"),
+      escape = FALSE,
+      callback = DT::JS(
+        "table.on('change', 'input.membership-row-check', function(){",
+        "  var checked = [];",
+        "  table.$('input.membership-row-check:checked').each(function(){",
+        "    checked.push(String($(this).data('rowid')));",
+        "  });",
+        "  Shiny.setInputValue('membership_checked_rowids', checked, {priority: 'event'});",
+        "});"
+      ),
       options = list(
-        pageLength = rvals$membershipTbl_state_length,
-        lengthMenu = c(10,25,50,100, 500,1000)
+        dom = "Brt",
+        buttons = list("colvis"),
+        autoWidth = !compact_mode,
+        scrollY = "420px",
+        scrollCollapse = TRUE,
+        scrollX = TRUE,
+        paging = FALSE,
+        columnDefs = list(
+          list(visible = FALSE, targets = hide_targets - 1),
+          list(className = "dt-right", targets = right_align_targets - 1),
+          list(orderable = FALSE, searchable = FALSE, width = "32px", targets = 0)
+        )
       )
     )
-  })
+    if (compact_mode) {
+      dt$x$options$columnDefs <- c(
+        dt$x$options$columnDefs,
+        list(list(width = "78px", targets = "_all"))
+      )
+    }
+    if (length(numeric_cols) > 0) {
+      dt <- DT::formatRound(dt, columns = numeric_cols, digits = 2)
+    }
+    dt
+  }, server = FALSE)
+  outputOptions(output, "membershipTbl", suspendWhenHidden = FALSE)
+
+  observeEvent(input$membership_checked_rowids, {
+    rowids <- as.character(input$membership_checked_rowids)
+    rowids <- rowids[!is.na(rowids) & nzchar(rowids)]
+    selected_membership_rowids(unique(rowids))
+  }, ignoreNULL = FALSE)
+
+  get_checked_membership_rows <- function() {
+    req(rvals$membershipProbs)
+    checked_rowids <- selected_membership_rowids()
+    if (length(checked_rowids) == 0) return(integer())
+    which(as.character(rvals$membershipProbs$rowid) %in% checked_rowids)
+  }
+
+  apply_membership_assignment <- function(values) {
+    req(rvals$membershipProbs)
+    selected_rows <- get_checked_membership_rows()
+    if (is.null(selected_rows) || length(selected_rows) == 0) {
+      mynotification("Check one or more rows in Membership Probabilities first.", type = "warning")
+      return(invisible(NULL))
+    }
+    if (length(values) == 1) {
+      values <- rep(values, length(selected_rows))
+    }
+    if (length(values) != length(selected_rows)) {
+      mynotification("Assignment value count does not match selected rows.", type = "error")
+      return(invisible(NULL))
+    }
+
+    rowid <- as.character(rvals$membershipProbs$rowid[selected_rows])
+    if (length(rowid) == 0 || !all(rowid %in% as.character(rvals$importedData$rowid))) {
+      mynotification("Selected rows could not be mapped back to the dataset.", type = "error")
+      return(invisible(NULL))
+    }
+
+    replaceCell(
+      rowid = rowid,
+      col = rvals$attrGroups,
+      value = values,
+      rvals = rvals,
+      con = con,
+      credentials = credentials,
+      input = input,
+      output = output,
+      session = session
+    )
+
+    if (is.data.frame(rvals$membershipProbs) && nrow(rvals$membershipProbs) > 0) {
+      DT::replaceData(
+        membership_proxy,
+        build_membership_display_table(rvals$membershipProbs),
+        resetPaging = FALSE,
+        rownames = FALSE
+      )
+    }
+    mynotification("Updated selected row assignments.", type = "message")
+    invisible(NULL)
+  }
 
   observeEvent(input$gAssignBestGroup,{
-    quietly(label = "assigning match group",{
-      selRows = input$membershipTbl_rows_selected
-      rvals$gNewValue = rvals$membershipProbs[[4]][selRows]
+    quietly(label = "assigning best group",{
+      req(rvals$membershipProbs)
+      selected_rows <- get_checked_membership_rows()
+      if (is.null(selected_rows) || length(selected_rows) == 0) {
+        mynotification("Check one or more rows in Membership Probabilities first.", type = "warning")
+        return(invisible(NULL))
+      }
+      if (!"BestGroup" %in% names(rvals$membershipProbs)) {
+        mynotification("BestGroup column is missing from membership results.", type = "error")
+        return(invisible(NULL))
+      }
+      best_values <- as.character(rvals$membershipProbs$BestGroup[selected_rows])
+      apply_membership_assignment(best_values)
     })
   })
 
   observeEvent(input$gChangeGroup,{
     quietly(label = "assigning new group",{
-      rvals$gNewValue = input$gNewGroup
-    })
-  })
-
-  observeEvent(rvals$gNewValue, {
-    message("updating group")
-    quietly(label = "updating group",{
-      if(isTruthy(!is.null(input$membershipTbl_state$length))){
-        rvals$membershipTbl_state_length = input$membershipTbl_state$length
-      } else {
-        rvals$membershipTbl_state_length = 25
+      new_group <- resolve_group_assignment_target(input$gGroupAssignChoice, input$gGroupAssignNew)
+      if (!nzchar(new_group)) {
+        mynotification("Choose an existing group or enter a new group designation.", type = "warning")
+        return(invisible(NULL))
       }
-      print("getting rowid")
-      rowid = rvals$membershipProbs$rowid[input$membershipTbl_rows_selected]
-      print(rowid)
-      if(isTruthy(rowid %in% as.character(rvals$importedData$rowid))){
-        print('replacing cell')
-        replaceCell(rowid = rowid,col = rvals$attrGroups,value = rvals$gNewValue, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
-      } else {
-        mynotification("rowid not found in imported data",type = "error")
-      }
-      rvals$gNewValue = NULL
-      print('end')
+      apply_membership_assignment(new_group)
     })
-  })
-
-  observeEvent(input$gNewGroup,{
-    if(isTruthy(stringr::str_detect(input$gNewGroup,"[a-zA-z]|[0-9]"))){
-      shinyjs::enable("gChangeGroup")
-    } else {
-      shinyjs::disable("gChangeGroup")
-    }
   })
 
 }

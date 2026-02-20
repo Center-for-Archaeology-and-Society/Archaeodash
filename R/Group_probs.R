@@ -12,7 +12,8 @@
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
   probsAlldf = NULL
   if (identical(method, "Hotellings") && !app_require_packages("ICSNP", feature = "Hotellings T2 group probabilities")) {
-    return(NULL)
+    mynotification("Falling back to Mahalanobis because Hotellings T2 is unavailable.", type = "warning")
+    return(group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID))
   }
   tryCatch({
   if("PC1" %in% names(data)){
@@ -28,8 +29,10 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
       grpindx = which(data[[group]]==grp)
       grpindx = setdiff(grpindx,r)
       if(method == "Hotellings"){
-        p.val <- ICSNP::HotellingsT2(data[r,chem],data[grpindx,chem])$p.value %>%
-          round(.,5)*100
+        p.val <- tryCatch(
+          ICSNP::HotellingsT2(data[r,chem],data[grpindx,chem])$p.value %>% round(.,5)*100,
+          error = function(e) stop(e)
+        )
       } else {
         p.val <- getMahalanobis(data[r,chem],data[grpindx,chem])
       }
@@ -40,9 +43,13 @@ group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) 
   bg = getBestGroup(probsAll,eligible,method = method)
   probsAlldf = probsAll %>%
     tibble::as_tibble() %>%
-    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1) %>%
-    dplyr::mutate_if(is.numeric,sprintf,fmt = "%05.2f")
+    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1)
   }, error = function(e){
+    if (identical(method, "Hotellings")) {
+      mynotification(glue::glue("Hotellings failed ({e$message}); falling back to Mahalanobis."), type = "warning")
+      probsAlldf <- group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID)
+      return(probsAlldf)
+    }
     mynotification(glue::glue("unable to return group membership probabilities: {e}"), type = "error")
   })
   return(probsAlldf)
@@ -106,10 +113,22 @@ getBestGroup = function(probsAll,eligible, method){
 #' @examples
 #' getMahalanobis(data[r,],data[,data[[group]] == grp])
 getMahalanobis = function(row, data){
-  cov_matrix <- cov(data)
-  mean_data <- colMeans(data)
-  result <- mahalanobis(row, mean_data, cov_matrix)
-  return(result)
+  if (!is.data.frame(data) || nrow(data) < 2 || ncol(data) == 0) {
+    return(Inf)
+  }
+  cov_matrix <- suppressWarnings(cov(data))
+  mean_data <- suppressWarnings(colMeans(data))
+  result <- tryCatch(
+    stats::mahalanobis(row, mean_data, cov_matrix, tol = 1e-8),
+    error = function(e) {
+      reg <- diag(1e-8, ncol(cov_matrix))
+      tryCatch(
+        stats::mahalanobis(row, mean_data, cov_matrix + reg, tol = 1e-8),
+        error = function(e2) Inf
+      )
+    }
+  )
+  as.numeric(result)
 }
 # read in sample data INAA_test, create attribute and element data.frames, impute missing data and transform
 # mydat <- read.csv('inst/INAA_test.csv',header=T,row.names=1)
