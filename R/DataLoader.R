@@ -87,6 +87,30 @@ merge_loaded_data <- function(existing_data, incoming_data, mode = c("replace", 
 
   existing_tbl <- existing_data %>% dplyr::select(-tidyselect::any_of("rowid"))
   incoming_tbl <- incoming_data %>% dplyr::select(-tidyselect::any_of("rowid"))
+  shared_cols <- intersect(names(existing_tbl), names(incoming_tbl))
+  for (col_name in shared_cols) {
+    existing_col <- existing_tbl[[col_name]]
+    incoming_col <- incoming_tbl[[col_name]]
+    if (identical(typeof(existing_col), typeof(incoming_col))) next
+
+    existing_chr <- as.character(existing_col)
+    incoming_chr <- as.character(incoming_col)
+    existing_num <- suppressWarnings(as.numeric(existing_chr))
+    incoming_num <- suppressWarnings(as.numeric(incoming_chr))
+
+    existing_nonblank <- !is.na(existing_chr) & nzchar(trimws(existing_chr))
+    incoming_nonblank <- !is.na(incoming_chr) & nzchar(trimws(incoming_chr))
+    existing_numeric_like <- !any(is.na(existing_num[existing_nonblank]))
+    incoming_numeric_like <- !any(is.na(incoming_num[incoming_nonblank]))
+
+    if (isTRUE(existing_numeric_like) && isTRUE(incoming_numeric_like)) {
+      existing_tbl[[col_name]] <- existing_num
+      incoming_tbl[[col_name]] <- incoming_num
+    } else {
+      existing_tbl[[col_name]] <- existing_chr
+      incoming_tbl[[col_name]] <- incoming_chr
+    }
+  }
   out <- dplyr::bind_rows(existing_tbl, incoming_tbl)
   out <- ensure_rowid_column(
     data = out,

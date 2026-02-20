@@ -73,3 +73,25 @@ test_that("merge_loaded_data replaces or appends based on mode", {
   expect_equal(as.character(added$rowid), c("1", "2", "3", "4"))
   expect_equal(as.character(added$grp), c("A", "B", "C", "D"))
 })
+
+test_that("merge_loaded_data appends when shared column types differ as numeric vs character", {
+  existing <- tibble::tibble(rowid = c("1", "2"), Fe = c(10.5, 11.2), grp = c("A", "B"))
+  incoming <- tibble::tibble(rowid = c("1", "2"), Fe = c("12.1", "13.0"), grp = c("C", "D"))
+
+  out <- merge_loaded_data(existing, incoming, mode = "add")
+
+  expect_equal(nrow(out), 4)
+  expect_true(is.numeric(out$Fe))
+  expect_equal(out$Fe, c(10.5, 11.2, 12.1, 13.0))
+})
+
+test_that("merge_loaded_data falls back to character when mixed values are not numeric-like", {
+  existing <- tibble::tibble(rowid = c("1", "2"), Fe = c(1.1, 2.2), grp = c("A", "B"))
+  incoming <- tibble::tibble(rowid = c("1", "2"), Fe = c("n/a", "3.3"), grp = c("C", "D"))
+
+  out <- merge_loaded_data(existing, incoming, mode = "add")
+
+  expect_equal(nrow(out), 4)
+  expect_true(is.character(out$Fe))
+  expect_equal(out$Fe, c("1.1", "2.2", "n/a", "3.3"))
+})

@@ -13,6 +13,8 @@
 - User requested double-check and implementation of security recommendations with tests first; implemented token-based remembered login, login throttling, cookie/token hardening, credential-file cleanup, added unit + opt-in DB-backed shinytest2 temp-user/INAA e2e tests, ran full tests, and documented infra-only constraints for headers/banner controls.
 - User requested Apache vhost review while keeping `.Renviron` unchanged; audited current `sites-available`/enabled config and provided hardening recommendations for headers, directory policy, proxy limits, and endpoint access control without changing server config.
 - User requested commit/tag/install for `archaeodashbeta`; prepared release commit for security hardening updates, created timestamp release tag, installed package into beta container, and restarted beta only.
+- User requested another external-only security audit (plus SQLi sanity check); executed black-box endpoint/header/method/path/SockJS probes against beta, verified SQL parameterization patterns in DB code, and delivered prioritized attack-vector recommendations without code changes.
+- User reported upload append failure due to `bind_rows()` character-vs-numeric column mismatch; added pre-append type harmonization in `merge_loaded_data()` (numeric-like to numeric, otherwise character), added regression tests, then installed and committed to beta (no tag).
 
 ## Related
 
