@@ -31,11 +31,11 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   group_levels <- sort(unique(group_values))
   plot_data$.plot_group <- factor(group_values, levels = group_levels)
 
+  # Keep marker symbols to a conservative set supported across plotly versions.
   symbol_pool <- c(
     "circle", "square", "diamond", "cross", "x",
     "triangle-up", "triangle-down", "triangle-left", "triangle-right",
-    "pentagon", "hexagon", "hexagon2", "star", "star-square",
-    "star-diamond", "diamond-wide", "hourglass", "bowtie"
+    "star"
   )
   symbol_map <- stats::setNames(rep(symbol_pool, length.out = length(group_levels)), group_levels)
   plot_data$.plot_symbol <- as.character(symbol_map[as.character(plot_data$.plot_group)])
@@ -130,12 +130,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   }
 
   point_mode <- if (isTRUE(show_point_labels)) "markers+text" else "markers"
-  ggP <- plotly::plot_ly()
+  ggP <- plotly::plot_ly(source = "A")
   for (grp in group_levels) {
     grp_df <- plot_data %>% dplyr::filter(as.character(.plot_group) == grp)
     if (nrow(grp_df) == 0) next
     trace_symbol <- if (isTRUE(use_symbols)) grp_df$.plot_symbol else rep("circle", nrow(grp_df))
     trace_text <- if (isTRUE(show_point_labels)) grp_df$.label_value else NULL
+    trace_textposition <- if (isTRUE(show_point_labels)) "top center" else NULL
+    trace_textfont <- if (isTRUE(show_point_labels)) list(size = 10) else NULL
     ggP <- ggP %>%
       plotly::add_trace(
         data = grp_df,
@@ -147,8 +149,8 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
         legendgroup = grp,
         key = ~.plot_key,
         text = trace_text,
-        textposition = "top center",
-        textfont = list(size = 10),
+        textposition = trace_textposition,
+        textfont = trace_textfont,
         hovertext = ~.hover_text,
         hoverinfo = "text",
         marker = list(
@@ -189,6 +191,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
       yaxis = list(title = yvar),
       dragmode = 'lasso'
     )
+  ggP <- plotly::event_register(ggP, "plotly_selected")
   ggP
 }
 

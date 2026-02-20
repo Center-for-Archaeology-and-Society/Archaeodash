@@ -125,7 +125,7 @@ visualizeassignTab = function() {
           column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
           column(2, offset = 1,actionButton('savePlot', "Save Plot"))
         ),
-        fluidRow(uiOutput('multiplot'))
+        fluidRow(uiOutput('multiplotUI'))
       )
     )
   )
@@ -145,6 +145,38 @@ visualizeassignTab = function() {
 #' visualizeAssignServer(input,output,session,rvals)
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
+  multiplot_loading_active <- shiny::reactiveVal(FALSE)
+
+  pick_selected_value <- function(candidate, choices, fallback = "") {
+    if (is.null(candidate) || length(candidate) == 0) return(fallback)
+    value <- as.character(candidate[[1]])
+    if (is.na(value) || !nzchar(value)) return(fallback)
+    if (value %in% choices) value else fallback
+  }
+
+  show_multiplot_loading <- function() {
+    if (isTRUE(multiplot_loading_active())) return(invisible(NULL))
+    multiplot_loading_active(TRUE)
+    showModal(modalDialog(
+      title = NULL,
+      footer = NULL,
+      class = "transformation-loading-modal",
+      easyClose = FALSE,
+      tags$div(
+        class = "transformation-loading-wrap",
+        tags$div(class = "transformation-loading-spinner"),
+        tags$div(class = "transformation-loading-text", "Building multiplot...")
+      )
+    ))
+    invisible(NULL)
+  }
+
+  hide_multiplot_loading <- function() {
+    if (!isTRUE(multiplot_loading_active())) return(invisible(NULL))
+    removeModal()
+    multiplot_loading_active(FALSE)
+    invisible(NULL)
+  }
 
   build_brush_display_table <- function(brush_df) {
     if (!inherits(brush_df, "data.frame") || !"rowid" %in% names(brush_df)) {
@@ -258,14 +290,18 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   output$xvarUI = renderUI({
     req(rvals$plotVars)
     req(rvals$plotVarChoices)
-    selected_x <- if (!is.null(rvals$xvar) && as.character(rvals$xvar) %in% rvals$plotVars) as.character(rvals$xvar) else rvals$plotVars[1]
+    selected_x <- pick_selected_value(rvals$xvar, rvals$plotVars, fallback = rvals$plotVars[1])
     selectInput('xvar', 'X', rvals$plotVarChoices, selected = selected_x)
   })
 
   output$yvarUI = renderUI({
     req(rvals$plotVars)
     req(rvals$plotVarChoices)
-    selected_y <- if (!is.null(rvals$yvar) && as.character(rvals$yvar) %in% rvals$plotVars) as.character(rvals$yvar) else rvals$plotVars[min(2, length(rvals$plotVars))]
+    selected_y <- pick_selected_value(
+      rvals$yvar,
+      rvals$plotVars,
+      fallback = rvals$plotVars[min(2, length(rvals$plotVars))]
+    )
     selectInput('yvar', 'y', rvals$plotVarChoices, selected = selected_y)
   })
 
@@ -275,12 +311,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     choices <- choices[!is.na(choices) & nzchar(choices)]
     if (length(choices) == 0) return(NULL)
     anid_matches <- choices[tolower(choices) == "anid"]
-    default_col <- if (!is.null(rvals$pointLabelColumn) && as.character(rvals$pointLabelColumn) %in% choices) {
-      as.character(rvals$pointLabelColumn)
+    point_label_selection <- pick_selected_value(rvals$pointLabelColumn, choices, fallback = "")
+    sample_id_selection <- pick_selected_value(rvals$sampleID, choices, fallback = "")
+    default_col <- if (nzchar(point_label_selection)) {
+      point_label_selection
     } else if (length(anid_matches) > 0) {
       anid_matches[[1]]
-    } else if (!is.null(rvals$sampleID) && as.character(rvals$sampleID) %in% choices) {
-      as.character(rvals$sampleID)
+    } else if (nzchar(sample_id_selection)) {
+      sample_id_selection
     } else if ("rowid" %in% choices) {
       "rowid"
     } else {
@@ -367,20 +405,25 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     req(input$xvar %in% names(rvals$plotdf))
     req(input$yvar %in% names(rvals$plotdf))
     req(rvals$attrGroups)
-    # quietly(label = "plotting data",{
-    p =  mainPlot(
-      plotdf = rvals$plotdf,
-      xvar = input$xvar,
-      yvar = input$yvar,
-      attrGroups = rvals$attrGroups,
-      Conf = input$Conf,
-      int.set = input$int.set,
-      theme = input$plot_theme,
-      use_symbols = isTRUE(input$use_symbols),
-      show_point_labels = isTRUE(input$show_point_labels),
-      label_col = input$pointLabelColumn
+    p <- tryCatch(
+      mainPlot(
+        plotdf = rvals$plotdf,
+        xvar = input$xvar,
+        yvar = input$yvar,
+        attrGroups = rvals$attrGroups,
+        Conf = input$Conf,
+        int.set = input$int.set,
+        theme = input$plot_theme,
+        use_symbols = isTRUE(input$use_symbols),
+        show_point_labels = isTRUE(input$show_point_labels),
+        label_col = input$pointLabelColumn
+      ),
+      error = function(e) {
+        msg <- paste0("Unable to render plot: ", conditionMessage(e))
+        mynotification(msg, type = "error")
+        validate(need(FALSE, msg))
+      }
     )
-    # })
     req(p)
     p
   })
@@ -409,45 +452,63 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   #### multiplots ####
 
   observeEvent(input$updateMultiplot, {
+    show_multiplot_loading()
+    on.exit(hide_multiplot_loading(), add = TRUE)
     req(nrow(rvals$selectedData) > 0)
     req(input$xvar2)
-    quietly(label = "multiplot",{
-
-      rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
+    ok <- tryCatch({
+      quietly(label = "multiplot",{
+        rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
+      })
+      TRUE
+    }, error = function(e) {
+      mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+      rvals$multiplot <- NULL
+      FALSE
     })
+    if (!isTRUE(ok)) return(invisible(NULL))
 
-    output$multiplot = renderUI({
+    output$multiplotUI = renderUI({
       req(rvals$multiplot)
-      if(input$interactive){
-        plotly::renderPlotly(
-          rvals$multiplot,
-        )
+      if (isTRUE(input$interactive)) {
+        plotly::plotlyOutput("multiplotPlotly", width = "100%", height = paste0(input$plotHeight, "px"))
       } else {
-        renderPlot(
-          rvals$multiplot,
-          width = "auto",
-          height = input$plotHeight
-        )
+        plotOutput("multiplotStatic", width = "100%", height = paste0(input$plotHeight, "px"))
       }
     })
 
+    output$multiplotPlotly = plotly::renderPlotly({
+      req(rvals$multiplot)
+      req(isTRUE(input$interactive))
+      req(inherits(rvals$multiplot, "plotly"))
+      rvals$multiplot
+    })
 
-    observeEvent(input$savePlot, {
-      showModal(
-        modalDialog(
-          title = "Save Plot",
-          textInput("plotfilename", "File name:", value = "ggplot.png"),
-          numericInput("width", "Width (inches):", value = 7),
-          numericInput("height", "Height (inches):", value = 5),
-          numericInput("res", "Resolution (dpi):", value = 300),
-          footer = tagList(
-            modalButton("Cancel"),
-            downloadButton("saveMultiPlot", "Save")
-          )
+    output$multiplotStatic = renderPlot({
+      req(rvals$multiplot)
+      req(!isTRUE(input$interactive))
+      req(inherits(rvals$multiplot, "ggplot"))
+      rvals$multiplot
+    }, width = "auto", height = function() input$plotHeight)
+
+
+  })
+
+  observeEvent(input$savePlot, {
+    showModal(
+      modalDialog(
+        title = "Save Plot",
+        textInput("plotfilename", "File name:", value = "ggplot.png"),
+        numericInput("width", "Width (inches):", value = 7),
+        numericInput("height", "Height (inches):", value = 5),
+        numericInput("res", "Resolution (dpi):", value = 300),
+        footer = tagList(
+          modalButton("Cancel"),
+          downloadButton("saveMultiPlot", "Save")
         )
       )
-    })
-  })
+    )
+  }, ignoreInit = TRUE)
 
   output$saveMultiPlot <- downloadHandler(
     filename = function() {
