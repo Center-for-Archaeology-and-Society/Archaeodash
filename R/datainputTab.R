@@ -45,6 +45,11 @@ should_refresh_dataset_tables <- function(dataset_loading, transformation_loadin
   !isTRUE(dataset_loading) && !isTRUE(transformation_loading)
 }
 
+normalize_selected_datasets <- function(selected_datasets) {
+  vals <- unique(as.character(selected_datasets))
+  vals[!is.na(vals) & nzchar(vals)]
+}
+
 dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
   available_group_values <- shiny::reactiveVal(character())
@@ -479,9 +484,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
     req(input$selectedDatasets)
     show_dataset_loading()
-    selected_datasets <- unique(as.character(input$selectedDatasets))
-    selected_datasets <- selected_datasets[!is.na(selected_datasets) & nzchar(selected_datasets)]
-    req(length(selected_datasets) > 0)
+    on.exit(hide_dataset_loading(), add = TRUE)
+    selected_datasets <- normalize_selected_datasets(input$selectedDatasets)
+    if (length(selected_datasets) == 0) {
+      mynotification("Choose at least one dataset before confirming.", type = "warning")
+      return(invisible(NULL))
+    }
     tryCatch({
       with_dataset_load_timeout({
         reset_transformation_store()
@@ -538,8 +546,6 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       } else {
         mynotification(paste("Unable to load selected dataset:", e$message), type = "error")
       }
-    }, finally = {
-      hide_dataset_loading()
     })
 
   })
