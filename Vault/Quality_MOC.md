@@ -19,6 +19,7 @@ Quality guardrails, tests, and known risks.
 - [[Upload_Append_Type_Harmonization_Fix_2026-02-20]]
 - [[Upload_Append_E2E_Test_Coverage_2026-02-20]]
 - [[Multiplot_Interactive_Performance_and_Cancel_2026-02-20]]
+- [[Beta_to_Live_Release_Sync_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

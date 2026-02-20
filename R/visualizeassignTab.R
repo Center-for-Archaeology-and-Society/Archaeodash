@@ -22,76 +22,71 @@ visualizeassignTab = function() {
           column(
             9,
             plotly::plotlyOutput('plot', width = '100%', height = '600px')
-          )
-        ),
-        fluidRow(
-          column(
-            2,
-            selectInput(
-              'data.src',
-              'Choose data type',
-              # choices = c('elements', 'principal components'),
-              choices = c('elements', 'principal components','UMAP','linear discriminants'),
-              selected = 'elements'
-            ),
-            uiOutput('xvarUI'),
-            uiOutput('yvarUI'),
           ),
           column(
             3,
-            offset = 0.5,
-            checkboxInput('Conf', 'Data Ellipse',
-                          value = TRUE),
-            checkboxInput(
-              "use_symbols",
-              label = bslib::popover(
-                tagList(
-                  "Use group symbols",
-                  trigger = bsicons::bs_icon("info-circle", title = "Help")
-                ),
-                title = "Group symbols",
-                "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
+            tags$div(
+              style = "max-height:600px; overflow-y:auto; padding-left:8px;",
+              selectInput(
+                'data.src',
+                'Choose data type',
+                choices = c('elements', 'principal components','UMAP','linear discriminants'),
+                selected = 'elements'
               ),
-              value = TRUE
-            ),
-            checkboxInput(
-              "show_point_labels",
-              label = bslib::popover(
-                tagList(
-                  "Show point labels",
-                  trigger = bsicons::bs_icon("info-circle", title = "Help")
+              uiOutput('xvarUI'),
+              uiOutput('yvarUI'),
+              selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
+              hr(),
+              h5("Visualization filter"),
+              uiOutput("vizMetaFilterFieldUI"),
+              uiOutput("vizMetaFilterValuesUI"),
+              actionButton("clearVizFilter", "Clear visualization filter"),
+              hr(),
+              checkboxInput('Conf', 'Data Ellipse', value = TRUE),
+              checkboxInput(
+                "use_symbols",
+                label = bslib::popover(
+                  tagList(
+                    "Use group symbols",
+                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+                  ),
+                  title = "Group symbols",
+                  "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
                 ),
-                title = "Point labels",
-                "Shows a text label next to each point using the selected label column."
+                value = TRUE
               ),
-              value = FALSE
-            ),
-            uiOutput("pointLabelColumnUI"),
-            sliderInput(
-              'int.set',
-              label = bslib::popover(
-                tagList("Choose ellipse level",
-                        trigger = bsicons::bs_icon("info-circle", title = "Help")
+              checkboxInput(
+                "show_point_labels",
+                label = bslib::popover(
+                  tagList(
+                    "Show point labels",
+                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+                  ),
+                  title = "Point labels",
+                  "Shows a text label next to each point using the selected label column."
                 ),
-                title = "Choose ellipse level",
-                "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
+                value = FALSE
               ),
-              min = 0.50,
-              max = 0.99,
-              step = 0.05,
-              value = 0.90
+              uiOutput("pointLabelColumnUI"),
+              sliderInput(
+                'int.set',
+                label = bslib::popover(
+                  tagList("Choose ellipse level",
+                          trigger = bsicons::bs_icon("info-circle", title = "Help")
+                  ),
+                  title = "Choose ellipse level",
+                  "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
+                ),
+                min = 0.50,
+                max = 0.99,
+                step = 0.05,
+                value = 0.90
+              ),
+              br(),
+              actionButton('Change', 'Change Group Assignment'),
+              uiOutput("groupAssignChoiceUI")
             )
-          ),
-          column(
-            3,
-            offset = 0.5,
-            br(),
-            actionButton('Change', 'Change Group Assignment'),
-            uiOutput("groupAssignChoiceUI")
-          ),
-          column(3,
-                 offset = 0.5,
-                 selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'))
+          )
         ),
         uiOutput('brush')
       ),
@@ -234,6 +229,96 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       dplyr::filter(rowid %in% selected_rowids) %>%
       dplyr::select(tidyselect::any_of(ordered_cols))
   }
+
+  missing_filter_label <- "(Missing)"
+  normalize_filter_values <- function(x) {
+    vals <- as.character(x)
+    vals[is.na(vals) | !nzchar(trimws(vals))] <- missing_filter_label
+    vals
+  }
+
+  metadata_filter_fields <- shiny::reactive({
+    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) return(character())
+    chem_cols <- if (is.null(rvals$chem)) character() else intersect(rvals$chem, names(rvals$selectedData))
+    fields <- setdiff(names(rvals$selectedData), c("rowid", chem_cols))
+    fields[!is.na(fields) & nzchar(fields)]
+  })
+
+  plot_df_for_display <- shiny::reactive({
+    req(inherits(rvals$plotdf, "data.frame"))
+    plot_df <- rvals$plotdf
+    if (!("rowid" %in% names(plot_df)) || nrow(plot_df) == 0) return(plot_df)
+    field <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
+    selected_vals <- tryCatch(as.character(input$vizMetaFilterValues), error = function(e) character())
+    selected_vals <- selected_vals[!is.na(selected_vals) & nzchar(selected_vals)]
+
+    if (!nzchar(field) || length(selected_vals) == 0) return(plot_df)
+    if (!inherits(rvals$selectedData, "data.frame")) return(plot_df)
+    if (!(field %in% names(rvals$selectedData)) || !("rowid" %in% names(rvals$selectedData))) return(plot_df)
+
+    matched_rowids <- rvals$selectedData %>%
+      dplyr::mutate(
+        rowid = as.character(rowid),
+        .filter_value = normalize_filter_values(.data[[field]])
+      ) %>%
+      dplyr::filter(.data$.filter_value %in% selected_vals) %>%
+      dplyr::pull(rowid) %>%
+      unique()
+
+    plot_df %>%
+      dplyr::mutate(rowid = as.character(rowid)) %>%
+      dplyr::filter(.data$rowid %in% matched_rowids)
+  })
+
+  output$vizMetaFilterFieldUI <- renderUI({
+    fields <- metadata_filter_fields()
+    if (length(fields) == 0) return(NULL)
+    current <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
+    if (length(current) == 0 || is.na(current[[1]]) || !nzchar(current[[1]])) {
+      current <- ""
+    } else {
+      current <- current[[1]]
+    }
+    selected_field <- if (current %in% fields) current else fields[[1]]
+    selectInput(
+      "vizMetaFilterField",
+      "Metadata field",
+      choices = fields,
+      selected = selected_field
+    )
+  })
+
+  output$vizMetaFilterValuesUI <- renderUI({
+    req(inherits(rvals$selectedData, "data.frame"))
+    field <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
+    if (length(field) == 0 || is.na(field[[1]]) || !nzchar(field[[1]])) return(NULL)
+    field <- field[[1]]
+    req(field %in% names(rvals$selectedData))
+    choices <- rvals$selectedData %>%
+      dplyr::pull(!!as.name(field)) %>%
+      normalize_filter_values() %>%
+      unique() %>%
+      sort()
+    selected_vals <- tryCatch(as.character(input$vizMetaFilterValues), error = function(e) character())
+    selected_vals <- intersect(selected_vals, choices)
+    selectizeInput(
+      "vizMetaFilterValues",
+      "Metadata values (multi-select)",
+      choices = choices,
+      selected = selected_vals,
+      multiple = TRUE,
+      options = list(
+        placeholder = "Select one or more values to filter the plot",
+        plugins = list("remove_button")
+      )
+    )
+  })
+
+  observeEvent(input$clearVizFilter, {
+    if (!is.null(input$vizMetaFilterValues)) {
+      shiny::updateSelectizeInput(session, "vizMetaFilterValues", selected = character())
+    }
+  }, ignoreInit = TRUE)
 
   output$groupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
@@ -382,7 +467,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   })
 
   observeEvent(plotly::event_data("plotly_selected", source = "A"), {
-    req(rvals$plotdf)
+    req(plot_df_for_display())
     plotly_select <- plotly::event_data("plotly_selected", source = "A")
     if (is.null(plotly_select) || !("key" %in% names(plotly_select))) {
       selected_plot_keys(character())
@@ -391,9 +476,27 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     }
     keys <- unique(as.character(plotly_select$key))
     selected_plot_keys(keys)
-    rvals$brushSelected <- rvals$plotdf %>%
+    rvals$brushSelected <- plot_df_for_display() %>%
       dplyr::filter(as.character(rowid) %in% keys)
   }, ignoreNULL = FALSE)
+
+  observeEvent(plot_df_for_display(), {
+    display_df <- plot_df_for_display()
+    if (!inherits(display_df, "data.frame") || !("rowid" %in% names(display_df))) {
+      selected_plot_keys(character())
+      rvals$brushSelected <- NULL
+      return(invisible(NULL))
+    }
+    display_keys <- unique(as.character(display_df$rowid))
+    keys <- intersect(selected_plot_keys(), display_keys)
+    selected_plot_keys(keys)
+    if (length(keys) == 0) {
+      rvals$brushSelected <- NULL
+      return(invisible(NULL))
+    }
+    rvals$brushSelected <- display_df %>%
+      dplyr::filter(as.character(rowid) %in% keys)
+  }, ignoreInit = FALSE)
 
   observeEvent(input$Change, {
     req(rvals$plotdf)
@@ -426,14 +529,15 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   # plot
   output$plot <- plotly::renderPlotly({
-    validate(need(inherits(rvals$plotdf,"data.frame"),"Waiting for plot data"))
-    req(nrow(rvals$plotdf) > 0)
-    req(input$xvar %in% names(rvals$plotdf))
-    req(input$yvar %in% names(rvals$plotdf))
+    display_df <- plot_df_for_display()
+    validate(need(inherits(display_df, "data.frame"), "Waiting for plot data"))
+    req(input$xvar %in% names(display_df))
+    req(input$yvar %in% names(display_df))
     req(rvals$attrGroups)
+    validate(need(nrow(display_df) > 0, "No rows match the current visualization filter."))
     p <- tryCatch(
       mainPlot(
-        plotdf = rvals$plotdf,
+        plotdf = display_df,
         xvar = input$xvar,
         yvar = input$yvar,
         attrGroups = rvals$attrGroups,
