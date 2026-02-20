@@ -274,7 +274,12 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     fields <- metadata_filter_fields()
     if (length(fields) == 0) return(NULL)
     current <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
-    selected_field <- if (nzchar(current) && current %in% fields) current else fields[[1]]
+    if (length(current) == 0 || is.na(current[[1]]) || !nzchar(current[[1]])) {
+      current <- ""
+    } else {
+      current <- current[[1]]
+    }
+    selected_field <- if (current %in% fields) current else fields[[1]]
     selectInput(
       "vizMetaFilterField",
       "Metadata field",
@@ -285,8 +290,10 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   output$vizMetaFilterValuesUI <- renderUI({
     req(inherits(rvals$selectedData, "data.frame"))
-    req(input$vizMetaFilterField %in% names(rvals$selectedData))
-    field <- input$vizMetaFilterField
+    field <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
+    if (length(field) == 0 || is.na(field[[1]]) || !nzchar(field[[1]])) return(NULL)
+    field <- field[[1]]
+    req(field %in% names(rvals$selectedData))
     choices <- rvals$selectedData %>%
       dplyr::pull(!!as.name(field)) %>%
       normalize_filter_values() %>%
