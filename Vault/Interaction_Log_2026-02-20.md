@@ -22,6 +22,7 @@
 - Requested transformation metadata synchronization across saved transformations; implemented canonical metadata sync from `importedData`, added unfiltered snapshot base (`selectedDataAll`) plus per-snapshot group-filter derivation, updated load/persistence paths, and validated targeted transformation/data-input tests.
 - Reported CSP report-only violations blocking Heurist external JS/CSS dependencies under strict `script-src/style-src`; provided targeted Apache CSP allowlist updates for required CDN hosts plus a safer migration path toward self-hosted assets and reduced `unsafe-*`.
 - Reported `accessTokens.php` blocked by `X-Content-Type-Options: nosniff` with `text/html`; provided root-cause triage and fix guidance to return the correct MIME type (or correct the caller/resource type) instead of weakening `nosniff`.
+- Requested Visualize & Assign layout/filter improvements; moved controls to a right-side sidebar, added metadata-field visualization filter with multi-select values (display-only via rowid intersection), hardened selection sync under filtering, and prepared commit/tag/install steps.
 
 ## Related
 

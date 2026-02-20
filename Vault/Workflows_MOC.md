@@ -12,6 +12,7 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Dataset_Selector_Refresh_and_Multiselect_2026-02-19]]
 - [[Multi_Dataset_Workspace_Writeback_and_Browse_Load_Mode_2026-02-19]]
 - [[Visualize_Assign_Ellipse_Robustness_Fix_2026-02-19]]
+- [[Visualize_Assign_Right_Sidebar_Metadata_Filter_2026-02-20]]
 - [[Multi_Dataset_Confirm_Hang_Fix_2026-02-19]]
 - [[Multi_Dataset_Load_UI_Performance_Optimization_2026-02-19]]
 
