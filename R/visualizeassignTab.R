@@ -88,6 +88,14 @@ validate_multiplot_axes <- function(x_vars, y_vars) {
   list(ok = TRUE, message = "", x = x_vars, y = y_vars)
 }
 
+resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
+  width <- suppressWarnings(as.numeric(plot_width))
+  if (length(width) == 0 || is.na(width[[1]]) || !is.finite(width[[1]])) {
+    return(NULL)
+  }
+  width[[1]] <= threshold
+}
+
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
@@ -256,9 +264,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   observe({
     if (isTRUE(auto_filters_layout_set())) return(invisible(NULL))
-    plot_width <- suppressWarnings(as.numeric(session$clientData$output_plot_width))
-    if (!is.finite(plot_width)) return(invisible(NULL))
-    shiny::updateCheckboxInput(session, "filters_below_plot", value = (plot_width <= 768))
+    default_layout <- resolve_filters_below_plot_default(session$clientData$output_plot_width, threshold = 768)
+    if (is.null(default_layout)) return(invisible(NULL))
+    shiny::updateCheckboxInput(session, "filters_below_plot", value = isTRUE(default_layout))
     auto_filters_layout_set(TRUE)
     invisible(NULL)
   })
