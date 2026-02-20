@@ -9,6 +9,10 @@
 - User requested commit/tag/restart for beta fixes; prepared release commit with vault documentation updates, created a release tag, installed current source into `archaeodashbeta`, and restarted beta container.
 - User reported multiplot loading indicator sometimes stays visible after plot renders; hardened cleanup logic by removing `req()` short-circuit exits in loader scope and enforcing `hide_multiplot_loading()` in a `tryCatch(..., finally=...)` block, then validated locally without deployment.
 - User reported loading issue persisted and requested stricter multiplot guards plus commit/install/restart; added axis validation to block update without X or Y and block overlapping X/Y selections, added unit coverage, ran full tests, then prepared deployment to beta.
+- User requested thorough security audit with external testing and recommendations only; performed black-box checks against the beta URL and code-level auth/cookie/DB review, then documented prioritized security recommendations without application code changes.
+- User requested double-check and implementation of security recommendations with tests first; implemented token-based remembered login, login throttling, cookie/token hardening, credential-file cleanup, added unit + opt-in DB-backed shinytest2 temp-user/INAA e2e tests, ran full tests, and documented infra-only constraints for headers/banner controls.
+- User requested Apache vhost review while keeping `.Renviron` unchanged; audited current `sites-available`/enabled config and provided hardening recommendations for headers, directory policy, proxy limits, and endpoint access control without changing server config.
+- User requested commit/tag/install for `archaeodashbeta`; prepared release commit for security hardening updates, created timestamp release tag, installed package into beta container, and restarted beta only.
 
 ## Related
 

@@ -41,7 +41,7 @@ Click *LOGIN* and enter your username and password.
 
 ### Cookies and Session Persistence
 
-If cookies are accepted, ArchaeoDash stores a local login cookie to keep you signed in for up to 30 days. You can decline cookies or log out to clear the local session cookie.
+If cookies are accepted, ArchaeoDash stores a local remembered-login token to keep you signed in for up to 30 days. You can decline cookies or log out to clear the local remembered-login token.
 
 ## Import and Manage Data
 

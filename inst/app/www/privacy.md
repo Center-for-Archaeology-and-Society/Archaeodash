@@ -20,7 +20,7 @@ If you are logged in, named transformations you save from the Data Manager (incl
 
 ### **Cookies**
 
-If you accept cookies, ArchaeoDash stores a local login cookie on your device so you can remain signed in for up to 30 days. This cookie stores your username for session restoration and is not used for advertising. You can decline cookies or log out at any time to clear the stored login cookie.
+If you accept cookies, ArchaeoDash stores a local remembered-login token on your device so you can remain signed in for up to 30 days. This token is used only for session restoration and is not used for advertising. You can decline cookies or log out at any time to clear the stored login token.
 
 ## **Use of Information**
 

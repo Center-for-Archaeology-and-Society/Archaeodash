@@ -8,12 +8,14 @@
       date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
       expires = "; expires=" + date.toUTCString();
     }
+    var secureFlag = window.location && window.location.protocol === "https:" ? "; Secure" : "";
     document.cookie =
       name +
       "=" +
       encodeURIComponent(value || "") +
       expires +
-      "; path=/; SameSite=Lax";
+      "; path=/; SameSite=Lax" +
+      secureFlag;
   }
 
   function getCookie(name) {
@@ -30,7 +32,13 @@
   }
 
   function eraseCookie(name) {
-    document.cookie = name + "=; Max-Age=-1; path=/; SameSite=Lax";
+    var secureFlag = window.location && window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = name + "=; Max-Age=-1; path=/; SameSite=Lax" + secureFlag;
+  }
+
+  function sendRememberTokenRevoke(token) {
+    if (!token) return;
+    sendToShiny("remembered_token_revoke", token, 30);
   }
 
   function sendToShiny(inputId, value, retries) {
@@ -52,11 +60,16 @@
         if (!msg || !msg.action) return;
         if (msg.action === "set") {
           var consent = getCookie("archaeodash_cookie_consent");
-          if (consent === "accepted" && msg.username) {
-            setCookie("archaeodash_auth_user", msg.username, 30);
+          if (consent === "accepted" && msg.token) {
+            setCookie("archaeodash_auth_token", msg.token, 30);
+            sendToShiny("remembered_token", msg.token, 30);
           }
         } else if (msg.action === "clear") {
-          eraseCookie("archaeodash_auth_user");
+          var existingToken = getCookie("archaeodash_auth_token");
+          if (existingToken) {
+            sendRememberTokenRevoke(existingToken);
+          }
+          eraseCookie("archaeodash_auth_token");
         }
       });
       window.Shiny.addCustomMessageHandler("theme_preference", function (msg) {
@@ -189,9 +202,9 @@
       }
 
       if (consent === "accepted") {
-        var rememberedUsername = getCookie("archaeodash_auth_user");
-        if (rememberedUsername) {
-          sendToShiny("remembered_username", rememberedUsername, 30);
+        var rememberedToken = getCookie("archaeodash_auth_token");
+        if (rememberedToken) {
+          sendToShiny("remembered_token", rememberedToken, 30);
         }
       }
 
@@ -206,7 +219,11 @@
       if (declineBtn) {
         declineBtn.addEventListener("click", function () {
           setCookie("archaeodash_cookie_consent", "declined", 180);
-          eraseCookie("archaeodash_auth_user");
+          var existingToken = getCookie("archaeodash_auth_token");
+          if (existingToken) {
+            sendRememberTokenRevoke(existingToken);
+          }
+          eraseCookie("archaeodash_auth_token");
           if (banner) banner.style.display = "none";
           sendToShiny("cookie_consent", "declined", 30);
         });

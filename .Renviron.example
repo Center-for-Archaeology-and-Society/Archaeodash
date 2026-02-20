@@ -1,0 +1,5 @@
+host = "your-db-host"
+db = "your-db-name"
+user = "your-db-user"
+pwd = "your-db-password"
+port = "3306"

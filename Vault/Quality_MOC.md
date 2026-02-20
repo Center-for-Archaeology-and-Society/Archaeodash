@@ -11,6 +11,9 @@ Quality guardrails, tests, and known risks.
 - [[Multiplot_RenderUI_Crash_Fix_2026-02-20]]
 - [[Multiplot_Save_Dialog_Observer_Fix_2026-02-20]]
 - [[Multiplot_Input_Validation_Fix_2026-02-20]]
+- [[Security_Audit_Blackbox_and_Code_2026-02-20]]
+- [[Security_Hardening_Implementation_2026-02-20]]
+- [[Apache_Sites_Config_Review_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
