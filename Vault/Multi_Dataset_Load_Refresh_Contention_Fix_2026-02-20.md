@@ -14,6 +14,8 @@ Addressed a multi-dataset loading hang by preventing dataset-list refresh querie
 - Added re-entry guard to block duplicate `confirmPrior` clicks during active load.
 - Deferred `rvals$currentDatasetName <- selected_datasets` until load workflow completes.
 - Hardened modal lifecycle helpers with idempotent guards.
+- Replaced post-modal `req(length(selected_datasets) > 0)` with explicit validation + return path so the loading modal cannot be left open by a silent `req` abort.
+- Added `normalize_selected_datasets()` to centralize blank/NA deduping.
 
 ## Validation
 - `parse(file='R/datainputTab.R')` pass.

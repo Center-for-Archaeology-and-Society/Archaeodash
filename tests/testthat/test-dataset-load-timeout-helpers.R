@@ -19,6 +19,11 @@ test_that("should_refresh_dataset_tables pauses refresh while loading", {
   expect_false(should_refresh_dataset_tables(TRUE, TRUE))
 })
 
+test_that("normalize_selected_datasets removes blanks and duplicates", {
+  vals <- normalize_selected_datasets(c("a_tbl", "", "a_tbl", NA_character_, "b_tbl"))
+  expect_identical(vals, c("a_tbl", "b_tbl"))
+})
+
 test_that("with_dataset_load_timeout returns expression result when under limit", {
   out <- with_dataset_load_timeout({ 1 + 1 }, timeout_sec = 1)
   expect_equal(out, 2)
