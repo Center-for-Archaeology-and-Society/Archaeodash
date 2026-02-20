@@ -41,6 +41,10 @@ datainputTab = function() {
 #'
 #' @examples
 #' dataInputServer(input, output, session, rvals)
+should_refresh_dataset_tables <- function(dataset_loading, transformation_loading) {
+  !isTRUE(dataset_loading) && !isTRUE(transformation_loading)
+}
+
 dataInputServer = function(input, output, session, rvals, con, credentials) {
   pending_new_column <- shiny::reactiveVal(NULL)
   available_group_values <- shiny::reactiveVal(character())
@@ -73,6 +77,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }
 
   show_dataset_loading <- function() {
+    if (isTRUE(dataset_loading_active())) return(invisible(NULL))
     dataset_loading_active(TRUE)
     showModal(modalDialog(
       title = NULL,
@@ -88,10 +93,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }
 
   hide_dataset_loading <- function() {
-    if (isTRUE(dataset_loading_active())) {
-      removeModal()
-      dataset_loading_active(FALSE)
-    }
+    if (!isTRUE(dataset_loading_active())) return(invisible(NULL))
+    removeModal()
+    dataset_loading_active(FALSE)
+    invisible(NULL)
   }
 
   safe_username <- function() {
@@ -401,6 +406,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observe({
     shiny::invalidateLater(1500, session)
+    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) {
+      return(invisible(NULL))
+    }
     if (is.null(con)) {
       rvals$tbls <- NULL
       return(invisible(NULL))
@@ -409,6 +417,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(rvals$currentDatasetName, {
+    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) {
+      return(invisible(NULL))
+    }
     if (is.null(con)) return(invisible(NULL))
     rvals$tbls <- get_user_dataset_tables()
   }, ignoreInit = TRUE)
@@ -462,6 +473,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$confirmPrior,{
+    if (isTRUE(dataset_loading_active())) {
+      mynotification("Dataset loading is already in progress. Please wait.", type = "warning")
+      return(invisible(NULL))
+    }
     req(input$selectedDatasets)
     show_dataset_loading()
     selected_datasets <- unique(as.character(input$selectedDatasets))
@@ -470,7 +485,6 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     tryCatch({
       with_dataset_load_timeout({
         reset_transformation_store()
-        rvals$currentDatasetName <- selected_datasets
         rvals$currentDatasetKey <- build_dataset_key(selected_datasets)
         set_last_opened_dataset(selected_datasets[[1]])
         rvals$currentDatasetRowMap <- NULL
@@ -505,6 +519,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           rvals$activeTransformation <- NULL
           mynotification("Multiple datasets loaded. Saved transformations are not loaded; create a new transformation for this combined workspace.", type = "message")
         }
+        rvals$currentDatasetName <- selected_datasets
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
       if (is_dataset_load_timeout_error(e)) {
