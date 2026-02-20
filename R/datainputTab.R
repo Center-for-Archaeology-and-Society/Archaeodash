@@ -618,8 +618,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dplyr::distinct_all() %>%
         tibble::rowid_to_column()
 
-      filename = paste0(credentials$res$username, "_", input$mergeName) %>%
-        janitor::make_clean_names()
+      filename <- build_dataset_table_name(
+        username = credentials$res$username,
+        dataset_label = input$mergeName,
+        max_len = 54
+      )
 
       # get metadata
       tblsmd = list()
@@ -646,6 +649,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       if(!db_table_exists_safe(con, filename)){
         db_write_table_safe(con, filename, merged, row.names = FALSE, context = "saving merged dataset")
         db_write_table_safe(con, paste0(filename, "_metadata"), tblsmd, row.names = FALSE, context = "saving merged dataset metadata")
+        expected_name <- janitor::make_clean_names(paste0(credentials$res$username, "_", input$mergeName))
+        if (!identical(filename, expected_name)) {
+          mynotification(paste0("Merged dataset name shortened for storage as: ", filename), type = "message")
+        }
       } else {
         rvals$mergeFilename = filename
         rvals$merged = merged

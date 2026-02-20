@@ -293,12 +293,11 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
           return(NULL)
         }
-        datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
-          janitor::make_clean_names()
-        if(nchar(datasetname) > 53){
-          mynotification("Error: datasetname is too long. Please try again.", type = "error")
-          return(NULL)
-        }
+        datasetname <- build_dataset_table_name(
+          username = credentials$res$username,
+          dataset_label = input$datasetName,
+          max_len = 54
+        )
         data_metadata = tibble::tibble(
           field = c("datasetName","created", rep("variable",length(rvals$chem))),
           value = c(input$datasetName,as.character(as.Date(Sys.time())),rvals$chem)
@@ -307,6 +306,9 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         if(isTruthy(datasetname %in% tblList) || input$datasetName %>% length() == 0){
           mynotification("This dataset already exists. Please choose a different name.", type = "error")
           return(NULL)
+        }
+        if (!identical(datasetname, janitor::make_clean_names(paste0(credentials$res$username, "_", input$datasetName)))) {
+          mynotification(paste0("Dataset name shortened for storage as: ", datasetname), type = "message")
         }
         ok_data <- db_write_table_safe(con, datasetname, data_loaded, row.names = FALSE, context = "saving uploaded dataset")
         ok_meta <- db_write_table_safe(con, paste0(datasetname, "_metadata"), data_metadata, row.names = FALSE, context = "saving uploaded dataset metadata")

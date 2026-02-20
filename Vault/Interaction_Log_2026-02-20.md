@@ -30,6 +30,7 @@
 - Requested regression coverage + release actions; extracted mobile-default width logic into a pure helper (`resolve_filters_below_plot_default`), added targeted unit tests for empty/NA/non-numeric/threshold scenarios, reran tests, then prepared tag/commit/install on beta.
 - Reported multi-dataset load hang; traced likely DB contention from background dataset-list refresh firing during active dataset loading, added load-state refresh gating + load re-entry guard + deferred `currentDatasetName` update until load completion, added helper regression assertions, and prepared beta redeploy.
 - Reported multi-dataset hang persisted after refresh; fixed another loader-deadlock path where `show_dataset_loading()` could run before a `req` abort and leave the modal open indefinitely, replaced with explicit selection validation + guaranteed teardown via `on.exit`, and added normalization/test coverage.
+- Reported save errors from overly long table names; added deterministic dataset-table name shortening with hash suffix and max-length enforcement for both upload and merge flows, surfaced user-facing notification when shortening occurs, and added regression tests.
 
 ## Related
 
