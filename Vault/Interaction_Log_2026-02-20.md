@@ -31,6 +31,7 @@
 - Reported multi-dataset load hang; traced likely DB contention from background dataset-list refresh firing during active dataset loading, added load-state refresh gating + load re-entry guard + deferred `currentDatasetName` update until load completion, added helper regression assertions, and prepared beta redeploy.
 - Reported multi-dataset hang persisted after refresh; fixed another loader-deadlock path where `show_dataset_loading()` could run before a `req` abort and leave the modal open indefinitely, replaced with explicit selection validation + guaranteed teardown via `on.exit`, and added normalization/test coverage.
 - Reported save errors from overly long table names; added deterministic dataset-table name shortening with hash suffix and max-length enforcement for both upload and merge flows, surfaced user-facing notification when shortening occurs, and added regression tests.
+- Reported multi-dataset loading still hanging; removed eager `mutate_all(as.character)` coercion during per-table `collect()` in workspace loader to reduce heavy memory/CPU blocking, and added stage-level load logging to isolate exactly where stalls occur in future runs.
 
 ## Related
 

@@ -14,9 +14,10 @@ load_selected_datasets_workspace <- function(con, selected_datasets) {
 
   loaded_tbls <- list()
   for (dataset_name in selected_datasets) {
+    app_log(glue::glue("load_selected_datasets_workspace: collecting {dataset_name}"))
     tbl <- dplyr::tbl(con, dataset_name) %>%
-      dplyr::collect() %>%
-      dplyr::mutate_all(as.character)
+      dplyr::collect()
+    app_log(glue::glue("load_selected_datasets_workspace: collected {dataset_name} rows={nrow(tbl)}"))
     tbl <- ensure_rowid_column(
       data = tbl,
       table_name = dataset_name,
@@ -31,6 +32,7 @@ load_selected_datasets_workspace <- function(con, selected_datasets) {
       `.__source_rowid` = as.character(.data$rowid),
       rowid = as.character(seq_len(dplyr::n()))
     )
+  app_log(glue::glue("load_selected_datasets_workspace: combined rows={nrow(imported_tbl)} datasets={length(selected_datasets)}"))
 
   row_map <- imported_tbl %>%
     dplyr::transmute(

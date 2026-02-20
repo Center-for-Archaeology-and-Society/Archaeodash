@@ -492,6 +492,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
     tryCatch({
       with_dataset_load_timeout({
+        app_log(glue::glue("confirmPrior: start selected_datasets={length(selected_datasets)}"))
         reset_transformation_store()
         rvals$currentDatasetKey <- build_dataset_key(selected_datasets)
         set_last_opened_dataset(selected_datasets[[1]])
@@ -511,6 +512,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         rvals$importedData <- workspace_loaded$importedData
         rvals$selectedData = rvals$importedData
         ensure_core_rowids(rvals)
+        app_log(glue::glue("confirmPrior: workspace loaded rows={nrow(rvals$importedData)}"))
 
         tblsmd <- load_selected_dataset_metadata_variables(con, selected_datasets)
         if(length(tblsmd) > 0){
@@ -528,6 +530,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           mynotification("Multiple datasets loaded. Saved transformations are not loaded; create a new transformation for this combined workspace.", type = "message")
         }
         rvals$currentDatasetName <- selected_datasets
+        app_log("confirmPrior: completed successfully")
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
       if (is_dataset_load_timeout_error(e)) {
