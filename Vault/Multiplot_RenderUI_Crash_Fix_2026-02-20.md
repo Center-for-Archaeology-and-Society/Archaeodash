@@ -16,6 +16,7 @@ Fixed a multiplot rendering wiring bug that could destabilize the beta app sessi
   - `output$multiplotPlotly <- plotly::renderPlotly(...)`
   - `output$multiplotStatic <- renderPlot(...)`
 - Added a modal loading indicator around multiplot generation (`Building multiplot...`) with guaranteed cleanup on success/error via `on.exit`.
+- Hardened loading-indicator teardown to avoid a stuck modal by replacing `req()` short-circuit paths with explicit guards and wrapping the multiplot build in `tryCatch(..., finally = hide_multiplot_loading())`.
 - Added/extended test coverage to assert `multiplot()` returns `ggplot` (static) and `plotly` (interactive).
 
 ## Validation

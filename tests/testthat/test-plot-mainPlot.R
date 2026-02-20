@@ -200,3 +200,22 @@ test_that("multiplot returns expected class for interactive and static modes", {
   )
   expect_s3_class(p_interactive, "plotly")
 })
+
+test_that("validate_multiplot_axes enforces non-empty and distinct selections", {
+  empty_x <- validate_multiplot_axes(character(), c("V2"))
+  expect_false(empty_x$ok)
+  expect_match(empty_x$message, "Select at least one X variable", fixed = TRUE)
+
+  empty_y <- validate_multiplot_axes(c("V1"), character())
+  expect_false(empty_y$ok)
+  expect_match(empty_y$message, "Select at least one Y variable", fixed = TRUE)
+
+  overlap <- validate_multiplot_axes(c("V1", "V2"), c("V2", "V3"))
+  expect_false(overlap$ok)
+  expect_match(overlap$message, "must be different variables", fixed = TRUE)
+
+  valid <- validate_multiplot_axes(c("V1"), c("V2", "V3"))
+  expect_true(valid$ok)
+  expect_equal(valid$x, "V1")
+  expect_equal(valid$y, c("V2", "V3"))
+})

@@ -143,6 +143,25 @@ visualizeassignTab = function() {
 #'
 #' @examples
 #' visualizeAssignServer(input,output,session,rvals)
+
+validate_multiplot_axes <- function(x_vars, y_vars) {
+  x_vars <- as.character(x_vars)
+  y_vars <- as.character(y_vars)
+  x_vars <- x_vars[!is.na(x_vars) & nzchar(x_vars)]
+  y_vars <- y_vars[!is.na(y_vars) & nzchar(y_vars)]
+
+  if (length(x_vars) == 0) {
+    return(list(ok = FALSE, message = "Select at least one X variable for multiplot.", x = x_vars, y = y_vars))
+  }
+  if (length(y_vars) == 0) {
+    return(list(ok = FALSE, message = "Select at least one Y variable for multiplot.", x = x_vars, y = y_vars))
+  }
+  if (length(intersect(x_vars, y_vars)) > 0) {
+    return(list(ok = FALSE, message = "X and Y multiplot selections must be different variables.", x = x_vars, y = y_vars))
+  }
+  list(ok = TRUE, message = "", x = x_vars, y = y_vars)
+}
+
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
@@ -453,18 +472,27 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   observeEvent(input$updateMultiplot, {
     show_multiplot_loading()
-    on.exit(hide_multiplot_loading(), add = TRUE)
-    req(nrow(rvals$selectedData) > 0)
-    req(input$xvar2)
     ok <- tryCatch({
+      if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
+        mynotification("No data available for multiplot.", type = "warning")
+        return(FALSE)
+      }
+      axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
+      if (!isTRUE(axis_check$ok)) {
+        mynotification(axis_check$message, type = "warning")
+        return(FALSE)
+      }
+
       quietly(label = "multiplot",{
-        rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
+        rvals$multiplot = multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = axis_check$x, yvar = axis_check$y,ptsize = input$ptsize, interactive = input$interactive, theme = input$plot_theme)
       })
       TRUE
     }, error = function(e) {
       mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
       rvals$multiplot <- NULL
       FALSE
+    }, finally = {
+      hide_multiplot_loading()
     })
     if (!isTRUE(ok)) return(invisible(NULL))
 

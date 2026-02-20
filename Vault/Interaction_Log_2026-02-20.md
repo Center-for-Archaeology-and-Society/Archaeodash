@@ -7,6 +7,8 @@
 - User requested a multiplot loading indicator without deployment; added a modal loading indicator (`Building multiplot...`) around multiplot generation with safe teardown and retained code-only/local-test state (no install/restart).
 - User reported save-plot dialog appearing after clicking multiplot update; fixed nested observer registration by moving `savePlot` observer out of `updateMultiplot` and setting `ignoreInit=TRUE`, then validated locally without deployment.
 - User requested commit/tag/restart for beta fixes; prepared release commit with vault documentation updates, created a release tag, installed current source into `archaeodashbeta`, and restarted beta container.
+- User reported multiplot loading indicator sometimes stays visible after plot renders; hardened cleanup logic by removing `req()` short-circuit exits in loader scope and enforcing `hide_multiplot_loading()` in a `tryCatch(..., finally=...)` block, then validated locally without deployment.
+- User reported loading issue persisted and requested stricter multiplot guards plus commit/install/restart; added axis validation to block update without X or Y and block overlapping X/Y selections, added unit coverage, ran full tests, then prepared deployment to beta.
 
 ## Related
 

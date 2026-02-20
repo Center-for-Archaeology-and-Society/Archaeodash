@@ -10,6 +10,7 @@ Quality guardrails, tests, and known risks.
 - [[Visualize_Assign_UMAP_Symbol_Compatibility_Fix_2026-02-20]]
 - [[Multiplot_RenderUI_Crash_Fix_2026-02-20]]
 - [[Multiplot_Save_Dialog_Observer_Fix_2026-02-20]]
+- [[Multiplot_Input_Validation_Fix_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
