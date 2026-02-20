@@ -23,6 +23,7 @@
 - Reported CSP report-only violations blocking Heurist external JS/CSS dependencies under strict `script-src/style-src`; provided targeted Apache CSP allowlist updates for required CDN hosts plus a safer migration path toward self-hosted assets and reduced `unsafe-*`.
 - Reported `accessTokens.php` blocked by `X-Content-Type-Options: nosniff` with `text/html`; provided root-cause triage and fix guidance to return the correct MIME type (or correct the caller/resource type) instead of weakening `nosniff`.
 - Requested Visualize & Assign layout/filter improvements; moved controls to a right-side sidebar, added metadata-field visualization filter with multi-select values (display-only via rowid intersection), hardened selection sync under filtering, and prepared commit/tag/install steps.
+- Reported unspecified visualization-filter error; traced to `vizMetaFilterFieldUI` NA handling (`if: missing value where TRUE/FALSE needed`), hardened NA/empty guards for both metadata field/value UI renderers, reinstalled and restarted `archaeodashbeta`, and verified the error no longer appears in fresh logs.
 
 ## Related
 
