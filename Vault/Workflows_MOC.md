@@ -19,6 +19,7 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Visualize_Assign_Responsive_Layout_Regression_Test_2026-02-20]]
 - [[Multi_Dataset_Confirm_Hang_Fix_2026-02-19]]
 - [[Multi_Dataset_Load_UI_Performance_Optimization_2026-02-19]]
+- [[Multi_Dataset_Load_Refresh_Contention_Fix_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
