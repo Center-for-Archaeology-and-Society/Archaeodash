@@ -14,6 +14,7 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Visualize_Assign_Ellipse_Robustness_Fix_2026-02-19]]
 - [[Visualize_Assign_Right_Sidebar_Metadata_Filter_2026-02-20]]
 - [[Visualize_Assign_Metadata_Filter_NA_UI_Hotfix_2026-02-20]]
+- [[Visualize_Assign_Responsive_Filter_Layout_2026-02-20]]
 - [[Multi_Dataset_Confirm_Hang_Fix_2026-02-19]]
 - [[Multi_Dataset_Load_UI_Performance_Optimization_2026-02-19]]
 

@@ -18,76 +18,7 @@ visualizeassignTab = function() {
       type = "pills",
       tabPanel(
         title = "visualize and select",
-        fluidRow(
-          column(
-            9,
-            plotly::plotlyOutput('plot', width = '100%', height = '600px')
-          ),
-          column(
-            3,
-            tags$div(
-              style = "max-height:600px; overflow-y:auto; padding-left:8px;",
-              selectInput(
-                'data.src',
-                'Choose data type',
-                choices = c('elements', 'principal components','UMAP','linear discriminants'),
-                selected = 'elements'
-              ),
-              uiOutput('xvarUI'),
-              uiOutput('yvarUI'),
-              selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
-              hr(),
-              h5("Visualization filter"),
-              uiOutput("vizMetaFilterFieldUI"),
-              uiOutput("vizMetaFilterValuesUI"),
-              actionButton("clearVizFilter", "Clear visualization filter"),
-              hr(),
-              checkboxInput('Conf', 'Data Ellipse', value = TRUE),
-              checkboxInput(
-                "use_symbols",
-                label = bslib::popover(
-                  tagList(
-                    "Use group symbols",
-                    trigger = bsicons::bs_icon("info-circle", title = "Help")
-                  ),
-                  title = "Group symbols",
-                  "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
-                ),
-                value = TRUE
-              ),
-              checkboxInput(
-                "show_point_labels",
-                label = bslib::popover(
-                  tagList(
-                    "Show point labels",
-                    trigger = bsicons::bs_icon("info-circle", title = "Help")
-                  ),
-                  title = "Point labels",
-                  "Shows a text label next to each point using the selected label column."
-                ),
-                value = FALSE
-              ),
-              uiOutput("pointLabelColumnUI"),
-              sliderInput(
-                'int.set',
-                label = bslib::popover(
-                  tagList("Choose ellipse level",
-                          trigger = bsicons::bs_icon("info-circle", title = "Help")
-                  ),
-                  title = "Choose ellipse level",
-                  "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
-                ),
-                min = 0.50,
-                max = 0.99,
-                step = 0.05,
-                value = 0.90
-              ),
-              br(),
-              actionButton('Change', 'Change Group Assignment'),
-              uiOutput("groupAssignChoiceUI")
-            )
-          )
-        ),
+        uiOutput("visualizeSelectLayout"),
         uiOutput('brush')
       ),
       tabPanel(
@@ -161,6 +92,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
   multiplot_cancel_requested <- shiny::reactiveVal(FALSE)
+  auto_filters_layout_set <- shiny::reactiveVal(FALSE)
 
   pick_selected_value <- function(candidate, choices, fallback = "") {
     if (is.null(candidate) || length(candidate) == 0) return(fallback)
@@ -229,6 +161,107 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       dplyr::filter(rowid %in% selected_rowids) %>%
       dplyr::select(tidyselect::any_of(ordered_cols))
   }
+
+  build_visualize_controls <- function(scroll_controls = TRUE) {
+    controls_style <- if (isTRUE(scroll_controls)) {
+      "max-height:600px; overflow-y:auto; padding-left:8px;"
+    } else {
+      "padding-top:8px;"
+    }
+    tags$div(
+      style = controls_style,
+      checkboxInput(
+        "filters_below_plot",
+        "Place filters below plot",
+        value = isTRUE(input$filters_below_plot)
+      ),
+      selectInput(
+        'data.src',
+        'Choose data type',
+        choices = c('elements', 'principal components','UMAP','linear discriminants'),
+        selected = 'elements'
+      ),
+      uiOutput('xvarUI'),
+      uiOutput('yvarUI'),
+      selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
+      hr(),
+      h5("Visualization filter"),
+      uiOutput("vizMetaFilterFieldUI"),
+      uiOutput("vizMetaFilterValuesUI"),
+      actionButton("clearVizFilter", "Clear visualization filter"),
+      hr(),
+      checkboxInput('Conf', 'Data Ellipse', value = TRUE),
+      checkboxInput(
+        "use_symbols",
+        label = bslib::popover(
+          tagList(
+            "Use group symbols",
+            trigger = bsicons::bs_icon("info-circle", title = "Help")
+          ),
+          title = "Group symbols",
+          "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
+        ),
+        value = TRUE
+      ),
+      checkboxInput(
+        "show_point_labels",
+        label = bslib::popover(
+          tagList(
+            "Show point labels",
+            trigger = bsicons::bs_icon("info-circle", title = "Help")
+          ),
+          title = "Point labels",
+          "Shows a text label next to each point using the selected label column."
+        ),
+        value = FALSE
+      ),
+      uiOutput("pointLabelColumnUI"),
+      sliderInput(
+        'int.set',
+        label = bslib::popover(
+          tagList("Choose ellipse level",
+                  trigger = bsicons::bs_icon("info-circle", title = "Help")
+          ),
+          title = "Choose ellipse level",
+          "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
+        ),
+        min = 0.50,
+        max = 0.99,
+        step = 0.05,
+        value = 0.90
+      ),
+      br(),
+      actionButton('Change', 'Change Group Assignment'),
+      uiOutput("groupAssignChoiceUI")
+    )
+  }
+
+  output$visualizeSelectLayout <- renderUI({
+    if (isTRUE(input$filters_below_plot)) {
+      tagList(
+        fluidRow(
+          column(12, plotly::plotlyOutput('plot', width = '100%', height = '600px'))
+        ),
+        fluidRow(
+          column(12, build_visualize_controls(scroll_controls = FALSE))
+        )
+      )
+    } else {
+      fluidRow(
+        column(9, plotly::plotlyOutput('plot', width = '100%', height = '600px')),
+        column(3, build_visualize_controls(scroll_controls = TRUE))
+      )
+    }
+  })
+
+  observe({
+    if (isTRUE(auto_filters_layout_set())) return(invisible(NULL))
+    plot_width <- suppressWarnings(as.numeric(session$clientData$output_plot_width))
+    if (!is.finite(plot_width)) return(invisible(NULL))
+    shiny::updateCheckboxInput(session, "filters_below_plot", value = (plot_width <= 768))
+    auto_filters_layout_set(TRUE)
+    invisible(NULL)
+  })
 
   missing_filter_label <- "(Missing)"
   normalize_filter_values <- function(x) {
