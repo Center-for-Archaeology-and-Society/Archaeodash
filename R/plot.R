@@ -8,6 +8,7 @@
 #' @param int.set confidence level
 #' @param theme color theme
 #' @param use_symbols whether to draw group symbols
+#' @param symbol_col column used to map marker symbols (defaults to attrGroups)
 #' @param show_point_labels whether to show point labels
 #' @param label_col column used for point labels
 #'
@@ -16,7 +17,7 @@
 #'
 #' @examples
 #' mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
-mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis", use_symbols = TRUE, show_point_labels = FALSE, label_col = NULL){
+mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis", use_symbols = TRUE, symbol_col = NULL, show_point_labels = FALSE, label_col = NULL){
   if(xvar == yvar) return(NULL)
   if (!inherits(plotdf, "data.frame")) return(NULL)
   if (!(xvar %in% names(plotdf)) || !(yvar %in% names(plotdf)) || !(attrGroups %in% names(plotdf))) return(NULL)
@@ -30,6 +31,14 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   group_values[is.na(group_values) | !nzchar(trimws(group_values))] <- "[NA]"
   group_levels <- sort(unique(group_values))
   plot_data$.plot_group <- factor(group_values, levels = group_levels)
+  if (!is.character(symbol_col) || length(symbol_col) == 0 || is.na(symbol_col[[1]]) || !(symbol_col[[1]] %in% names(plot_data))) {
+    symbol_col <- attrGroups
+  } else {
+    symbol_col <- symbol_col[[1]]
+  }
+  symbol_values <- as.character(plot_data[[symbol_col]])
+  symbol_values[is.na(symbol_values) | !nzchar(trimws(symbol_values))] <- "[NA]"
+  plot_data$.plot_symbol_value <- symbol_values
 
   # Keep marker symbols to a conservative set supported across plotly versions.
   symbol_pool <- c(
@@ -37,8 +46,9 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
     "triangle-up", "triangle-down", "triangle-left", "triangle-right",
     "star"
   )
-  symbol_map <- stats::setNames(rep(symbol_pool, length.out = length(group_levels)), group_levels)
-  plot_data$.plot_symbol <- as.character(symbol_map[as.character(plot_data$.plot_group)])
+  symbol_levels <- sort(unique(plot_data$.plot_symbol_value))
+  symbol_map <- stats::setNames(rep(symbol_pool, length.out = length(symbol_levels)), symbol_levels)
+  plot_data$.plot_symbol <- as.character(symbol_map[plot_data$.plot_symbol_value])
   plot_data$.plot_symbol[is.na(plot_data$.plot_symbol)] <- "circle"
 
   if (!is.character(label_col) || length(label_col) == 0 || is.na(label_col[[1]]) || !(label_col[[1]] %in% names(plot_data))) {
@@ -49,7 +59,7 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
   plot_data$.label_value <- as.character(plot_data[[label_col]])
   plot_data$.label_value[is.na(plot_data$.label_value)] <- ""
   plot_data$.hover_text <- glue::glue(
-    "{as.character(plot_data$.plot_group)}<br>rowid: {plot_data$.plot_key}<br>{label_col}: {plot_data$.label_value}<br>{xvar}: {plot_data[[xvar]]}<br>{yvar}: {plot_data[[yvar]]}<br>"
+    "{as.character(plot_data$.plot_group)}<br>rowid: {plot_data$.plot_key}<br>{label_col}: {plot_data$.label_value}<br>{symbol_col}: {plot_data$.plot_symbol_value}<br>{xvar}: {plot_data[[xvar]]}<br>{yvar}: {plot_data[[yvar]]}<br>"
   )
 
   gg = ggplot2::ggplot(
