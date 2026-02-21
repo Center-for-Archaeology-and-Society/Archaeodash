@@ -19,6 +19,8 @@
 - User requested a post-fix sanity sweep beyond tests; ran `devtools::check(args='--no-manual')` and a direct shinytest2 multiplot smoke path, confirmed no recurrence of the `future::multisession()` runtime error, and documented residual package-hygiene notes and minor automation nav-value caveat.
 - User approved follow-up for navbar sanity caveat; set Visualize & Assign top-level tab `value` to `visualizetab`, added shinytest2 regression assertion for programmatic nav switching, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 59`), and prepared beta deployment.
 - User requested immediate beta push after nav fix; bumped version to `2026.02.21.1524`, committed `3821e6d`, tagged `v2026.02.21.1524`, deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 4 | PASS 242` in-container), and verified health (`200`) plus installed version (`2026.2.21.1524`).
+- User reported multiplot warning path spinner persistence when X-axis is missing; updated multiplot update flow to validate before showing loader and force-clear stale loader on invalid-input exits, added shinytest2 regression `test-shinytest2-multiplot-loader.R` for no-X loader teardown, and validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`).
+- User approved deployment of the no-X multiplot loader fix; bumped version to `2026.02.21.1620`, ran gated beta installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 242` in-container), reinstalled/restarted `archaeodashbeta`, and verified health (`200`) plus installed version (`2026.2.21.1620`).
 
 ## Related
 
@@ -37,3 +39,4 @@
 - [[Multiplot_Future_Multisession_Strategy_Init_Fix_2026-02-21]]
 - [[Post_Fix_Sanity_Check_2026-02-21]]
 - [[Visualize_Tab_Nav_Value_and_Regression_Test_2026-02-21]]
+- [[Multiplot_No_X_Warning_Loader_Clear_Fix_2026-02-21]]
