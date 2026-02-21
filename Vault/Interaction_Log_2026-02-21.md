@@ -14,6 +14,7 @@
 - User requested local merge of remote changes; merged `origin/master` into local `master`, resolved conflicts by keeping newer local revisions in conflicted workflow/vault files, and completed merge commit `47eeeab`.
 - User requested full test run then beta reinstall; ran `devtools::test()` (`FAIL 3 | WARN 0 | SKIP 1 | PASS 247`, failures in `test-shinytest2-assignment-flows.R`), reinstalled package into `archaeodashbeta`, restarted container, and verified endpoint `http://127.0.0.1:23838/inst/app/` returned `200`.
 - User requested install safety on test failures and bug fixes/retest; fixed assignment-flow regressions (membership Mahalanobis fallback, DT assignment update race, group-assignment input state), added a pre-install test gate to `install.sh`, and validated `devtools::test()` now passes (`FAIL 0 | WARN 0 | SKIP 1 | PASS 263`).
+- User approved release actions; committed fixes as `ae6277e`, tagged `v2026.02.21.1450`, and deployed to `archaeodashbeta` via `install.sh` with tests gated before install/restart (container tests: `FAIL 0 | WARN 0 | SKIP 4 | PASS 242`, version `2026.2.21.1450`, healthcheck `200`).
 
 ## Related
 
