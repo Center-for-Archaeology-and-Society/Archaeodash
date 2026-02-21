@@ -20,9 +20,12 @@ Quality guardrails, tests, and known risks.
 - [[Upload_Append_E2E_Test_Coverage_2026-02-20]]
 - [[Multiplot_Interactive_Performance_and_Cancel_2026-02-20]]
 - [[Beta_to_Live_Release_Sync_2026-02-20]]
+- [[Local_Merge_With_Origin_Master_2026-02-21]]
 - [[Shiny_Sass_Cache_Permission_Fix_2026-02-20]]
 - [[Live_Healthcheck_Timer_Setup_2026-02-21]]
 - [[Docker_Build_Dependency_Hardening_Future_Promises_2026-02-21]]
+- [[Full_Test_Run_and_Beta_Reinstall_2026-02-21]]
+- [[Assignment_Flow_Stability_and_Install_Test_Gate_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

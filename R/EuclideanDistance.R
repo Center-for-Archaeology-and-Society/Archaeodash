@@ -7,7 +7,7 @@
 #' euclideanDistanceTab()
 euclideanDistanceTab = function() {
   tabPanel(title = "Euclidean Distance",
-           id = "euclideanDistancetab",
+           value = "euclideanDistancetab",
            fluidPage(
              wellPanel(
                h4("Euclidean Distance Controls"),
@@ -101,8 +101,18 @@ euclideanDistanceTab = function() {
 #' @examples
 #' euclideanDistanceSrvr(input,output,session,rvals)
 euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
-  edProxy = DT::dataTableProxy('EDTbl')
   selected_ed_rowids <- shiny::reactiveVal(character())
+  resolve_group_column <- function(df = NULL) {
+    candidate <- tryCatch(as.character(rvals$attrGroups[[1]]), error = function(e) "")
+    if (!nzchar(candidate)) {
+      candidate <- tryCatch(as.character(input$attrGroups[[1]]), error = function(e) "")
+    }
+    if (!is.data.frame(df) || nrow(df) == 0) return(candidate)
+    if (nzchar(candidate) && candidate %in% names(df)) return(candidate)
+    non_numeric <- names(df)[!vapply(df, is.numeric, logical(1))]
+    if (length(non_numeric) > 0) return(non_numeric[[1]])
+    names(df)[[1]]
+  }
 
   build_ed_display_table <- function(df) {
     checked_rowids <- shiny::isolate(selected_ed_rowids())
@@ -124,6 +134,11 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
 
   apply_ed_assignment <- function(values) {
     req(rvals$edistance)
+    group_col <- resolve_group_column(rvals$importedData)
+    if (!nzchar(group_col) || !(group_col %in% names(rvals$importedData))) {
+      mynotification("Unable to determine a valid group column for assignment updates.", type = "error")
+      return(invisible(NULL))
+    }
     selected_rows <- get_checked_ed_rows()
     if (is.null(selected_rows) || length(selected_rows) == 0) {
       mynotification("Check one or more rows in Euclidean Distance results first.", type = "warning")
@@ -141,7 +156,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     }
     replaceCell(
       rowid = rowid,
-      col = rvals$attrGroups,
+      col = group_col,
       value = values,
       rvals = rvals,
       con = con,
@@ -150,8 +165,8 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       output = output,
       session = session
     )
-    if (is.data.frame(rvals$edistance) && nrow(rvals$edistance) > 0) {
-      DT::replaceData(edProxy, build_ed_display_table(rvals$edistance), resetPaging = FALSE, rownames = FALSE)
+    if (is.data.frame(rvals$edistance)) {
+      rvals$edistance <- rvals$edistance
     }
     invisible(NULL)
   }
@@ -216,11 +231,10 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
   output$projectionGroupUI = renderUI({
     source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = FALSE)
     req(!is.null(source_data))
-    if(!is.null(rvals$attrGroups)){
-      choices = tryCatch(sort(unique(as.character(source_data$df[[rvals$attrGroups]]))),error = function(e) return(NULL))
-    } else {
-      choices = NULL
-    }
+    group_col <- resolve_group_column(source_data$df)
+    req(nzchar(group_col))
+    req(group_col %in% names(source_data$df))
+    choices = tryCatch(sort(unique(as.character(source_data$df[[group_col]]))),error = function(e) return(NULL))
 
     selectInput(
       "projectionGroup",
@@ -312,12 +326,14 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
     req(rvals$selectedData)
     req(rvals$attrGroups)
     groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
-    selected_choice <- tryCatch(as.character(input$edGroupAssignChoice[[1]]), error = function(e) "")
+    selected_choice <- tryCatch(as.character(shiny::isolate(input$edGroupAssignChoice[[1]])), error = function(e) "")
+    new_value <- tryCatch(as.character(shiny::isolate(input$edGroupAssignNew[[1]])), error = function(e) "")
     build_group_assignment_ui(
       choice_input_id = "edGroupAssignChoice",
       new_input_id = "edGroupAssignNew",
       groups = groups,
-      selected_choice = selected_choice
+      selected_choice = selected_choice,
+      new_value = new_value
     )
   })
 
@@ -326,6 +342,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       source_data <- get_ed_data(if (is.null(input$EDdataset)) "elements" else input$EDdataset, notify = TRUE)
       if (is.null(source_data)) return(invisible(NULL))
       analysis_df <- source_data$df
+      group_col <- resolve_group_column(analysis_df)
+      if (!nzchar(group_col) || !(group_col %in% names(analysis_df))) {
+        mynotification("No valid group column is available for Euclidean projection.", type = "error")
+        return(invisible(NULL))
+      }
+      rvals$attrGroups <- group_col
       feature_cols <- source_data$features
       if (identical(input$EDdataset, "principal components")) {
         feature_cols <- limit_pc_features(feature_cols, input$EDPCCount)
@@ -348,7 +370,7 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
       mynotification("calculating Euclidean Distances")
       projection_groups <- input$projectionGroup
       if (is.null(projection_groups) || length(projection_groups) == 0) {
-        projection_groups <- sort(unique(as.character(analysis_df[[rvals$attrGroups]])))
+        projection_groups <- sort(unique(as.character(analysis_df[[group_col]])))
         projection_groups <- projection_groups[!is.na(projection_groups) & nzchar(projection_groups)]
         if (length(projection_groups) > 0) {
           mynotification("Projection groups were not selected; using all groups.", type = "warning")
@@ -456,7 +478,12 @@ euclideanDistanceSrvr = function(input,output,session,rvals,credentials, con) {
         mynotification("Check one or more rows in Euclidean Distance results first.", type = "warning")
         return(invisible(NULL))
       }
-      match_col <- paste0(rvals$attrGroups, "_match")
+      group_col <- resolve_group_column(rvals$edistance)
+      if (!nzchar(group_col)) {
+        mynotification("Unable to determine group column for Euclidean assignment.", type = "error")
+        return(invisible(NULL))
+      }
+      match_col <- paste0(group_col, "_match")
       if (!match_col %in% names(rvals$edistance)) {
         mynotification("Unable to locate matched-group column in Euclidean Distance results.", type = "error")
         return(invisible(NULL))

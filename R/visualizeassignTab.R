@@ -468,12 +468,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     req(rvals$selectedData)
     req(rvals$attrGroups)
     groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
-    selected_choice <- tryCatch(as.character(input$groupAssignChoice[[1]]), error = function(e) "")
+    selected_choice <- tryCatch(as.character(shiny::isolate(input$groupAssignChoice[[1]])), error = function(e) "")
+    new_value <- tryCatch(as.character(shiny::isolate(input$groupAssignNew[[1]])), error = function(e) "")
     build_group_assignment_ui(
       choice_input_id = "groupAssignChoice",
       new_input_id = "groupAssignNew",
       groups = groups,
-      selected_choice = selected_choice
+      selected_choice = selected_choice,
+      new_value = new_value
     )
   })
 
