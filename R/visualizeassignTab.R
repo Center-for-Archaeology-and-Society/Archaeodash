@@ -825,6 +825,20 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   }, ignoreInit = TRUE)
 
   observeEvent(input$updateMultiplot, {
+    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
+      mynotification("No data available for multiplot.", type = "warning")
+      multiplot_active_request_id(NA_integer_)
+      hide_multiplot_loading()
+      return(invisible(NULL))
+    }
+    axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
+    if (!isTRUE(axis_check$ok)) {
+      mynotification(axis_check$message, type = "warning")
+      multiplot_active_request_id(NA_integer_)
+      hide_multiplot_loading()
+      return(invisible(NULL))
+    }
+
     request_id <- as.integer(multiplot_request_counter()) + 1L
     multiplot_request_counter(request_id)
     multiplot_active_request_id(request_id)
@@ -836,18 +850,6 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
         hide_multiplot_loading()
       }
       invisible(NULL)
-    }
-
-    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
-      mynotification("No data available for multiplot.", type = "warning")
-      clear_loader_if_active()
-      return(invisible(NULL))
-    }
-    axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
-    if (!isTRUE(axis_check$ok)) {
-      mynotification(axis_check$message, type = "warning")
-      clear_loader_if_active()
-      return(invisible(NULL))
     }
 
     selected_data <- rvals$selectedData
