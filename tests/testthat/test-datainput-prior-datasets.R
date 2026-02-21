@@ -238,6 +238,11 @@ test_that("confirm prior dataset load completes with persisted legacy transforma
       expect_equal(nrow(isolate(rvals$importedData)), 2)
       expect_equal(nrow(isolate(rvals$selectedData)), 2)
       expect_true(tx_name %in% names(isolate(rvals$transformations)))
+      expect_null(isolate(rvals$transformations[[tx_name]]))
+
+      session$setInputs(activeTransformation = tx_name)
+      session$flushReact()
+      expect_true(is.list(isolate(rvals$transformations[[tx_name]])))
     }
   )
 })
