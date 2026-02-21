@@ -57,11 +57,14 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   suppress_group_reset <- shiny::reactiveVal(FALSE)
   transformation_loading_active <- shiny::reactiveVal(FALSE)
   dataset_loading_active <- shiny::reactiveVal(FALSE)
+  dataset_table_refreshing <- shiny::reactiveVal(FALSE)
+  dataset_table_ready <- shiny::reactiveVal(FALSE)
   transformation_loading_status <- shiny::reactiveVal("Updating transformation...")
   transformation_loading_detail <- shiny::reactiveVal("Validating selections and preparing derived analysis objects.")
   dataset_loading_status <- shiny::reactiveVal("Loading selected dataset(s)...")
   dataset_loading_detail <- shiny::reactiveVal("Reading rows, metadata, and saved transformations from the database.")
   numeric_columns_cache <- shiny::reactiveVal(character())
+  rvals$tbls <- character()
 
   set_transformation_loading_status <- function(status, detail = "") {
     transformation_loading_status(as.character(status))
@@ -136,16 +139,28 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     as.character(raw_username)
   }
 
-  safe_scalar_chr <- function(x) {
-    if (is.null(x) || length(x) == 0 || is.na(x[[1]])) return("")
-    as.character(x[[1]])
-  }
-
-  get_user_dataset_tables <- function() {
+  get_user_dataset_tables <- function(max_attempts = 2L) {
     if (is.null(con)) return(character())
     username <- safe_username()
     if (!nzchar(username)) return(character())
-    tbls <- DBI::dbListTables(con)
+    tbls <- NULL
+    last_error <- NULL
+    max_attempts <- max(1L, as.integer(max_attempts))
+    for (attempt in seq_len(max_attempts)) {
+      tbls <- tryCatch(
+        DBI::dbListTables(con),
+        error = function(e) {
+          last_error <<- e
+          NULL
+        }
+      )
+      if (!is.null(tbls)) break
+      Sys.sleep(0.15 * attempt)
+    }
+    if (is.null(tbls)) {
+      if (!is.null(last_error)) stop(last_error)
+      stop("Unable to list user dataset tables.")
+    }
     tbls <- tbls[which(stringr::str_detect(tbls, paste0("^", username, "_")))]
     tbls <- tbls[which(!stringr::str_detect(tbls, "_metadata"))]
     tbls <- tbls[which(!stringr::str_detect(tbls, "_tx_"))]
@@ -155,51 +170,58 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     tbls
   }
 
+  refresh_dataset_tables <- function(reason = "manual", notify_on_error = FALSE) {
+    if (isTRUE(dataset_table_refreshing())) return(invisible(FALSE))
+    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) return(invisible(FALSE))
+    if (!isTruthy(credentials$status) || !nzchar(safe_username()) || is.null(con)) {
+      rvals$tbls <- character()
+      dataset_table_ready(FALSE)
+      return(invisible(FALSE))
+    }
+    dataset_table_refreshing(TRUE)
+    on.exit(dataset_table_refreshing(FALSE), add = TRUE)
+    tbls <- tryCatch(
+      get_user_dataset_tables(),
+      error = function(e) e
+    )
+    if (inherits(tbls, "error")) {
+      app_log(glue::glue("refresh_dataset_tables: error reason={reason} msg={conditionMessage(tbls)}"))
+      if (isTRUE(notify_on_error)) {
+        mynotification(
+          paste0("Unable to refresh dataset list: ", conditionMessage(tbls)),
+          type = "warning"
+        )
+      }
+      dataset_table_ready(length(rvals$tbls) > 0)
+      return(invisible(FALSE))
+    }
+    rvals$tbls <- as.character(tbls)
+    dataset_table_ready(TRUE)
+    invisible(TRUE)
+  }
+
   get_last_opened_dataset <- function() {
     if (!isTruthy(credentials$status) || is.null(con)) return("")
     username <- safe_username()
     if (!nzchar(username)) return("")
-    prefs <- read_user_preferences(username)
-    if (!inherits(prefs, "data.frame") || nrow(prefs) == 0) return("")
-    val <- prefs %>%
-      dplyr::filter(field == "lastOpenedDataset") %>%
-      dplyr::pull(value)
-    safe_scalar_chr(val)
-  }
-
-  read_user_preferences <- function(username) {
-    if (is.null(con) || !nzchar(username)) return(tibble::tibble(field = character(), value = character()))
-    pref_tbl <- build_user_preferences_table_name(username, max_len = app_table_name_max_len)
-    if (!DBI::dbExistsTable(con, pref_tbl)) return(tibble::tibble(field = character(), value = character()))
-    prefs <- tryCatch(
-      dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
-      error = function(e) tibble::tibble(field = character(), value = character())
+    get_user_preference_safe(
+      con = con,
+      username = username,
+      field = "lastOpenedDataset",
+      default_value = ""
     )
-    if (!inherits(prefs, "data.frame")) return(tibble::tibble(field = character(), value = character()))
-    if (!all(c("field", "value") %in% names(prefs))) return(tibble::tibble(field = character(), value = character()))
-    prefs %>% dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value))
   }
 
   set_last_opened_dataset <- function(dataset_name) {
     if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
     username <- safe_username()
     if (!nzchar(username) || !nzchar(dataset_name)) return(invisible(NULL))
-    pref_tbl <- build_user_preferences_table_name(username, max_len = app_table_name_max_len)
-    prefs <- read_user_preferences(username) %>%
-      dplyr::filter(.data$field != "lastOpenedDataset") %>%
-      dplyr::bind_rows(
-        tibble::tibble(
-          field = "lastOpenedDataset",
-          value = as.character(dataset_name)
-        )
-      )
     try(
-      DBI::dbWriteTable(
-        conn = con,
-        name = pref_tbl,
-        value = prefs,
-        row.names = FALSE,
-        overwrite = TRUE
+      write_user_preference_safe(
+        con = con,
+        username = username,
+        field = "lastOpenedDataset",
+        value = as.character(dataset_name)
       ),
       silent = TRUE
     )
@@ -434,25 +456,22 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
   }
 
-
-  observe({
-    shiny::invalidateLater(1500, session)
-    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) {
-      return(invisible(NULL))
-    }
-    if (is.null(con)) {
-      rvals$tbls <- NULL
-      return(invisible(NULL))
-    }
-    rvals$tbls <- get_user_dataset_tables()
-  })
+  observeEvent(
+    list(credentials$status, credentials$res$username),
+    {
+      if (!isTruthy(credentials$status) || !nzchar(safe_username())) {
+        rvals$tbls <- character()
+        dataset_table_ready(FALSE)
+        return(invisible(NULL))
+      }
+      dataset_table_ready(FALSE)
+      refresh_dataset_tables(reason = "auth-state", notify_on_error = TRUE)
+    },
+    ignoreInit = FALSE
+  )
 
   observeEvent(rvals$currentDatasetName, {
-    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) {
-      return(invisible(NULL))
-    }
-    if (is.null(con)) return(invisible(NULL))
-    rvals$tbls <- get_user_dataset_tables()
+    refresh_dataset_tables(reason = "dataset-name-change", notify_on_error = FALSE)
   }, ignoreInit = TRUE)
 
   observeEvent(rvals$importedData, {
@@ -465,11 +484,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }, ignoreInit = FALSE)
 
   output$confirmPriorUI = renderUI({
-    if(isTruthy(credentials$status) && nzchar(safe_username()) && length(rvals$tbls) > 0){
-      actionButton("confirmPrior","Confirm dataset selection", class = 'mybtn')
-    } else {
-      NULL
+    if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(NULL)
+    if (!isTRUE(dataset_table_ready()) || isTRUE(dataset_table_refreshing())) {
+      return(tags$div(class = "text-muted", "Preparing dataset selector..."))
     }
+    if (length(rvals$tbls) == 0) return(NULL)
+    if (!isTruthy(input$selectedDatasets)) {
+      return(tags$div(class = "text-muted", "Select at least one dataset to continue."))
+    }
+    actionButton("confirmPrior","Confirm dataset selection", class = 'mybtn')
   })
 
   output$priorDatasets = renderUI({
@@ -477,6 +500,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     username <- safe_username()
     if (!nzchar(username)) {
       return(tags$div(class = "text-muted", "Waiting for login session..."))
+    }
+    if (!isTRUE(dataset_table_ready()) || isTRUE(dataset_table_refreshing())) {
+      return(tags$div(class = "text-muted", "Loading available datasets..."))
     }
     if (is.null(rvals$tbls) || length(rvals$tbls) == 0) {
       return(
@@ -490,7 +516,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       )
     }
 
-    pref_selection <- safe_scalar_chr(get_last_opened_dataset())
+    pref_selection <- get_last_opened_dataset()
     current_selection <- tryCatch(as.character(rvals$currentDatasetName), error = function(e) character())
     current_selection <- current_selection[!is.na(current_selection) & nzchar(current_selection) & current_selection %in% rvals$tbls]
     selection <- if (length(current_selection) > 0) {
@@ -508,6 +534,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       mynotification("Dataset loading is already in progress. Please wait.", type = "warning")
       return(invisible(NULL))
     }
+    if (!isTRUE(dataset_table_ready()) || isTRUE(dataset_table_refreshing())) {
+      mynotification("Dataset selector is still initializing. Please wait a moment and try again.", type = "warning")
+      return(invisible(NULL))
+    }
     req(input$selectedDatasets)
     show_dataset_loading(
       status = "Loading selected dataset(s)...",
@@ -517,6 +547,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     selected_datasets <- normalize_selected_datasets(input$selectedDatasets)
     if (length(selected_datasets) == 0) {
       mynotification("Choose at least one dataset before confirming.", type = "warning")
+      return(invisible(NULL))
+    }
+    stale_selection <- setdiff(selected_datasets, as.character(rvals$tbls))
+    if (length(stale_selection) > 0) {
+      hide_dataset_loading()
+      refresh_dataset_tables(reason = "stale-selection", notify_on_error = TRUE)
+      mynotification("Dataset list changed during initialization. Reconfirm the dataset selection.", type = "warning")
       return(invisible(NULL))
     }
     stage <- "initializing selected dataset load"
@@ -662,6 +699,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         db_remove_table_safe(con, tbl, context = "deleting dataset")
         db_remove_table_safe(con, paste0(tbl, "_metadata"), context = "deleting dataset metadata")
       }
+      deleted_datasets <- normalize_selected_datasets(input$selectedDatasets)
+      current_datasets <- normalize_selected_datasets(tryCatch(rvals$currentDatasetName, error = function(e) character()))
+      remaining_datasets <- setdiff(current_datasets, deleted_datasets)
+      if (length(current_datasets) > 0 && length(remaining_datasets) == 0) {
+        rvals$currentDatasetName <- NULL
+        rvals$currentDatasetKey <- NULL
+        rvals$currentDatasetRowMap <- NULL
+      }
+      refresh_dataset_tables(reason = "delete-datasets", notify_on_error = TRUE)
       mynotification("Selected dataset(s) deleted.", type = "message")
     }, error = function(e) {
       app_log(glue::glue("deleteDatasetsconfirm: error stage={stage} msg={conditionMessage(e)}"))
@@ -763,6 +809,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         )
         db_write_table_safe(con, filename, merged, row.names = FALSE, context = "saving merged dataset")
         db_write_table_safe(con, paste0(filename, "_metadata"), tblsmd, row.names = FALSE, context = "saving merged dataset metadata")
+        refresh_dataset_tables(reason = "merge-datasets", notify_on_error = TRUE)
         expected_name <- janitor::make_clean_names(paste0(credentials$res$username, "_", input$mergeName))
         if (!identical(filename, expected_name)) {
           mynotification(paste0("Merged dataset name shortened for storage as: ", filename), type = "message")
@@ -804,6 +851,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     tryCatch({
       db_write_table_safe(con, rvals$mergeFilename, rvals$merged, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset")
       db_write_table_safe(con, paste0(rvals$mergeFilename, "_metadata"), rvals$merged_metadata, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset metadata")
+      refresh_dataset_tables(reason = "overwrite-merged-dataset", notify_on_error = TRUE)
       mynotification("Merged dataset overwritten.", type = "message")
     }, error = function(e) {
       app_log(glue::glue("overwriteDataset: error name={rvals$mergeFilename} msg={conditionMessage(e)}"))
