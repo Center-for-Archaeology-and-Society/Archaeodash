@@ -118,7 +118,6 @@ resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
 
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
-  multiplot_loading_active <- shiny::reactiveVal(FALSE)
   multiplot_build_request <- shiny::reactiveVal(NULL)
   multiplot_mode <- shiny::reactiveVal(FALSE)
   multiplot_height <- shiny::reactiveVal(900)
@@ -129,34 +128,6 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     value <- as.character(candidate[[1]])
     if (is.na(value) || !nzchar(value)) return(fallback)
     if (value %in% choices) value else fallback
-  }
-
-  show_multiplot_loading <- function() {
-    if (isTRUE(shiny::isolate(multiplot_loading_active()))) return(invisible(NULL))
-    try(removeModal(session = session), silent = FALSE)
-    multiplot_loading_active(TRUE)
-    showModal(
-      modalDialog(
-        title = NULL,
-        footer = NULL,
-        class = "transformation-loading-modal",
-        easyClose = FALSE,
-        tags$div(
-          class = "transformation-loading-wrap",
-          tags$div(class = "transformation-loading-spinner"),
-          tags$div(class = "transformation-loading-text", "Building multiplot...")
-        )
-      ),
-      session = session
-    )
-    invisible(NULL)
-  }
-
-  hide_multiplot_loading <- function() {
-    if (!isTRUE(shiny::isolate(multiplot_loading_active()))) return(invisible(NULL))
-    try(removeModal(session = session), silent = FALSE)
-    multiplot_loading_active(FALSE)
-    invisible(NULL)
   }
 
   interactive_mode <- function(x) {
@@ -802,16 +773,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   observeEvent(input$updateMultiplot, {
     if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
       mynotification("No data available for multiplot.", type = "warning")
-      hide_multiplot_loading()
       return(invisible(NULL))
     }
     axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
     if (!isTRUE(axis_check$ok)) {
       mynotification(axis_check$message, type = "warning")
-      hide_multiplot_loading()
       return(invisible(NULL))
     }
-    show_multiplot_loading()
+    mynotification("Generating multiplots...", type = "message")
     multiplot_build_request(list(
       selected_data = rvals$selectedData,
       attr_group = rvals$attrGroups,
@@ -830,7 +799,6 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     request <- multiplot_build_request()
     multiplot_build_request(NULL)
     later::later(function() {
-      on.exit(hide_multiplot_loading(), add = TRUE)
       tryCatch({
         quietly(label = "multiplot",{
           rvals$multiplot = multiplot(
