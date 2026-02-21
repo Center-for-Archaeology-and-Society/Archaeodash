@@ -34,6 +34,7 @@ Quality guardrails, tests, and known risks.
 - [[Multiplot_Two_Phase_Server_Loader_Teardown_Fix_2026-02-21]]
 - [[Multiplot_Loading_Modal_Removal_Message_Only_2026-02-21]]
 - [[Dataset_Selector_Hard_Refresh_Initialization_and_Preference_Upsert_Fix_2026-02-21]]
+- [[Dataset_Confirm_Permanent_Hardening_DB_Lock_Lazy_Transform_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

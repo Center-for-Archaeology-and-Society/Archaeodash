@@ -29,6 +29,7 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Dataset_Management_Stage_Tracing_and_Loading_Status_Messages_2026-02-21]]
 - [[Ellipse_First_Group_Red_Color_Fix_2026-02-21]]
 - [[Dataset_Selector_Hard_Refresh_Initialization_and_Preference_Upsert_Fix_2026-02-21]]
+- [[Dataset_Confirm_Permanent_Hardening_DB_Lock_Lazy_Transform_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
