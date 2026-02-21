@@ -4,7 +4,7 @@
 \alias{multiplot}
 \title{Multiplot function}
 \usage{
-multiplot(selectedData, attrGroups, xvar, yvar, ptsize, interactive = F, theme)
+multiplot(selectedData, attrGroups, xvar, yvar, ptsize, interactive = FALSE, theme)
 }
 \arguments{
 \item{selectedData}{data frame for plotting}
@@ -18,6 +18,8 @@ multiplot(selectedData, attrGroups, xvar, yvar, ptsize, interactive = F, theme)
 \item{ptsize}{point size}
 
 \item{interactive}{whether to return plotly object or ggplot object}
+
+\item{theme}{color theme}
 }
 \value{
 plot object
@@ -26,5 +28,7 @@ plot object
 Multiplot function
 }
 \examples{
+\dontrun{
 multiplot(selectedData = rvals$selectedData,attrGroups = rvals$attrGroups,xvar  = input$xvar2, yvar = input$yvar2,ptsize = input$ptsize, interactive = input$interactive)
+}
 }

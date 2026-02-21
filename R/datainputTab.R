@@ -59,6 +59,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   dataset_loading_active <- shiny::reactiveVal(FALSE)
   dataset_table_refreshing <- shiny::reactiveVal(FALSE)
   dataset_table_ready <- shiny::reactiveVal(FALSE)
+  dataset_retry_poll_ms <- 5000L
+  dataset_steady_poll_min_ms <- 60000L
+  dataset_steady_poll_max_ms <- 300000L
+  dataset_steady_poll_ms <- shiny::reactiveVal(dataset_steady_poll_min_ms)
   transformation_loading_status <- shiny::reactiveVal("Updating transformation...")
   transformation_loading_detail <- shiny::reactiveVal("Validating selections and preparing derived analysis objects.")
   dataset_loading_status <- shiny::reactiveVal("Loading selected dataset(s)...")
@@ -144,6 +148,8 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (is.null(con)) return(character())
     username <- safe_username()
     if (!nzchar(username)) return(character())
+    prefixes <- dataset_username_table_prefixes(username, max_len = app_table_name_max_len)
+    if (length(prefixes) == 0) return(character())
     tbls <- NULL
     last_error <- NULL
     max_attempts <- max(1L, as.integer(max_attempts))
@@ -162,7 +168,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       if (!is.null(last_error)) stop(last_error)
       stop("Unable to list user dataset tables.")
     }
-    tbls <- tbls[which(stringr::str_detect(tbls, paste0("^", username, "_")))]
+    tbls <- tbls[vapply(
+      tbls,
+      function(tbl_name) any(startsWith(tbl_name, paste0(prefixes, "_"))),
+      logical(1)
+    )]
     tbls <- tbls[which(!stringr::str_detect(tbls, "_metadata"))]
     tbls <- tbls[which(!stringr::str_detect(tbls, "_tx_"))]
     tbls <- tbls[which(!stringr::str_detect(tbls, "_transformations$"))]
@@ -172,15 +182,40 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   }
 
   refresh_dataset_tables <- function(reason = "manual", notify_on_error = FALSE) {
-    if (isTRUE(dataset_table_refreshing())) return(invisible(FALSE))
-    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) return(invisible(FALSE))
+    refresh_started <- Sys.time()
+    refresh_user <- safe_username()
+    app_timing_log(
+      "dataset_refresh:start",
+      list(
+        reason = reason,
+        user = if (nzchar(refresh_user)) refresh_user else "anonymous",
+        notify = isTRUE(notify_on_error)
+      )
+    )
+    if (isTRUE(dataset_table_refreshing())) {
+      app_timing_log("dataset_refresh:skip", list(reason = reason, why = "already_refreshing"))
+      return(invisible(FALSE))
+    }
+    if (!should_refresh_dataset_tables(dataset_loading_active(), transformation_loading_active())) {
+      app_timing_log("dataset_refresh:skip", list(reason = reason, why = "loading_guard"))
+      return(invisible(FALSE))
+    }
     if (!isTruthy(credentials$status) || !nzchar(safe_username()) || is.null(con)) {
       rvals$tbls <- character()
       dataset_table_ready(FALSE)
+      app_timing_log(
+        "dataset_refresh:end",
+        list(
+          reason = reason,
+          status = "skipped_not_ready",
+          elapsed_ms = timing_elapsed_ms(refresh_started)
+        )
+      )
       return(invisible(FALSE))
     }
     dataset_table_refreshing(TRUE)
     on.exit(dataset_table_refreshing(FALSE), add = TRUE)
+    previous_tbls <- sort(unique(as.character(rvals$tbls)))
     tbls <- tryCatch(
       get_user_dataset_tables(),
       error = function(e) e
@@ -194,10 +229,41 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         )
       }
       dataset_table_ready(length(rvals$tbls) > 0)
+      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+      app_timing_log(
+        "dataset_refresh:end",
+        list(
+          reason = reason,
+          user = if (nzchar(refresh_user)) refresh_user else "anonymous",
+          status = "error",
+          elapsed_ms = timing_elapsed_ms(refresh_started),
+          detail = conditionMessage(tbls),
+          next_ms = dataset_steady_poll_ms()
+        )
+      )
       return(invisible(FALSE))
     }
-    rvals$tbls <- as.character(tbls)
+    tbls_chr <- sort(unique(as.character(tbls)))
+    changed <- !identical(previous_tbls, tbls_chr)
+    if (isTRUE(changed) || !identical(reason, "steady-state-sync")) {
+      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+    } else {
+      dataset_steady_poll_ms(min(dataset_steady_poll_max_ms, as.integer(dataset_steady_poll_ms() * 2L)))
+    }
+    rvals$tbls <- tbls_chr
     dataset_table_ready(TRUE)
+    app_timing_log(
+      "dataset_refresh:end",
+      list(
+        reason = reason,
+        user = if (nzchar(refresh_user)) refresh_user else "anonymous",
+        status = "ok",
+        changed = isTRUE(changed),
+        count = length(tbls_chr),
+        elapsed_ms = timing_elapsed_ms(refresh_started),
+        next_ms = dataset_steady_poll_ms()
+      )
+    )
     invisible(TRUE)
   }
 
@@ -466,6 +532,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dataset_table_ready(FALSE)
         return(invisible(NULL))
       }
+      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
       dataset_table_ready(FALSE)
       refresh_dataset_tables(reason = "auth-state", notify_on_error = TRUE)
     },
@@ -476,18 +543,20 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (isTRUE(disable_refresh_timers)) return(invisible(NULL))
     if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
     if (isTRUE(dataset_table_ready())) return(invisible(NULL))
-    shiny::invalidateLater(2000, session)
+    shiny::invalidateLater(dataset_retry_poll_ms, session)
     refresh_dataset_tables(reason = "auth-retry", notify_on_error = FALSE)
   })
 
   observe({
     if (isTRUE(disable_refresh_timers)) return(invisible(NULL))
     if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
-    shiny::invalidateLater(10000, session)
+    if (!isTRUE(dataset_table_ready())) return(invisible(NULL))
+    shiny::invalidateLater(max(dataset_steady_poll_min_ms, as.integer(dataset_steady_poll_ms())), session)
     refresh_dataset_tables(reason = "steady-state-sync", notify_on_error = FALSE)
   })
 
   observeEvent(rvals$currentDatasetName, {
+    dataset_steady_poll_ms(dataset_steady_poll_min_ms)
     refresh_dataset_tables(reason = "dataset-name-change", notify_on_error = FALSE)
   }, ignoreInit = TRUE)
 
@@ -547,12 +616,31 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   observeEvent(input$confirmPrior,{
+    load_started <- Sys.time()
+    load_user <- safe_username()
+    selected_datasets <- character()
     if (isTRUE(dataset_loading_active())) {
       mynotification("Dataset loading is already in progress. Please wait.", type = "warning")
+      app_timing_log(
+        "confirm_prior:end",
+        list(
+          user = if (nzchar(load_user)) load_user else "anonymous",
+          status = "skipped_already_loading",
+          elapsed_ms = timing_elapsed_ms(load_started)
+        )
+      )
       return(invisible(NULL))
     }
     if (!isTRUE(dataset_table_ready()) || isTRUE(dataset_table_refreshing())) {
       mynotification("Dataset selector is still initializing. Please wait a moment and try again.", type = "warning")
+      app_timing_log(
+        "confirm_prior:end",
+        list(
+          user = if (nzchar(load_user)) load_user else "anonymous",
+          status = "skipped_selector_not_ready",
+          elapsed_ms = timing_elapsed_ms(load_started)
+        )
+      )
       return(invisible(NULL))
     }
     req(input$selectedDatasets)
@@ -562,8 +650,23 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     )
     on.exit(hide_dataset_loading(), add = TRUE)
     selected_datasets <- normalize_selected_datasets(input$selectedDatasets)
+    app_timing_log(
+      "confirm_prior:start",
+      list(
+        user = if (nzchar(load_user)) load_user else "anonymous",
+        selected_count = length(selected_datasets)
+      )
+    )
     if (length(selected_datasets) == 0) {
       mynotification("Choose at least one dataset before confirming.", type = "warning")
+      app_timing_log(
+        "confirm_prior:end",
+        list(
+          user = if (nzchar(load_user)) load_user else "anonymous",
+          status = "skipped_no_selection",
+          elapsed_ms = timing_elapsed_ms(load_started)
+        )
+      )
       return(invisible(NULL))
     }
     stale_selection <- setdiff(selected_datasets, as.character(rvals$tbls))
@@ -571,6 +674,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       hide_dataset_loading()
       refresh_dataset_tables(reason = "stale-selection", notify_on_error = TRUE)
       mynotification("Dataset list changed during initialization. Reconfirm the dataset selection.", type = "warning")
+      app_timing_log(
+        "confirm_prior:end",
+        list(
+          user = if (nzchar(load_user)) load_user else "anonymous",
+          status = "stale_selection",
+          stale_count = length(stale_selection),
+          elapsed_ms = timing_elapsed_ms(load_started)
+        )
+      )
       return(invisible(NULL))
     }
     stage <- "initializing selected dataset load"
@@ -646,6 +758,16 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           silent = TRUE
         )
         app_log("confirmPrior: completed successfully")
+        app_timing_log(
+          "confirm_prior:end",
+          list(
+            user = if (nzchar(load_user)) load_user else "anonymous",
+            status = "ok",
+            selected_count = length(selected_datasets),
+            rows = nrow(rvals$importedData),
+            elapsed_ms = timing_elapsed_ms(load_started)
+          )
+        )
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
       if (is_dataset_load_timeout_error(e)) {
@@ -661,11 +783,32 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           ),
           type = "error"
         )
+        app_timing_log(
+          "confirm_prior:end",
+          list(
+            user = if (nzchar(load_user)) load_user else "anonymous",
+            status = "timeout",
+            selected_count = length(selected_datasets),
+            stage = stage,
+            elapsed_ms = timing_elapsed_ms(load_started)
+          )
+        )
       } else {
         app_log(glue::glue("confirmPrior: error stage={stage} msg={conditionMessage(e)}"))
         mynotification(
           paste0("Unable to load selected dataset during ", stage, ": ", conditionMessage(e)),
           type = "error"
+        )
+        app_timing_log(
+          "confirm_prior:end",
+          list(
+            user = if (nzchar(load_user)) load_user else "anonymous",
+            status = "error",
+            selected_count = length(selected_datasets),
+            stage = stage,
+            detail = conditionMessage(e),
+            elapsed_ms = timing_elapsed_ms(load_started)
+          )
         )
       }
     })

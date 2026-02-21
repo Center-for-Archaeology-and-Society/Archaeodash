@@ -1,2 +1,14 @@
 ^NAA_analytical_dashboard\.Rproj$
+^Archaeodash\.Rproj$
 ^\.Rproj\.user$
+^\.dockerignore$
+^\.github$
+^\.Renviron$
+^\.Renviron\.example$
+^Vault$
+^security$
+^quarto$
+^AGENTS\.md$
+^deploy\.sh$
+^install\.sh$
+^test_run_archaeodash\.sh$

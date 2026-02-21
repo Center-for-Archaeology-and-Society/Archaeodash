@@ -27,6 +27,7 @@
 - User reported first hard-refresh dataset confirm hangs while second refresh works; replaced preference-table overwrite writes with update/insert helpers, moved dataset selector refresh to auth/event-driven readiness gating with stale-selection checks, added session-end DB disconnect, added regression tests, and validated full suite (`FAIL 0 | WARN 0 | SKIP 1 | PASS 283`).
 - User requested beta deployment of hard-refresh dataset-confirm fixes; bumped package version, prepared release commit/tag, and executed gated beta install workflow.
 - User reported persistent confirm-dataset hangs after deployment; implemented permanent hardening by bounding DB lock waits, lazy-loading persisted transformation snapshots, deferring preference writes off the critical confirm path, and adding selector refresh self-healing with test-safe timer guards; validated full suite (`FAIL 0 | WARN 0 | SKIP 1 | PASS 290`).
+- User requested permanent remediation deployment; released `v2026.02.21.1941` (`4c2a9aa`) and deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 263` in-container), then restarted beta service.
 
 ## Related
 

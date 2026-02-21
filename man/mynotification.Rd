@@ -14,6 +14,8 @@ mynotification(
 \item{message}{message to display}
 
 \item{type}{type of message}
+
+\item{duration}{duration in seconds for the notification}
 }
 \value{
 notification
@@ -22,5 +24,7 @@ notification
 custom notification
 }
 \examples{
+\dontrun{
 mynotification("hello world")
+}
 }

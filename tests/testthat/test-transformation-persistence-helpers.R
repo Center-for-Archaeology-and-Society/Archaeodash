@@ -39,6 +39,17 @@ test_that("transformation index table keeps expected suffix under 32-char policy
   expect_match(idx, "_transformations$")
 })
 
+test_that("dataset username prefixes include sanitized and truncated forms", {
+  prefixes <- dataset_username_table_prefixes("nick-digs", max_len = 32L)
+  expect_true("nick-digs" %in% prefixes)
+  expect_true("nick_digs" %in% prefixes)
+
+  long_user <- "zz_final_17717023151327"
+  long_prefixes <- dataset_username_table_prefixes(long_user, max_len = 32L, hash_len = 8L)
+  expect_true(long_user %in% long_prefixes)
+  expect_true(substr(janitor::make_clean_names(long_user), 1, 22) %in% long_prefixes)
+})
+
 test_that("transformation index listing and single-snapshot load work", {
   skip_if_not_installed("RSQLite")
 

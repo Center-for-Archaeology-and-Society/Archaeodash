@@ -13,5 +13,7 @@ UI
 The home tab provides an introduction and basic overview of functionality
 }
 \examples{
+\dontrun{
 homeTab()
+}
 }

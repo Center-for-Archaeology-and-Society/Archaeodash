@@ -10,5 +10,7 @@ dataLoaderUI()
 dataLoaderUI
 }
 \examples{
+\dontrun{
 dataLoaderUI()
+}
 }

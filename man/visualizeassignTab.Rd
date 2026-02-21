@@ -13,5 +13,7 @@ UI
 UI elements for visualization and group reassignment
 }
 \examples{
+\dontrun{
 visualizeassignTab()
+}
 }

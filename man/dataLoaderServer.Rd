@@ -7,15 +7,23 @@
 dataLoaderServer(rvals, input, output, session, credentials, con)
 }
 \arguments{
+\item{rvals}{reactive values object}
+
 \item{input}{Shiny input}
 
 \item{output}{Shiny output}
 
 \item{session}{Shiny session}
+
+\item{credentials}{reactive values object containing authentication state}
+
+\item{con}{database connection}
 }
 \description{
 dataLoaderServer
 }
 \examples{
-dataLoaderServer(input,output,session, credentials, con)
+\dontrun{
+dataLoaderServer(rvals, input, output, session, credentials, con)
+}
 }

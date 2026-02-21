@@ -13,5 +13,7 @@ UI
 Euclidean Distance UI
 }
 \examples{
+\dontrun{
 euclideanDistanceTab()
+}
 }

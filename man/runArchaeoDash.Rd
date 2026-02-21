@@ -4,7 +4,10 @@
 \alias{runArchaeoDash}
 \title{Run Application}
 \usage{
-runArchaeoDash()
+runArchaeoDash(verbose = FALSE)
+}
+\arguments{
+\item{verbose}{logical; if TRUE, enables verbose console logging for debugging.}
 }
 \value{
 shiny app
@@ -13,5 +16,7 @@ shiny app
 Run Application
 }
 \examples{
+\dontrun{
 runArchaeoDash()
+}
 }

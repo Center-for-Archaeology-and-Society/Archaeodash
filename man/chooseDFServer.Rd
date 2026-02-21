@@ -18,5 +18,7 @@ module server
 Choose dataset server
 }
 \examples{
+\dontrun{
 chooseDFServer("chooseDF",rvals)
+}
 }

@@ -14,6 +14,10 @@ groupServer(input, output, session, rvals, credentials, con)
 \item{session}{Shiny session object}
 
 \item{rvals}{reactive values object}
+
+\item{credentials}{reactive values object containing authentication state}
+
+\item{con}{database connection}
 }
 \value{
 server
@@ -22,5 +26,7 @@ server
 Group Membership Server
 }
 \examples{
-groupServer(input,output,session,rvals)
+\dontrun{
+groupServer(input, output, session, rvals, credentials, con)
+}
 }

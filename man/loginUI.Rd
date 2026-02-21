@@ -13,5 +13,7 @@ loginUI(input)
 loginUI
 }
 \examples{
+\dontrun{
 loginUI(input)
+}
 }

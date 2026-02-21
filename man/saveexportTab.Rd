@@ -13,5 +13,7 @@ UI
 UI Elements for Saving and Exporting
 }
 \examples{
+\dontrun{
 saveexportTab()
+}
 }

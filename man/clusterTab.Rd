@@ -13,5 +13,7 @@ UI
 UI elements for cluster tab
 }
 \examples{
+\dontrun{
 clusterTab()
+}
 }

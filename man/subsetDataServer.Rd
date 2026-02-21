@@ -22,5 +22,7 @@ server
 Subset data server
 }
 \examples{
+\dontrun{
 subsetDataServer(input,output,session,rvals)
+}
 }

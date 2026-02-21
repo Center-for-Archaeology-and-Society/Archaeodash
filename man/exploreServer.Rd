@@ -14,6 +14,10 @@ exploreServer(input, output, session, rvals, con, credentials)
 \item{session}{shiny session object}
 
 \item{rvals}{reactive values object}
+
+\item{con}{database connection}
+
+\item{credentials}{reactive values object containing authentication state}
 }
 \value{
 server
@@ -22,5 +26,7 @@ server
 Explore Server
 }
 \examples{
-exploreServer(input,output,session,rvals)
+\dontrun{
+exploreServer(input, output, session, rvals, con, credentials)
+}
 }

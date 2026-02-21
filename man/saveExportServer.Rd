@@ -22,5 +22,7 @@ server
 Save and Export Server
 }
 \examples{
+\dontrun{
 saveExportServer(input,output,session,rvals)
+}
 }

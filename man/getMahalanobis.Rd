@@ -18,5 +18,7 @@ distance
 Get Mahalanobis distance
 }
 \examples{
+\dontrun{
 getMahalanobis(data[r,],data[,data[[group]] == grp])
+}
 }

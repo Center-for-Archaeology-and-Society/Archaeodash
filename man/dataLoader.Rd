@@ -7,7 +7,7 @@
 dataLoader(filename)
 }
 \arguments{
-\item{filename}{}
+\item{filename}{path to the file to load}
 }
 \value{
 data
@@ -16,5 +16,7 @@ data
 dataLoader
 }
 \examples{
+\dontrun{
 dataLoader("data.csv")
+}
 }

@@ -7,9 +7,17 @@
 group.mem.probs(data, chem, group, eligible, method = "Hotellings", ID)
 }
 \arguments{
-\item{elements}{transformed element data}
+\item{data}{dataframe from imported data}
 
-\item{assigned}{group designation by sample}
+\item{chem}{names of columns with chemical elements}
+
+\item{group}{selected group attribute}
+
+\item{eligible}{groups to include in assignment}
+
+\item{method}{distance/probability method}
+
+\item{ID}{identifier column}
 }
 \value{
 data frame
@@ -18,5 +26,7 @@ data frame
 Function for calculating group membership probabilities by chemical compositional distance using Mahalanobis distances and Hotellings T^2 statistic
 }
 \examples{
-group.mem.probs(elements,assigned)
+\dontrun{
+group.mem.probs(data, chem, group, eligible, method = "Hotellings", ID = "rowid")
+}
 }

@@ -14,6 +14,10 @@ euclideanDistanceSrvr(input, output, session, rvals, credentials, con)
 \item{session}{Shiny session object}
 
 \item{rvals}{reactive values object}
+
+\item{credentials}{reactive values object containing authentication state}
+
+\item{con}{database connection}
 }
 \value{
 server
@@ -22,5 +26,7 @@ server
 Euclidean Distance Server
 }
 \examples{
-euclideanDistanceSrvr(input,output,session,rvals)
+\dontrun{
+euclideanDistanceSrvr(input, output, session, rvals, credentials, con)
+}
 }
