@@ -7,6 +7,8 @@ How datasets, preferences, and transformations are persisted.
 - [[Edit_Assignment_and_RowID_Integrity]]
 - [[Transformation_Metadata_Synchronization_2026-02-20]]
 - [[Dataset_Table_Name_Length_Hardening_2026-02-20]]
+- [[Transformation_Table_Name_Length_Hardening_2026-02-20]]
+- [[Table_Name_Policy_32_and_DB_Migration_2026-02-20]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

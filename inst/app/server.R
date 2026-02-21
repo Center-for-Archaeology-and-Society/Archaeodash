@@ -41,6 +41,8 @@ shinyServer(function(input, output, session) {
         duration = NULL
       )
     }, once = TRUE, ignoreInit = FALSE)
+  } else if (identical(Sys.getenv("ARCHAEODASH_RUN_TABLE_MIGRATION", "0"), "1")) {
+    try(ArchaeoDash:::migrate_table_names_to_32(con), silent = TRUE)
   }
 
   loginUI(input = input)
@@ -55,7 +57,10 @@ shinyServer(function(input, output, session) {
 
   read_user_preferences <- function(username) {
     if (is.null(con) || !nzchar(username)) return(tibble::tibble(field = character(), value = character()))
-    pref_tbl <- paste0(username, "_preferences")
+    pref_tbl <- tryCatch(
+      ArchaeoDash:::build_user_preferences_table_name(username, max_len = ArchaeoDash:::app_table_name_max_len),
+      error = function(e) paste0(janitor::make_clean_names(as.character(username)), "_preferences")
+    )
     if (!DBI::dbExistsTable(con, pref_tbl)) return(tibble::tibble(field = character(), value = character()))
     prefs <- tryCatch(
       dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
@@ -68,7 +73,10 @@ shinyServer(function(input, output, session) {
 
   write_user_preference <- function(username, field, value) {
     if (is.null(con) || !nzchar(username) || !nzchar(field) || !nzchar(value)) return(invisible(NULL))
-    pref_tbl <- paste0(username, "_preferences")
+    pref_tbl <- tryCatch(
+      ArchaeoDash:::build_user_preferences_table_name(username, max_len = ArchaeoDash:::app_table_name_max_len),
+      error = function(e) paste0(janitor::make_clean_names(as.character(username)), "_preferences")
+    )
     prefs <- read_user_preferences(username)
     prefs <- prefs %>%
       dplyr::filter(.data$field != field) %>%

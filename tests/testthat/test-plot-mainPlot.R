@@ -197,6 +197,44 @@ test_that("mainPlot skips ellipse gracefully when data are not ellipse-eligible"
   })
 })
 
+test_that("mainPlot uses the same group colors for markers and ellipses", {
+  set.seed(6)
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(12)),
+    grp = rep(c("A", "B"), each = 6),
+    x = c(rnorm(6, mean = 0), rnorm(6, mean = 3)),
+    y = c(rnorm(6, mean = 0), rnorm(6, mean = 3)),
+    stringsAsFactors = FALSE
+  )
+
+  p <- mainPlot(
+    plotdf = plotdf,
+    xvar = "x",
+    yvar = "y",
+    attrGroups = "grp",
+    Conf = TRUE,
+    int.set = 0.9,
+    theme = "viridis"
+  )
+
+  built <- plotly::plotly_build(p)
+  marker_traces <- Filter(function(tr) identical(tr$mode, "markers"), built$x$data)
+  line_traces <- Filter(function(tr) identical(tr$mode, "lines"), built$x$data)
+
+  marker_colors <- stats::setNames(
+    vapply(marker_traces, function(tr) as.character(tr$marker$color[[1]]), character(1)),
+    vapply(marker_traces, function(tr) as.character(tr$name[[1]]), character(1))
+  )
+  line_colors <- stats::setNames(
+    vapply(line_traces, function(tr) as.character(tr$line$color[[1]]), character(1)),
+    vapply(line_traces, function(tr) as.character(tr$legendgroup[[1]]), character(1))
+  )
+
+  common_groups <- intersect(names(marker_colors), names(line_colors))
+  expect_true(length(common_groups) > 0)
+  expect_true(all(marker_colors[common_groups] == line_colors[common_groups]))
+})
+
 test_that("multiplot returns expected class for interactive and static modes", {
   set.seed(3)
   selectedData <- data.frame(

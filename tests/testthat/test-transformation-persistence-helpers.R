@@ -26,6 +26,15 @@ test_that("transformation prefix is bounded length", {
     dataset_key = "a_really_long_dataset_key_that_should_be_trimmed",
     transformation_name = "a_really_long_transformation_name_that_should_be_trimmed"
   )
-  expect_true(nchar(prefix) <= 55)
+  expect_true(nchar(prefix) <= transform_prefix_max_len())
   expect_true(grepl("^[a-z0-9_]+$", prefix))
+
+  full_names <- paste0(prefix, transform_table_suffixes)
+  expect_true(all(nchar(full_names) <= transform_table_name_max_len))
+})
+
+test_that("transformation index table keeps expected suffix under 32-char policy", {
+  idx <- transform_index_table("a_very_long_username_that_needs_shortening")
+  expect_lte(nchar(idx), transform_table_name_max_len)
+  expect_match(idx, "_transformations$")
 })
