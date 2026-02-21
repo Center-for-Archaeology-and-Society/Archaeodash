@@ -21,6 +21,7 @@ Quality guardrails, tests, and known risks.
 - [[Multiplot_Interactive_Performance_and_Cancel_2026-02-20]]
 - [[Beta_to_Live_Release_Sync_2026-02-20]]
 - [[Shiny_Sass_Cache_Permission_Fix_2026-02-20]]
+- [[Live_Healthcheck_Timer_Setup_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
