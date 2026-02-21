@@ -121,6 +121,36 @@ test_that("mainPlot uses conservative marker symbols for cross-version compatibi
   )))
 })
 
+test_that("mainPlot supports symbol mapping from a metadata field", {
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(6)),
+    grp = rep("A", 6),
+    context = c("alpha", "beta", "gamma", "alpha", "beta", "gamma"),
+    x = c(1, 2, 3, 4, 5, 6),
+    y = c(6, 5, 4, 3, 2, 1),
+    stringsAsFactors = FALSE
+  )
+
+  p <- mainPlot(
+    plotdf = plotdf,
+    xvar = "x",
+    yvar = "y",
+    attrGroups = "grp",
+    Conf = FALSE,
+    int.set = 0.9,
+    theme = "viridis",
+    use_symbols = TRUE,
+    symbol_col = "context"
+  )
+
+  built <- plotly::plotly_build(p)
+  marker_symbols <- unlist(lapply(built$x$data, function(tr) tr$marker$symbol), use.names = FALSE)
+  marker_symbols <- unique(as.character(marker_symbols))
+  marker_symbols <- marker_symbols[!is.na(marker_symbols) & nzchar(marker_symbols)]
+
+  expect_true(all(c("circle", "square", "diamond") %in% marker_symbols))
+})
+
 test_that("mainPlot tolerates missing theme and ellipse level inputs", {
   plotdf <- data.frame(
     rowid = as.character(seq_len(10)),
@@ -263,4 +293,22 @@ test_that("validate_multiplot_axes enforces non-empty and distinct selections", 
   expect_true(valid$ok)
   expect_equal(valid$x, "V1")
   expect_equal(valid$y, c("V2", "V3"))
+})
+
+test_that("resolve_multiplot_y_selection removes X variables from Y options", {
+  sel <- resolve_multiplot_y_selection(
+    all_vars = c("V1", "V2", "V3"),
+    x_vars = c("V1"),
+    y_vars = c("V1", "V2")
+  )
+  expect_equal(sel$choices, c("V2", "V3"))
+  expect_equal(sel$selected, "V2")
+
+  fallback <- resolve_multiplot_y_selection(
+    all_vars = c("V1", "V2"),
+    x_vars = c("V1"),
+    y_vars = c("V1")
+  )
+  expect_equal(fallback$choices, "V2")
+  expect_equal(fallback$selected, "V2")
 })

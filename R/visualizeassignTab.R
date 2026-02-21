@@ -88,6 +88,25 @@ validate_multiplot_axes <- function(x_vars, y_vars) {
   list(ok = TRUE, message = "", x = x_vars, y = y_vars)
 }
 
+resolve_multiplot_y_selection <- function(all_vars, x_vars, y_vars = character()) {
+  all_vars <- as.character(all_vars)
+  all_vars <- all_vars[!is.na(all_vars) & nzchar(all_vars)]
+
+  x_vars <- as.character(x_vars)
+  x_vars <- x_vars[!is.na(x_vars) & nzchar(x_vars)]
+
+  y_vars <- as.character(y_vars)
+  y_vars <- y_vars[!is.na(y_vars) & nzchar(y_vars)]
+
+  choices <- setdiff(all_vars, x_vars)
+  selected <- intersect(y_vars, choices)
+  if (length(selected) == 0) {
+    selected <- choices
+  }
+
+  list(choices = choices, selected = selected)
+}
+
 resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
   width <- suppressWarnings(as.numeric(plot_width))
   if (length(width) == 0 || is.na(width[[1]]) || !is.finite(width[[1]])) {
@@ -99,7 +118,12 @@ resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
-  multiplot_cancel_requested <- shiny::reactiveVal(FALSE)
+  multiplot_request_counter <- shiny::reactiveVal(0L)
+  multiplot_active_request_id <- shiny::reactiveVal(NA_integer_)
+  multiplot_cancelled_request_id <- shiny::reactiveVal(NA_integer_)
+  multiplot_mode <- shiny::reactiveVal(FALSE)
+  multiplot_height <- shiny::reactiveVal(900)
+  multiplot_build_promise <- shiny::reactiveVal(NULL)
   auto_filters_layout_set <- shiny::reactiveVal(FALSE)
 
   pick_selected_value <- function(candidate, choices, fallback = "") {
@@ -111,6 +135,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   show_multiplot_loading <- function() {
     if (isTRUE(multiplot_loading_active())) return(invisible(NULL))
+    try(removeModal(), silent = TRUE)
     multiplot_loading_active(TRUE)
     showModal(modalDialog(
       title = NULL,
@@ -130,13 +155,20 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   hide_multiplot_loading <- function() {
     if (!isTRUE(multiplot_loading_active())) return(invisible(NULL))
-    removeModal()
+    try(removeModal(), silent = TRUE)
     multiplot_loading_active(FALSE)
     invisible(NULL)
   }
 
   interactive_mode <- function(x) {
     isTRUE(suppressWarnings(as.logical(x)))
+  }
+
+  async_multiplot_enabled <- requireNamespace("promises", quietly = TRUE) &&
+    requireNamespace("future", quietly = TRUE)
+  if (isTRUE(async_multiplot_enabled) && !isTRUE(getOption("archaeodash.multiplot.future_plan_initialized"))) {
+    future::plan(future::multisession, workers = 1)
+    options(archaeodash.multiplot.future_plan_initialized = TRUE)
   }
 
   build_brush_display_table <- function(brush_df) {
@@ -174,73 +206,144 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     controls_style <- if (isTRUE(scroll_controls)) {
       "max-height:600px; overflow-y:auto; padding-left:8px;"
     } else {
-      "padding-top:8px;"
+      "padding-top:8px; padding-left:8px; padding-right:8px;"
     }
+    if (isTRUE(scroll_controls)) {
+      return(tags$div(
+        style = controls_style,
+        checkboxInput(
+          "filters_below_plot",
+          "Place filters below plot",
+          value = isTRUE(input$filters_below_plot)
+        ),
+        selectInput(
+          'data.src',
+          'Choose data type',
+          choices = c('elements', 'principal components','UMAP','linear discriminants'),
+          selected = 'elements'
+        ),
+        uiOutput('xvarUI'),
+        uiOutput('yvarUI'),
+        selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
+        hr(),
+        h5("Visualization filter"),
+        uiOutput("vizMetaFilterFieldUI"),
+        uiOutput("vizMetaFilterValuesUI"),
+        actionButton("clearVizFilter", "Clear visualization filter"),
+        hr(),
+        checkboxInput('Conf', 'Data Ellipse', value = TRUE),
+        checkboxInput(
+          "use_symbols",
+          label = bslib::popover(
+            tagList(
+              "Use group symbols",
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Group symbols",
+            "Applies marker symbols by metadata values. Defaults to the current group column and repeats symbols when values exceed the available symbol set."
+          ),
+          value = TRUE
+        ),
+        uiOutput("symbolGroupColumnUI"),
+        checkboxInput(
+          "show_point_labels",
+          label = bslib::popover(
+            tagList(
+              "Show point labels",
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Point labels",
+            "Shows a text label next to each point using the selected label column."
+          ),
+          value = FALSE
+        ),
+        uiOutput("pointLabelColumnUI"),
+        sliderInput(
+          'int.set',
+          label = bslib::popover(
+            tagList("Choose ellipse level",
+                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Choose ellipse level",
+            "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
+          ),
+          min = 0.50,
+          max = 0.99,
+          step = 0.05,
+          value = 0.90
+        ),
+        br(),
+        actionButton('Change', 'Change Group Assignment'),
+        uiOutput("groupAssignChoiceUI")
+      ))
+    }
+
     tags$div(
       style = controls_style,
-      checkboxInput(
-        "filters_below_plot",
-        "Place filters below plot",
-        value = isTRUE(input$filters_below_plot)
+      fluidRow(
+        column(3, checkboxInput("filters_below_plot", "Place filters below plot", value = isTRUE(input$filters_below_plot))),
+        column(3, selectInput('data.src', 'Choose data type', choices = c('elements', 'principal components','UMAP','linear discriminants'), selected = 'elements')),
+        column(3, uiOutput('xvarUI')),
+        column(3, uiOutput('yvarUI'))
       ),
-      selectInput(
-        'data.src',
-        'Choose data type',
-        choices = c('elements', 'principal components','UMAP','linear discriminants'),
-        selected = 'elements'
+      fluidRow(
+        column(3, selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis')),
+        column(3, checkboxInput('Conf', 'Data Ellipse', value = TRUE)),
+        column(3, checkboxInput(
+          "use_symbols",
+          label = bslib::popover(
+            tagList(
+              "Use group symbols",
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Group symbols",
+            "Applies marker symbols by metadata values. Defaults to the current group column and repeats symbols when values exceed the available symbol set."
+          ),
+          value = TRUE
+        )),
+        column(3, uiOutput("symbolGroupColumnUI"))
       ),
-      uiOutput('xvarUI'),
-      uiOutput('yvarUI'),
-      selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
+      fluidRow(
+        column(3, checkboxInput(
+          "show_point_labels",
+          label = bslib::popover(
+            tagList(
+              "Show point labels",
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Point labels",
+            "Shows a text label next to each point using the selected label column."
+          ),
+          value = FALSE
+        )),
+        column(3, uiOutput("pointLabelColumnUI")),
+        column(6, sliderInput(
+          'int.set',
+          label = bslib::popover(
+            tagList("Choose ellipse level",
+                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+            ),
+            title = "Choose ellipse level",
+            "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
+          ),
+          min = 0.50,
+          max = 0.99,
+          step = 0.05,
+          value = 0.90
+        ))
+      ),
       hr(),
       h5("Visualization filter"),
-      uiOutput("vizMetaFilterFieldUI"),
-      uiOutput("vizMetaFilterValuesUI"),
-      actionButton("clearVizFilter", "Clear visualization filter"),
+      fluidRow(
+        column(3, uiOutput("vizMetaFilterFieldUI")),
+        column(6, uiOutput("vizMetaFilterValuesUI")),
+        column(3, br(), actionButton("clearVizFilter", "Clear visualization filter"))
+      ),
       hr(),
-      checkboxInput('Conf', 'Data Ellipse', value = TRUE),
-      checkboxInput(
-        "use_symbols",
-        label = bslib::popover(
-          tagList(
-            "Use group symbols",
-            trigger = bsicons::bs_icon("info-circle", title = "Help")
-          ),
-          title = "Group symbols",
-          "Applies marker symbols by group. Symbols repeat automatically when groups exceed the available symbol set."
-        ),
-        value = TRUE
-      ),
-      checkboxInput(
-        "show_point_labels",
-        label = bslib::popover(
-          tagList(
-            "Show point labels",
-            trigger = bsicons::bs_icon("info-circle", title = "Help")
-          ),
-          title = "Point labels",
-          "Shows a text label next to each point using the selected label column."
-        ),
-        value = FALSE
-      ),
-      uiOutput("pointLabelColumnUI"),
-      sliderInput(
-        'int.set',
-        label = bslib::popover(
-          tagList("Choose ellipse level",
-                  trigger = bsicons::bs_icon("info-circle", title = "Help")
-          ),
-          title = "Choose ellipse level",
-          "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
-        ),
-        min = 0.50,
-        max = 0.99,
-        step = 0.05,
-        value = 0.90
-      ),
-      br(),
-      actionButton('Change', 'Change Group Assignment'),
-      uiOutput("groupAssignChoiceUI")
+      fluidRow(
+        column(3, actionButton('Change', 'Change Group Assignment')),
+        column(9, uiOutput("groupAssignChoiceUI"))
+      )
     )
   }
 
@@ -491,6 +594,42 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
+  output$symbolGroupColumnUI = renderUI({
+    req(inherits(rvals$plotdf, "data.frame"))
+    choices <- names(rvals$plotdf)
+    choices <- choices[!is.na(choices) & nzchar(choices)]
+    choices <- setdiff(choices, "rowid")
+    if (length(choices) == 0) return(NULL)
+
+    active_input <- tryCatch(as.character(input$symbolGroupColumn[[1]]), error = function(e) "")
+    prior_selection <- pick_selected_value(rvals$symbolGroupColumn, choices, fallback = "")
+    default_group <- if (!is.null(rvals$attrGroups)) as.character(rvals$attrGroups) else ""
+    if (!nzchar(default_group) || !(default_group %in% choices)) {
+      default_group <- choices[[1]]
+    }
+    selected_col <- if (length(active_input) > 0 && !is.na(active_input[[1]]) && active_input[[1]] %in% choices) {
+      active_input[[1]]
+    } else if (nzchar(prior_selection)) {
+      prior_selection
+    } else {
+      default_group
+    }
+
+    selectInput(
+      "symbolGroupColumn",
+      label = bslib::popover(
+        tagList(
+          "Symbol metadata field",
+          trigger = bsicons::bs_icon("info-circle", title = "Help")
+        ),
+        title = "Symbol metadata field",
+        "Choose which metadata field controls marker symbols. Defaults to the current group column."
+      ),
+      choices = choices,
+      selected = selected_col
+    )
+  })
+
   output$xvar2UI = renderUI({
     req(rvals$chem)
     selectInput('xvar2', 'X', rvals$chem, multiple = T)
@@ -498,14 +637,34 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   output$yvar2UI = renderUI({
     req(rvals$chem)
+    selection <- resolve_multiplot_y_selection(
+      all_vars = rvals$chem,
+      x_vars = input$xvar2,
+      y_vars = input$yvar2
+    )
     selectInput(
       'yvar2',
       'Y',
-      choices = rvals$chem,
+      choices = selection$choices,
       multiple = T,
-      selected = rvals$chem
+      selected = selection$selected
     )
   })
+
+  observeEvent(input$xvar2, {
+    req(rvals$chem)
+    selection <- resolve_multiplot_y_selection(
+      all_vars = rvals$chem,
+      x_vars = input$xvar2,
+      y_vars = input$yvar2
+    )
+    updateSelectInput(
+      session,
+      "yvar2",
+      choices = selection$choices,
+      selected = selection$selected
+    )
+  }, ignoreInit = TRUE)
 
   observeEvent(plotly::event_data("plotly_selected", source = "A"), {
     req(plot_df_for_display())
@@ -562,7 +721,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       }
       mynotification(glue::glue("Updated {length(rowid)} row(s) to group '{target_group}'."), type = "message")
     })
-    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set","use_symbols","show_point_labels","pointLabelColumn")
+    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set","use_symbols","symbolGroupColumn","show_point_labels","pointLabelColumn")
     for(i in inputList){
       rvals[[i]] = tryCatch(input[[i]],error = function(e)return(NULL))
     }
@@ -586,6 +745,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
         int.set = input$int.set,
         theme = input$plot_theme,
         use_symbols = isTRUE(input$use_symbols),
+        symbol_col = input$symbolGroupColumn,
         show_point_labels = isTRUE(input$show_point_labels),
         label_col = input$pointLabelColumn
       ),
@@ -622,75 +782,129 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   #### multiplots ####
 
+  output$multiplotUI = renderUI({
+    req(rvals$multiplot)
+    if (isTRUE(multiplot_mode())) {
+      plotly::plotlyOutput("multiplotPlotly", width = "100%", height = paste0(multiplot_height(), "px"))
+    } else {
+      plotOutput("multiplotStatic", width = "100%", height = paste0(multiplot_height(), "px"))
+    }
+  })
+
+  output$multiplotPlotly = plotly::renderPlotly({
+    req(rvals$multiplot)
+    req(isTRUE(multiplot_mode()))
+    req(inherits(rvals$multiplot, "plotly"))
+    rvals$multiplot
+  })
+
+  output$multiplotStatic = renderPlot({
+    req(rvals$multiplot)
+    req(!isTRUE(multiplot_mode()))
+    req(inherits(rvals$multiplot, "ggplot"))
+    rvals$multiplot
+  }, width = "auto", height = function() multiplot_height())
+
   observeEvent(input$cancelMultiplotBuild, {
-    multiplot_cancel_requested(TRUE)
+    active_request_id <- multiplot_active_request_id()
+    if (is.na(active_request_id)) return(invisible(NULL))
+    multiplot_cancelled_request_id(active_request_id)
+    multiplot_active_request_id(NA_integer_)
     hide_multiplot_loading()
     mynotification("Cancelled multiplot build request.", type = "message")
   }, ignoreInit = TRUE)
 
   observeEvent(input$updateMultiplot, {
-    multiplot_cancel_requested(FALSE)
+    request_id <- as.integer(multiplot_request_counter()) + 1L
+    multiplot_request_counter(request_id)
+    multiplot_active_request_id(request_id)
+    multiplot_cancelled_request_id(NA_integer_)
     show_multiplot_loading()
-    ok <- tryCatch({
-      if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
-        mynotification("No data available for multiplot.", type = "warning")
-        return(FALSE)
+    clear_loader_if_active <- function() {
+      if (identical(multiplot_active_request_id(), request_id)) {
+        multiplot_active_request_id(NA_integer_)
+        hide_multiplot_loading()
       }
-      axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
-      if (!isTRUE(axis_check$ok)) {
-        mynotification(axis_check$message, type = "warning")
-        return(FALSE)
-      }
+      invisible(NULL)
+    }
 
-      quietly(label = "multiplot",{
-        rvals$multiplot = multiplot(
-          selectedData = rvals$selectedData,
-          attrGroups = rvals$attrGroups,
-          xvar  = axis_check$x,
-          yvar = axis_check$y,
-          ptsize = input$ptsize,
-          interactive = interactive_mode(input$interactive),
-          theme = input$plot_theme
-        )
-      })
-      TRUE
-    }, error = function(e) {
-      mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
-      rvals$multiplot <- NULL
-      FALSE
-    }, finally = {
-      hide_multiplot_loading()
-    })
-    if (isTRUE(multiplot_cancel_requested())) {
-      rvals$multiplot <- NULL
+    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
+      mynotification("No data available for multiplot.", type = "warning")
+      clear_loader_if_active()
       return(invisible(NULL))
     }
-    if (!isTRUE(ok)) return(invisible(NULL))
+    axis_check <- validate_multiplot_axes(input$xvar2, input$yvar2)
+    if (!isTRUE(axis_check$ok)) {
+      mynotification(axis_check$message, type = "warning")
+      clear_loader_if_active()
+      return(invisible(NULL))
+    }
 
-    output$multiplotUI = renderUI({
-      req(rvals$multiplot)
-      if (interactive_mode(input$interactive)) {
-        plotly::plotlyOutput("multiplotPlotly", width = "100%", height = paste0(input$plotHeight, "px"))
-      } else {
-        plotOutput("multiplotStatic", width = "100%", height = paste0(input$plotHeight, "px"))
+    selected_data <- rvals$selectedData
+    attr_group <- rvals$attrGroups
+    point_size <- input$ptsize
+    use_interactive <- interactive_mode(input$interactive)
+    use_theme <- input$plot_theme
+    use_height <- as.integer(input$plotHeight)
+
+    if (!isTRUE(async_multiplot_enabled)) {
+      ok <- tryCatch({
+        quietly(label = "multiplot",{
+          rvals$multiplot = multiplot(
+            selectedData = selected_data,
+            attrGroups = attr_group,
+            xvar  = axis_check$x,
+            yvar = axis_check$y,
+            ptsize = point_size,
+            interactive = use_interactive,
+            theme = use_theme
+          )
+        })
+        multiplot_mode(use_interactive)
+        multiplot_height(use_height)
+        TRUE
+      }, error = function(e) {
+        mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+        rvals$multiplot <- NULL
+        FALSE
+      })
+      clear_loader_if_active()
+      if (!isTRUE(ok)) return(invisible(NULL))
+      return(invisible(NULL))
+    }
+
+    promise <- promises::future_promise({
+      multiplot(
+        selectedData = selected_data,
+        attrGroups = attr_group,
+        xvar = axis_check$x,
+        yvar = axis_check$y,
+        ptsize = point_size,
+        interactive = use_interactive,
+        theme = use_theme
+      )
+    })
+    promise <- promises::then(
+      promise,
+      onFulfilled = function(multiplot_obj) {
+        is_cancelled <- identical(multiplot_cancelled_request_id(), request_id)
+        is_active <- identical(multiplot_active_request_id(), request_id)
+        if (is_cancelled || !is_active) return(invisible(NULL))
+        rvals$multiplot <- multiplot_obj
+        multiplot_mode(use_interactive)
+        multiplot_height(use_height)
+        clear_loader_if_active()
+        invisible(NULL)
+      },
+      onRejected = function(e) {
+        if (!identical(multiplot_active_request_id(), request_id)) return(invisible(NULL))
+        mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+        rvals$multiplot <- NULL
+        clear_loader_if_active()
+        invisible(NULL)
       }
-    })
-
-    output$multiplotPlotly = plotly::renderPlotly({
-      req(rvals$multiplot)
-      req(interactive_mode(input$interactive))
-      req(inherits(rvals$multiplot, "plotly"))
-      rvals$multiplot
-    })
-
-    output$multiplotStatic = renderPlot({
-      req(rvals$multiplot)
-      req(!interactive_mode(input$interactive))
-      req(inherits(rvals$multiplot, "ggplot"))
-      rvals$multiplot
-    }, width = "auto", height = function() input$plotHeight)
-
-
+    )
+    multiplot_build_promise(promise)
   })
 
   observeEvent(input$savePlot, {

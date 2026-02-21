@@ -1,6 +1,6 @@
 Package: ArchaeoDash
 Title: Analyzes geochemically sourced objects
-Version: 2026.02.20.1437
+Version: 2026.02.21.0333
 Authors@R: 
     person("Robert", "Bischoff", , "rbischoff@asu.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8708-9041"))
@@ -24,12 +24,14 @@ Suggests:
     umap
 Config/testthat/edition: 3
 Imports: 
+    future,
     cluster,
     dplyr,
     DT,
     ggplot2,
     magrittr,
     plotly,
+    promises,
     rio,
     shiny,
     tidyselect,
