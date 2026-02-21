@@ -65,6 +65,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   dataset_loading_detail <- shiny::reactiveVal("Reading rows, metadata, and saved transformations from the database.")
   numeric_columns_cache <- shiny::reactiveVal(character())
   rvals$tbls <- character()
+  disable_refresh_timers <- isTRUE(getOption("shiny.testmode")) || identical(Sys.getenv("TESTTHAT"), "true")
 
   set_transformation_loading_status <- function(status, detail = "") {
     transformation_loading_status(as.character(status))
@@ -275,19 +276,20 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     username <- safe_username()
     if (!nzchar(username)) return(invisible(NULL))
 
-    persisted <- tryCatch(
-      load_transformations_db(
+    persisted_names <- tryCatch(
+      list_transformations_db(
         con = con,
         username = username,
         dataset_key = rvals$currentDatasetKey
       ),
       error = function(e) {
-        mynotification(paste("Unable to load persisted transformations:", e$message), type = "warning")
-        list()
+        mynotification(paste("Unable to load persisted transformation index:", e$message), type = "warning")
+        character()
       }
     )
-    if (length(persisted) > 0) {
-      rvals$transformations <- persisted
+    if (length(persisted_names) > 0) {
+      # Lazy-load transformation snapshots on demand to avoid confirm-load hangs.
+      rvals$transformations <- stats::setNames(vector("list", length(persisted_names)), persisted_names)
       rvals$activeTransformation <- NULL
       refresh_transformation_selector(selected_name = "")
     }
@@ -470,6 +472,21 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     ignoreInit = FALSE
   )
 
+  observe({
+    if (isTRUE(disable_refresh_timers)) return(invisible(NULL))
+    if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
+    if (isTRUE(dataset_table_ready())) return(invisible(NULL))
+    shiny::invalidateLater(2000, session)
+    refresh_dataset_tables(reason = "auth-retry", notify_on_error = FALSE)
+  })
+
+  observe({
+    if (isTRUE(disable_refresh_timers)) return(invisible(NULL))
+    if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
+    shiny::invalidateLater(10000, session)
+    refresh_dataset_tables(reason = "steady-state-sync", notify_on_error = FALSE)
+  })
+
   observeEvent(rvals$currentDatasetName, {
     refresh_dataset_tables(reason = "dataset-name-change", notify_on_error = FALSE)
   }, ignoreInit = TRUE)
@@ -567,7 +584,6 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         )
         reset_transformation_store()
         rvals$currentDatasetKey <- build_dataset_key(selected_datasets)
-        set_last_opened_dataset(selected_datasets[[1]])
         rvals$currentDatasetRowMap <- NULL
 
         null_vars <- c("chem", "attrGroups", "attr", "attrs", "attrGroupsSub",
@@ -622,6 +638,13 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           detail = "Publishing loaded data and refreshing dataset selectors."
         )
         rvals$currentDatasetName <- selected_datasets
+        try(
+          later::later(
+            function() try(set_last_opened_dataset(selected_datasets[[1]]), silent = TRUE),
+            delay = 0
+          ),
+          silent = TRUE
+        )
         app_log("confirmPrior: completed successfully")
       }, timeout_sec = dataset_load_timeout_seconds())
     }, error = function(e) {
@@ -904,7 +927,22 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       req(name)
       req(length(rvals$transformations) > 0)
       snapshot <- rvals$transformations[[name]]
-      req(!is.null(snapshot))
+      if (is.null(snapshot)) {
+        username <- safe_username()
+        req(nzchar(username))
+        req(!is.null(rvals$currentDatasetKey))
+        req(nzchar(rvals$currentDatasetKey))
+        snapshot <- load_single_transformation_db(
+          con = con,
+          username = username,
+          dataset_key = rvals$currentDatasetKey,
+          transformation_name = name
+        )
+        if (is.null(snapshot)) {
+          stop(paste0("Saved transformation '", name, "' is unavailable or incomplete in storage."))
+        }
+        rvals$transformations[[name]] <- snapshot
+      }
 
       normalize_group_factor <- function(df, group_col, preferred_levels = NULL) {
         if (!inherits(df, "data.frame")) return(df)
@@ -1013,7 +1051,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   observeEvent(input$deleteTransformation, {
     req(input$activeTransformation)
-    if (is.null(rvals$transformations[[input$activeTransformation]])) return(NULL)
+    if (!(input$activeTransformation %in% names(rvals$transformations))) return(NULL)
     if (isTruthy(credentials$status) && !is.null(con) && !is.null(rvals$currentDatasetKey) && nzchar(rvals$currentDatasetKey)) {
       username <- safe_username()
       if (nzchar(username)) {
