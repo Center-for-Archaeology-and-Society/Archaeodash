@@ -21,6 +21,7 @@
 - User requested immediate beta push after nav fix; bumped version to `2026.02.21.1524`, committed `3821e6d`, tagged `v2026.02.21.1524`, deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 4 | PASS 242` in-container), and verified health (`200`) plus installed version (`2026.2.21.1524`).
 - User reported multiplot warning path spinner persistence when X-axis is missing; updated multiplot update flow to validate before showing loader and force-clear stale loader on invalid-input exits, added shinytest2 regression `test-shinytest2-multiplot-loader.R` for no-X loader teardown, and validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`).
 - User approved deployment of the no-X multiplot loader fix; bumped version to `2026.02.21.1620`, ran gated beta installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 242` in-container), reinstalled/restarted `archaeodashbeta`, and verified health (`200`) plus installed version (`2026.2.21.1620`).
+- User requested multiplot simplification after persistent `future::multisession()` runtime failures; removed async `future`/`promises` and cancel flow from multiplot build, made build fully synchronous, added guaranteed loader teardown on exit/error, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`), and prepared beta deployment.
 
 ## Related
 
@@ -40,3 +41,4 @@
 - [[Post_Fix_Sanity_Check_2026-02-21]]
 - [[Visualize_Tab_Nav_Value_and_Regression_Test_2026-02-21]]
 - [[Multiplot_No_X_Warning_Loader_Clear_Fix_2026-02-21]]
+- [[Multiplot_Synchronous_Loader_Hardening_2026-02-21]]

@@ -30,6 +30,7 @@ Quality guardrails, tests, and known risks.
 - [[Post_Fix_Sanity_Check_2026-02-21]]
 - [[Visualize_Tab_Nav_Value_and_Regression_Test_2026-02-21]]
 - [[Multiplot_No_X_Warning_Loader_Clear_Fix_2026-02-21]]
+- [[Multiplot_Synchronous_Loader_Hardening_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]
