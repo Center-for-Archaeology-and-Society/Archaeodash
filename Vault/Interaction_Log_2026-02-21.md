@@ -23,6 +23,7 @@
 - User approved deployment of the no-X multiplot loader fix; bumped version to `2026.02.21.1620`, ran gated beta installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 242` in-container), reinstalled/restarted `archaeodashbeta`, and verified health (`200`) plus installed version (`2026.2.21.1620`).
 - User requested multiplot simplification after persistent `future::multisession()` runtime failures; removed async `future`/`promises` and cancel flow from multiplot build, made build fully synchronous, added guaranteed loader teardown on exit/error, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`), then deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 242` in-container), confirming health (`200`) and installed version (`2026.2.21.1647`).
 - User requested a cleaner separated server finish/teardown for multiplot loader persistence; implemented two-phase server build queue (`update` observer + queued build observer), moved build execution to next tick (`later::later`), fixed modal teardown domain issue by binding modal APIs to explicit `session`, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`) plus success-path smoke, then deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 5 | PASS 242` in-container), confirming health (`200`) and installed version (`2026.2.21.1803`).
+- User requested removing multiplot loading modal entirely in favor of message-only status; removed modal logic from multiplot flow, added `Generating multiplots...` notification on build start, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 64`) plus direct smoke, and prepared beta deployment.
 
 ## Related
 
@@ -44,3 +45,4 @@
 - [[Multiplot_No_X_Warning_Loader_Clear_Fix_2026-02-21]]
 - [[Multiplot_Synchronous_Loader_Hardening_2026-02-21]]
 - [[Multiplot_Two_Phase_Server_Loader_Teardown_Fix_2026-02-21]]
+- [[Multiplot_Loading_Modal_Removal_Message_Only_2026-02-21]]
