@@ -119,6 +119,7 @@ resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
 visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_loading_active <- shiny::reactiveVal(FALSE)
+  multiplot_build_request <- shiny::reactiveVal(NULL)
   multiplot_mode <- shiny::reactiveVal(FALSE)
   multiplot_height <- shiny::reactiveVal(900)
   auto_filters_layout_set <- shiny::reactiveVal(FALSE)
@@ -131,26 +132,29 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   }
 
   show_multiplot_loading <- function() {
-    if (isTRUE(multiplot_loading_active())) return(invisible(NULL))
-    try(removeModal(), silent = TRUE)
+    if (isTRUE(shiny::isolate(multiplot_loading_active()))) return(invisible(NULL))
+    try(removeModal(session = session), silent = FALSE)
     multiplot_loading_active(TRUE)
-    showModal(modalDialog(
-      title = NULL,
-      footer = NULL,
-      class = "transformation-loading-modal",
-      easyClose = FALSE,
-      tags$div(
-        class = "transformation-loading-wrap",
-        tags$div(class = "transformation-loading-spinner"),
-        tags$div(class = "transformation-loading-text", "Building multiplot...")
-      )
-    ))
+    showModal(
+      modalDialog(
+        title = NULL,
+        footer = NULL,
+        class = "transformation-loading-modal",
+        easyClose = FALSE,
+        tags$div(
+          class = "transformation-loading-wrap",
+          tags$div(class = "transformation-loading-spinner"),
+          tags$div(class = "transformation-loading-text", "Building multiplot...")
+        )
+      ),
+      session = session
+    )
     invisible(NULL)
   }
 
   hide_multiplot_loading <- function() {
-    if (!isTRUE(multiplot_loading_active())) return(invisible(NULL))
-    try(removeModal(), silent = TRUE)
+    if (!isTRUE(shiny::isolate(multiplot_loading_active()))) return(invisible(NULL))
+    try(removeModal(session = session), silent = FALSE)
     multiplot_loading_active(FALSE)
     invisible(NULL)
   }
@@ -807,37 +811,48 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       hide_multiplot_loading()
       return(invisible(NULL))
     }
-
     show_multiplot_loading()
-    on.exit(hide_multiplot_loading(), add = TRUE)
-
-    selected_data <- rvals$selectedData
-    attr_group <- rvals$attrGroups
-    point_size <- input$ptsize
-    use_interactive <- interactive_mode(input$interactive)
-    use_theme <- input$plot_theme
-    use_height <- as.integer(input$plotHeight)
-
-    tryCatch({
-      quietly(label = "multiplot",{
-        rvals$multiplot = multiplot(
-          selectedData = selected_data,
-          attrGroups = attr_group,
-          xvar  = axis_check$x,
-          yvar = axis_check$y,
-          ptsize = point_size,
-          interactive = use_interactive,
-          theme = use_theme
-        )
-      })
-      multiplot_mode(use_interactive)
-      multiplot_height(use_height)
-    }, error = function(e) {
-      mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
-      rvals$multiplot <- NULL
-    })
+    multiplot_build_request(list(
+      selected_data = rvals$selectedData,
+      attr_group = rvals$attrGroups,
+      x_vars = axis_check$x,
+      y_vars = axis_check$y,
+      point_size = input$ptsize,
+      use_interactive = interactive_mode(input$interactive),
+      use_theme = input$plot_theme,
+      use_height = as.integer(input$plotHeight)
+    ))
     invisible(NULL)
   })
+
+  observeEvent(multiplot_build_request(), {
+    req(multiplot_build_request())
+    request <- multiplot_build_request()
+    multiplot_build_request(NULL)
+    later::later(function() {
+      on.exit(hide_multiplot_loading(), add = TRUE)
+      tryCatch({
+        quietly(label = "multiplot",{
+          rvals$multiplot = multiplot(
+            selectedData = request$selected_data,
+            attrGroups = request$attr_group,
+            xvar  = request$x_vars,
+            yvar = request$y_vars,
+            ptsize = request$point_size,
+            interactive = request$use_interactive,
+            theme = request$use_theme
+          )
+        })
+        multiplot_mode(request$use_interactive)
+        multiplot_height(request$use_height)
+      }, error = function(e) {
+        mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+        rvals$multiplot <- NULL
+      })
+      invisible(NULL)
+    }, delay = 0)
+    invisible(NULL)
+  }, ignoreInit = TRUE)
 
   observeEvent(input$savePlot, {
     showModal(
