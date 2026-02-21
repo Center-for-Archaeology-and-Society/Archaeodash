@@ -18,6 +18,7 @@
 - User reported multiplot build error `future::multisession() must never be called directly`; switched async plan init to `future::plan(strategy = \"multisession\", workers = 1)` with sync fallback on init failure, and validated with `devtools::test(filter='plot-mainPlot|visualize-layout-default')` (`FAIL 0 | WARN 0 | SKIP 0 | PASS 42`).
 - User requested a post-fix sanity sweep beyond tests; ran `devtools::check(args='--no-manual')` and a direct shinytest2 multiplot smoke path, confirmed no recurrence of the `future::multisession()` runtime error, and documented residual package-hygiene notes and minor automation nav-value caveat.
 - User approved follow-up for navbar sanity caveat; set Visualize & Assign top-level tab `value` to `visualizetab`, added shinytest2 regression assertion for programmatic nav switching, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 59`), and prepared beta deployment.
+- User requested immediate beta push after nav fix; bumped version to `2026.02.21.1524`, committed `3821e6d`, tagged `v2026.02.21.1524`, deployed to `archaeodashbeta` via gated installer (`FAIL 0 | WARN 0 | SKIP 4 | PASS 242` in-container), and verified health (`200`) plus installed version (`2026.2.21.1524`).
 
 ## Related
 
