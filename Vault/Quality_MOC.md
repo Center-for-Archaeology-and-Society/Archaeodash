@@ -26,6 +26,9 @@ Quality guardrails, tests, and known risks.
 - [[Docker_Build_Dependency_Hardening_Future_Promises_2026-02-21]]
 - [[Full_Test_Run_and_Beta_Reinstall_2026-02-21]]
 - [[Assignment_Flow_Stability_and_Install_Test_Gate_2026-02-21]]
+- [[Multiplot_Future_Multisession_Strategy_Init_Fix_2026-02-21]]
+- [[Post_Fix_Sanity_Check_2026-02-21]]
+- [[Visualize_Tab_Nav_Value_and_Regression_Test_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

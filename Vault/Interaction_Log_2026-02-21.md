@@ -15,6 +15,9 @@
 - User requested full test run then beta reinstall; ran `devtools::test()` (`FAIL 3 | WARN 0 | SKIP 1 | PASS 247`, failures in `test-shinytest2-assignment-flows.R`), reinstalled package into `archaeodashbeta`, restarted container, and verified endpoint `http://127.0.0.1:23838/inst/app/` returned `200`.
 - User requested install safety on test failures and bug fixes/retest; fixed assignment-flow regressions (membership Mahalanobis fallback, DT assignment update race, group-assignment input state), added a pre-install test gate to `install.sh`, and validated `devtools::test()` now passes (`FAIL 0 | WARN 0 | SKIP 1 | PASS 263`).
 - User approved release actions; committed fixes as `ae6277e`, tagged `v2026.02.21.1450`, and deployed to `archaeodashbeta` via `install.sh` with tests gated before install/restart (container tests: `FAIL 0 | WARN 0 | SKIP 4 | PASS 242`, version `2026.2.21.1450`, healthcheck `200`).
+- User reported multiplot build error `future::multisession() must never be called directly`; switched async plan init to `future::plan(strategy = \"multisession\", workers = 1)` with sync fallback on init failure, and validated with `devtools::test(filter='plot-mainPlot|visualize-layout-default')` (`FAIL 0 | WARN 0 | SKIP 0 | PASS 42`).
+- User requested a post-fix sanity sweep beyond tests; ran `devtools::check(args='--no-manual')` and a direct shinytest2 multiplot smoke path, confirmed no recurrence of the `future::multisession()` runtime error, and documented residual package-hygiene notes and minor automation nav-value caveat.
+- User approved follow-up for navbar sanity caveat; set Visualize & Assign top-level tab `value` to `visualizetab`, added shinytest2 regression assertion for programmatic nav switching, validated targeted suites (`FAIL 0 | WARN 0 | SKIP 0 | PASS 59`), and prepared beta deployment.
 
 ## Related
 
@@ -30,3 +33,6 @@
 - [[Local_Merge_With_Origin_Master_2026-02-21]]
 - [[Full_Test_Run_and_Beta_Reinstall_2026-02-21]]
 - [[Assignment_Flow_Stability_and_Install_Test_Gate_2026-02-21]]
+- [[Multiplot_Future_Multisession_Strategy_Init_Fix_2026-02-21]]
+- [[Post_Fix_Sanity_Check_2026-02-21]]
+- [[Visualize_Tab_Nav_Value_and_Regression_Test_2026-02-21]]
