@@ -17,7 +17,7 @@ datainputTab = function() {
     uiOutput('newCol'),
     br(),
     hr(),
-    uiOutput("attr"),
+    uiOutput("attrUI"),
     uiOutput("subSelect"),
     uiOutput("chemUI"),
     uiOutput("ratioUI"),
@@ -988,7 +988,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   dataLoaderServer(rvals = rvals,input,output,session, credentials = credentials, con = con)
 
   # Render multi-select lookup for choosing attribute columns
-  output$attr <- renderUI({
+  output$attrUI <- renderUI({
     req(nrow(rvals$importedData) > 0)
     app_log("attr")
     quietly(label = "attr",{
