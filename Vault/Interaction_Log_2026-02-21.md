@@ -8,6 +8,9 @@
 - User requested extending hardening to dataset management workflows and clearer loading-screen progress copy; added stage-aware tracing/error reporting for delete/merge/overwrite, added concise status+detail text in dataset/transformation loading modals with stage updates, validated targeted tests, and reinstalled/restarted `archaeodashbeta`.
 - User reported first-group ellipse rendering red regardless of theme; fixed `mainPlot()` ellipse trace coloring to use the app group palette consistently, added regression test for marker/ellipse color consistency, validated `plot-mainPlot`, and reinstalled/restarted `archaeodashbeta`.
 - User requested all pending work be committed/tagged/deployed to beta and live plus a 30-minute live health monitor; committed and tagged `v2026.02.21.0434`, installed/restarted both `archaeodashbeta` and `archaeodash`, and added `security/live_healthcheck.sh` with sudo installer `security/install_live_healthcheck_timer.sh` for a `systemd` timer.
+- User requested Docker build hardening for async dependencies; confirmed `DESCRIPTION` already imports `future`, added explicit `future` and `promises` install entries in `Dockerfile` to match package imports under `dependencies = F` container installs.
+- User asked whether the latest dataset-load hang root cause was identified; triaged fresh beta/live logs and runtime state, confirmed no new cache-permission signature and passing source-based dataset-load timeout tests (`devtools::test(filter='datainput-prior-datasets')`), but no single new root-cause signature yet without a timestamped reproduction window.
+- User reported Shiny warning for shared input/output ID `attr`; resolved by renaming the Data Input output container from `attr` to `attrUI` while preserving input ID `attr`, then validated with `devtools::test(filter='datainput-prior-datasets')`.
 
 ## Related
 
@@ -19,3 +22,4 @@
 - [[Dataset_Management_Stage_Tracing_and_Loading_Status_Messages_2026-02-21]]
 - [[Ellipse_First_Group_Red_Color_Fix_2026-02-21]]
 - [[Live_Healthcheck_Timer_Setup_2026-02-21]]
+- [[Docker_Build_Dependency_Hardening_Future_Promises_2026-02-21]]
