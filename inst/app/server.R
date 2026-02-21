@@ -44,6 +44,11 @@ shinyServer(function(input, output, session) {
   } else if (identical(Sys.getenv("ARCHAEODASH_RUN_TABLE_MIGRATION", "0"), "1")) {
     try(ArchaeoDash:::migrate_table_names_to_32(con), silent = TRUE)
   }
+  session$onSessionEnded(function() {
+    if (!is.null(con)) {
+      try(DBI::dbDisconnect(con), silent = TRUE)
+    }
+  })
 
   loginUI(input = input)
 
@@ -56,38 +61,22 @@ shinyServer(function(input, output, session) {
   }
 
   read_user_preferences <- function(username) {
-    if (is.null(con) || !nzchar(username)) return(tibble::tibble(field = character(), value = character()))
-    pref_tbl <- tryCatch(
-      ArchaeoDash:::build_user_preferences_table_name(username, max_len = ArchaeoDash:::app_table_name_max_len),
-      error = function(e) paste0(janitor::make_clean_names(as.character(username)), "_preferences")
+    ArchaeoDash:::read_user_preferences_safe(
+      con = con,
+      username = username,
+      max_len = ArchaeoDash:::app_table_name_max_len
     )
-    if (!DBI::dbExistsTable(con, pref_tbl)) return(tibble::tibble(field = character(), value = character()))
-    prefs <- tryCatch(
-      dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
-      error = function(e) tibble::tibble(field = character(), value = character())
-    )
-    if (!inherits(prefs, "data.frame")) return(tibble::tibble(field = character(), value = character()))
-    if (!all(c("field", "value") %in% names(prefs))) return(tibble::tibble(field = character(), value = character()))
-    prefs %>% dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value))
   }
 
   write_user_preference <- function(username, field, value) {
     if (is.null(con) || !nzchar(username) || !nzchar(field) || !nzchar(value)) return(invisible(NULL))
-    pref_tbl <- tryCatch(
-      ArchaeoDash:::build_user_preferences_table_name(username, max_len = ArchaeoDash:::app_table_name_max_len),
-      error = function(e) paste0(janitor::make_clean_names(as.character(username)), "_preferences")
-    )
-    prefs <- read_user_preferences(username)
-    prefs <- prefs %>%
-      dplyr::filter(.data$field != field) %>%
-      dplyr::bind_rows(tibble::tibble(field = field, value = as.character(value)))
     try(
-      DBI::dbWriteTable(
-        conn = con,
-        name = pref_tbl,
-        value = prefs,
-        row.names = FALSE,
-        overwrite = TRUE
+      ArchaeoDash:::write_user_preference_safe(
+        con = con,
+        username = username,
+        field = field,
+        value = as.character(value),
+        max_len = ArchaeoDash:::app_table_name_max_len
       ),
       silent = TRUE
     )
