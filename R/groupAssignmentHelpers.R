@@ -13,12 +13,13 @@ available_group_assignments <- function(data, group_col) {
   sort(unique(groups))
 }
 
-build_group_assignment_ui <- function(choice_input_id, new_input_id, groups, selected_choice = NULL, new_label = "Enter new group designation") {
+build_group_assignment_ui <- function(choice_input_id, new_input_id, groups, selected_choice = NULL, new_label = "Enter new group designation", new_value = "") {
   groups <- as.character(groups)
   groups <- groups[!is.na(groups) & nzchar(groups)]
   groups <- sort(unique(groups))
   choices <- c(groups, "Create new group..." = "__new__")
   selected_choice <- safe_scalar_chr(selected_choice)
+  new_value <- safe_scalar_chr(new_value)
   if (!isTRUE(nzchar(selected_choice)) || !isTRUE(selected_choice %in% unname(choices))) {
     selected_choice <- if (length(groups) > 0) groups[[1]] else "__new__"
   }
@@ -29,9 +30,10 @@ build_group_assignment_ui <- function(choice_input_id, new_input_id, groups, sel
       choices = choices,
       selected = selected_choice
     ),
-    shiny::conditionalPanel(
-      condition = sprintf("input.%s == '__new__'", choice_input_id),
-      shiny::textInput(new_input_id, label = new_label)
+    shiny::textInput(
+      new_input_id,
+      label = new_label,
+      value = new_value
     )
   )
 }

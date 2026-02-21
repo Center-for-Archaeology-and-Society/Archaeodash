@@ -22,6 +22,12 @@ echo "docker container: $CONTAINER_NAME"
 echo "Pulling git repository"
 git -C "$REPO_DIR" pull
 
+echo "running test suite"
+if ! docker exec -i -w /srv/shiny-server "$CONTAINER_NAME" R -e 'devtools::test(stop_on_failure = TRUE)'; then
+  echo "Tests failed. Skipping install and container restart." >&2
+  exit 1
+fi
+
 echo "installing package"
 docker exec -i -w /srv/shiny-server "$CONTAINER_NAME" R -e 'devtools::install_local(".", force = T, dependencies = F)'
 

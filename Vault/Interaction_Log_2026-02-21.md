@@ -11,6 +11,9 @@
 - User requested Docker build hardening for async dependencies; confirmed `DESCRIPTION` already imports `future`, added explicit `future` and `promises` install entries in `Dockerfile` to match package imports under `dependencies = F` container installs.
 - User asked whether the latest dataset-load hang root cause was identified; triaged fresh beta/live logs and runtime state, confirmed no new cache-permission signature and passing source-based dataset-load timeout tests (`devtools::test(filter='datainput-prior-datasets')`), but no single new root-cause signature yet without a timestamped reproduction window.
 - User reported Shiny warning for shared input/output ID `attr`; resolved by renaming the Data Input output container from `attr` to `attrUI` while preserving input ID `attr`, then validated with `devtools::test(filter='datainput-prior-datasets')`.
+- User requested local merge of remote changes; merged `origin/master` into local `master`, resolved conflicts by keeping newer local revisions in conflicted workflow/vault files, and completed merge commit `47eeeab`.
+- User requested full test run then beta reinstall; ran `devtools::test()` (`FAIL 3 | WARN 0 | SKIP 1 | PASS 247`, failures in `test-shinytest2-assignment-flows.R`), reinstalled package into `archaeodashbeta`, restarted container, and verified endpoint `http://127.0.0.1:23838/inst/app/` returned `200`.
+- User requested install safety on test failures and bug fixes/retest; fixed assignment-flow regressions (membership Mahalanobis fallback, DT assignment update race, group-assignment input state), added a pre-install test gate to `install.sh`, and validated `devtools::test()` now passes (`FAIL 0 | WARN 0 | SKIP 1 | PASS 263`).
 
 ## Related
 
@@ -23,3 +26,6 @@
 - [[Ellipse_First_Group_Red_Color_Fix_2026-02-21]]
 - [[Live_Healthcheck_Timer_Setup_2026-02-21]]
 - [[Docker_Build_Dependency_Hardening_Future_Promises_2026-02-21]]
+- [[Local_Merge_With_Origin_Master_2026-02-21]]
+- [[Full_Test_Run_and_Beta_Reinstall_2026-02-21]]
+- [[Assignment_Flow_Stability_and_Install_Test_Gate_2026-02-21]]
