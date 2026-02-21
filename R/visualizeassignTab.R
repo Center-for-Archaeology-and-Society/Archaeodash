@@ -11,6 +11,7 @@
 visualizeassignTab = function() {
   tabPanel(
     title = "Visualize & Assign",
+    value = "visualizetab",
     id = "visualizetab",
     icon = icon("signal", lib = "glyphicon"),
     tabsetPanel(
@@ -168,8 +169,15 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     requireNamespace("future", quietly = TRUE) &&
     !isTRUE(getOption("archaeodash.multiplot.force_sync", FALSE))
   if (isTRUE(async_multiplot_enabled) && !isTRUE(getOption("archaeodash.multiplot.future_plan_initialized"))) {
-    future::plan(future::multisession, workers = 1)
-    options(archaeodash.multiplot.future_plan_initialized = TRUE)
+    async_multiplot_enabled <- tryCatch({
+      # Use strategy name to avoid direct multisession() calls on newer future versions.
+      future::plan(strategy = "multisession", workers = 1)
+      options(archaeodash.multiplot.future_plan_initialized = TRUE)
+      TRUE
+    }, error = function(e) {
+      try(app_log(paste0("multiplot async disabled: ", conditionMessage(e))), silent = TRUE)
+      FALSE
+    })
   }
 
   build_brush_display_table <- function(brush_df) {

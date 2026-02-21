@@ -90,6 +90,11 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   app$set_inputs(confirmTransformationAction = "click")
   app$wait_for_idle(timeout = 60000)
 
+  # Regression: top-level Visualize & Assign tab must be addressable by value.
+  app$set_inputs(nav = "visualizetab")
+  app$wait_for_value(input = "nav", timeout = 15000)
+  expect_equal(app$get_value(input = "nav"), "visualizetab")
+
   # Membership: assign checked row to BestGroup, then to a new group.
   app$set_inputs(nav = "groupMembershiptab")
   app$wait_for_idle(timeout = 15000)
