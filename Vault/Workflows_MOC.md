@@ -24,6 +24,10 @@ Major analytical workflows implemented in Shiny server modules.
 - [[Multi_Dataset_Load_UI_Performance_Optimization_2026-02-19]]
 - [[Multi_Dataset_Load_Refresh_Contention_Fix_2026-02-20]]
 - [[Multi_Dataset_Load_Collect_Coercion_Performance_Fix_2026-02-20]]
+- [[Dataset_Load_Hang_Timeout_Regression_and_Runtime_Hardening_2026-02-21]]
+- [[Import_DB_Load_and_Transformation_Error_Hardening_2026-02-21]]
+- [[Dataset_Management_Stage_Tracing_and_Loading_Status_Messages_2026-02-21]]
+- [[Ellipse_First_Group_Red_Color_Fix_2026-02-21]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

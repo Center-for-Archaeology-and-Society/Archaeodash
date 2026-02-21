@@ -1,4 +1,16 @@
 transformation_sep <- "\u001f"
+transform_table_name_max_len <- 32L
+transform_table_suffixes <- c("_selected", "_selected_all", "_pca", "_umap", "_lda", "_meta")
+transform_prefix_max_len <- function() {
+  as.integer(transform_table_name_max_len - max(nchar(transform_table_suffixes)))
+}
+
+transform_table_name_hash <- function(x, n = 8) {
+  tf <- tempfile("archaeodash_transform_table_name_")
+  on.exit(unlink(tf), add = TRUE)
+  writeBin(charToRaw(enc2utf8(as.character(x))), tf)
+  substr(as.character(tools::md5sum(tf)[[1]]), 1, n)
+}
 
 collapse_transform_values <- function(x) {
   x <- as.character(x)
@@ -56,11 +68,26 @@ build_dataset_key <- function(dataset_names) {
 }
 
 transform_index_table <- function(username) {
-  safe_table_name(paste0(username, "_transformations"), max_len = 63)
+  user <- janitor::make_clean_names(as.character(username))
+  suffix <- "_transformations"
+  candidate <- paste0(user, suffix)
+  if (nchar(candidate) <= transform_table_name_max_len) return(candidate)
+
+  hash <- transform_table_name_hash(candidate, n = 6)
+  user_budget <- max(1, transform_table_name_max_len - nchar(suffix) - 1 - nchar(hash))
+  paste0(substr(user, 1, user_budget), "_", hash, suffix)
 }
 
 transform_prefix <- function(username, dataset_key, transformation_name) {
-  safe_table_name(paste(username, "tx", dataset_key, transformation_name, sep = "_"), max_len = 55)
+  cleaned <- safe_table_name(
+    paste(username, "tx", dataset_key, transformation_name, sep = "_"),
+    max_len = 63
+  )
+  max_len <- transform_prefix_max_len()
+  if (nchar(cleaned) <= max_len) return(cleaned)
+  suffix <- transform_table_name_hash(cleaned, n = 6)
+  base_budget <- max_len - 1 - nchar(suffix)
+  paste0(substr(cleaned, 1, max(1, base_budget)), "_", suffix)
 }
 
 ensure_transform_index_table <- function(con, username) {

@@ -177,7 +177,10 @@ mainPlot = function(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viri
       if (is.na(grp) || !nzchar(grp)) next
       grp_df <- gg_data_ellipse %>% dplyr::filter(as.character(name) == grp)
       if (nrow(grp_df) == 0) next
-      line_col <- if ("colour" %in% names(grp_df)) as.character(grp_df$colour[[1]]) else palette_vals[[grp]]
+      line_col <- palette_vals[[grp]]
+      if (is.null(line_col) || !nzchar(as.character(line_col))) {
+        line_col <- if ("colour" %in% names(grp_df)) as.character(grp_df$colour[[1]]) else "#404040"
+      }
       ggP <- ggP %>%
         plotly::add_trace(
           data = grp_df,

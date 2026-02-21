@@ -57,9 +57,20 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   suppress_group_reset <- shiny::reactiveVal(FALSE)
   transformation_loading_active <- shiny::reactiveVal(FALSE)
   dataset_loading_active <- shiny::reactiveVal(FALSE)
+  transformation_loading_status <- shiny::reactiveVal("Updating transformation...")
+  transformation_loading_detail <- shiny::reactiveVal("Validating selections and preparing derived analysis objects.")
+  dataset_loading_status <- shiny::reactiveVal("Loading selected dataset(s)...")
+  dataset_loading_detail <- shiny::reactiveVal("Reading rows, metadata, and saved transformations from the database.")
   numeric_columns_cache <- shiny::reactiveVal(character())
 
-  show_transformation_loading <- function() {
+  set_transformation_loading_status <- function(status, detail = "") {
+    transformation_loading_status(as.character(status))
+    transformation_loading_detail(as.character(detail))
+    invisible(NULL)
+  }
+
+  show_transformation_loading <- function(status = "Updating transformation...", detail = "Validating selections and preparing derived analysis objects.") {
+    set_transformation_loading_status(status, detail)
     transformation_loading_active(TRUE)
     showModal(modalDialog(
       title = NULL,
@@ -69,7 +80,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       tags$div(
         class = "transformation-loading-wrap",
         tags$div(class = "transformation-loading-spinner"),
-        tags$div(class = "transformation-loading-text", "Updating transformation...")
+        tags$div(
+          class = "transformation-loading-text",
+          tags$div(transformation_loading_status()),
+          tags$div(style = "font-weight:400; font-size:12px; opacity:0.9;", transformation_loading_detail())
+        )
       )
     ))
   }
@@ -81,8 +96,15 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
   }
 
-  show_dataset_loading <- function() {
+  set_dataset_loading_status <- function(status, detail = "") {
+    dataset_loading_status(as.character(status))
+    dataset_loading_detail(as.character(detail))
+    invisible(NULL)
+  }
+
+  show_dataset_loading <- function(status = "Loading selected dataset(s)...", detail = "Reading rows, metadata, and saved transformations from the database.") {
     if (isTRUE(dataset_loading_active())) return(invisible(NULL))
+    set_dataset_loading_status(status, detail)
     dataset_loading_active(TRUE)
     showModal(modalDialog(
       title = NULL,
@@ -92,7 +114,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       tags$div(
         class = "transformation-loading-wrap",
         tags$div(class = "transformation-loading-spinner"),
-        tags$div(class = "transformation-loading-text", "Loading selected dataset(s)...")
+        tags$div(
+          class = "transformation-loading-text",
+          tags$div(dataset_loading_status()),
+          tags$div(style = "font-weight:400; font-size:12px; opacity:0.9;", dataset_loading_detail())
+        )
       )
     ))
   }
@@ -143,7 +169,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
 
   read_user_preferences <- function(username) {
     if (is.null(con) || !nzchar(username)) return(tibble::tibble(field = character(), value = character()))
-    pref_tbl <- paste0(username, "_preferences")
+    pref_tbl <- build_user_preferences_table_name(username, max_len = app_table_name_max_len)
     if (!DBI::dbExistsTable(con, pref_tbl)) return(tibble::tibble(field = character(), value = character()))
     prefs <- tryCatch(
       dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
@@ -158,7 +184,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!isTruthy(credentials$status) || is.null(con)) return(invisible(NULL))
     username <- safe_username()
     if (!nzchar(username) || !nzchar(dataset_name)) return(invisible(NULL))
-    pref_tbl <- paste0(username, "_preferences")
+    pref_tbl <- build_user_preferences_table_name(username, max_len = app_table_name_max_len)
     prefs <- read_user_preferences(username) %>%
       dplyr::filter(.data$field != "lastOpenedDataset") %>%
       dplyr::bind_rows(
@@ -483,16 +509,25 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       return(invisible(NULL))
     }
     req(input$selectedDatasets)
-    show_dataset_loading()
+    show_dataset_loading(
+      status = "Loading selected dataset(s)...",
+      detail = "Initializing workspace state and preparing to read database tables."
+    )
     on.exit(hide_dataset_loading(), add = TRUE)
     selected_datasets <- normalize_selected_datasets(input$selectedDatasets)
     if (length(selected_datasets) == 0) {
       mynotification("Choose at least one dataset before confirming.", type = "warning")
       return(invisible(NULL))
     }
+    stage <- "initializing selected dataset load"
     tryCatch({
       with_dataset_load_timeout({
         app_log(glue::glue("confirmPrior: start selected_datasets={length(selected_datasets)}"))
+        stage <<- "resetting transformation state"
+        set_dataset_loading_status(
+          status = "Resetting workspace state...",
+          detail = "Clearing prior transformation snapshots and restoring default reactive values."
+        )
         reset_transformation_store()
         rvals$currentDatasetKey <- build_dataset_key(selected_datasets)
         set_last_opened_dataset(selected_datasets[[1]])
@@ -507,6 +542,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           rvals[[var]] <- NULL
         }
 
+        stage <<- "loading selected dataset workspace"
+        set_dataset_loading_status(
+          status = "Loading dataset rows...",
+          detail = "Collecting selected dataset table(s) and building a unified workspace row map."
+        )
         workspace_loaded <- load_selected_datasets_workspace(con, selected_datasets)
         rvals$currentDatasetRowMap <- workspace_loaded$currentDatasetRowMap
         rvals$importedData <- workspace_loaded$importedData
@@ -514,6 +554,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         ensure_core_rowids(rvals)
         app_log(glue::glue("confirmPrior: workspace loaded rows={nrow(rvals$importedData)}"))
 
+        stage <<- "loading dataset metadata variables"
+        set_dataset_loading_status(
+          status = "Loading metadata variables...",
+          detail = "Reading metadata tables to restore predictor/element column definitions."
+        )
         tblsmd <- load_selected_dataset_metadata_variables(con, selected_datasets)
         if(length(tblsmd) > 0){
           rvals$chem <- tblsmd
@@ -523,12 +568,22 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         # Persisted transformations are dataset-keyed snapshots for a single base table.
         # Skipping them for combined multi-dataset workspaces avoids heavy/colliding loads.
         if (length(selected_datasets) == 1) {
+          stage <<- "loading persisted transformations"
+          set_dataset_loading_status(
+            status = "Loading saved transformations...",
+            detail = "Reading persisted transformation snapshots for this dataset key."
+          )
           load_persisted_transformations()
         } else {
           rvals$transformations <- list()
           rvals$activeTransformation <- NULL
           mynotification("Multiple datasets loaded. Saved transformations are not loaded; create a new transformation for this combined workspace.", type = "message")
         }
+        stage <<- "finalizing selected dataset load"
+        set_dataset_loading_status(
+          status = "Finalizing dataset load...",
+          detail = "Publishing loaded data and refreshing dataset selectors."
+        )
         rvals$currentDatasetName <- selected_datasets
         app_log("confirmPrior: completed successfully")
       }, timeout_sec = dataset_load_timeout_seconds())
@@ -547,7 +602,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           type = "error"
         )
       } else {
-        mynotification(paste("Unable to load selected dataset:", e$message), type = "error")
+        app_log(glue::glue("confirmPrior: error stage={stage} msg={conditionMessage(e)}"))
+        mynotification(
+          paste0("Unable to load selected dataset during ", stage, ": ", conditionMessage(e)),
+          type = "error"
+        )
       }
     })
 
@@ -580,16 +639,37 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   observeEvent(input$deleteDatasetsconfirm,{
     removeModal()
     req(input$selectedDatasets)
-    app_log("deleting datasets")
-    username <- safe_username()
-    for(tbl in input$selectedDatasets){
-      if (nzchar(username)) {
-        dataset_key <- build_dataset_key(tbl)
-        try(delete_transformations_for_dataset_db(con, username, dataset_key), silent = TRUE)
+    stage <- "initializing dataset delete"
+    show_dataset_loading(
+      status = "Deleting selected dataset(s)...",
+      detail = "Removing dataset rows, metadata tables, and persisted transformations."
+    )
+    on.exit(hide_dataset_loading(), add = TRUE)
+    tryCatch({
+      app_log("deleting datasets")
+      username <- safe_username()
+      for(tbl in input$selectedDatasets){
+        stage <- paste0("deleting dataset tables for ", tbl)
+        set_dataset_loading_status(
+          status = "Deleting dataset tables...",
+          detail = paste0("Removing ", tbl, " and its metadata table.")
+        )
+        if (nzchar(username)) {
+          stage <- paste0("deleting persisted transformations for ", tbl)
+          dataset_key <- build_dataset_key(tbl)
+          try(delete_transformations_for_dataset_db(con, username, dataset_key), silent = TRUE)
+        }
+        db_remove_table_safe(con, tbl, context = "deleting dataset")
+        db_remove_table_safe(con, paste0(tbl, "_metadata"), context = "deleting dataset metadata")
       }
-      db_remove_table_safe(con, tbl, context = "deleting dataset")
-      db_remove_table_safe(con, paste0(tbl, "_metadata"), context = "deleting dataset metadata")
-    }
+      mynotification("Selected dataset(s) deleted.", type = "message")
+    }, error = function(e) {
+      app_log(glue::glue("deleteDatasetsconfirm: error stage={stage} msg={conditionMessage(e)}"))
+      mynotification(
+        paste0("Unable to delete selected dataset(s) during ", stage, ": ", conditionMessage(e)),
+        type = "error"
+      )
+    })
   })
 
   observeEvent(input$mergeDatasets,{
@@ -610,12 +690,28 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(input$selectedDatasets)
     req(input$mergeName %>% length() > 0)
     app_log("merging datasets")
+    show_dataset_loading(
+      status = "Merging selected dataset(s)...",
+      detail = "Collecting rows and metadata, then writing merged tables."
+    )
+    on.exit(hide_dataset_loading(), add = TRUE)
+    stage <- "initializing merge"
     tryCatch({
       tbls = list()
       for(tbl in input$selectedDatasets){
+        stage <- paste0("collecting rows from ", tbl)
+        set_dataset_loading_status(
+          status = "Collecting source tables...",
+          detail = paste0("Reading rows from ", tbl, ".")
+        )
         tbls[[tbl]] = dplyr::tbl(con,tbl) %>% dplyr::collect() %>%
           dplyr::mutate_all(as.character)
       }
+      stage <- "building merged dataset rows"
+      set_dataset_loading_status(
+        status = "Combining dataset rows...",
+        detail = "Binding selected source tables and normalizing row IDs."
+      )
       merged = do.call(dplyr::bind_rows,tbls) %>%
         dplyr::select(-tidyselect::any_of('rowid')) %>%
         dplyr::distinct_all() %>%
@@ -624,12 +720,17 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       filename <- build_dataset_table_name(
         username = credentials$res$username,
         dataset_label = input$mergeName,
-        max_len = 54
+        max_len = app_table_name_max_len
       )
 
       # get metadata
       tblsmd = list()
       for(tbl in input$selectedDatasets){
+        stage <- paste0("collecting metadata from ", tbl)
+        set_dataset_loading_status(
+          status = "Collecting metadata...",
+          detail = paste0("Reading metadata from ", tbl, "_metadata.")
+        )
         tblnm = paste0(tbl,"_metadata")
         dblist = DBI::dbListTables(con)
         if(tblnm %in% dblist){
@@ -638,6 +739,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         }
       }
       if(length(tblsmd) > 0){
+        stage <- "building merged metadata payload"
+        set_dataset_loading_status(
+          status = "Building merged metadata...",
+          detail = "Combining and deduplicating metadata records for merged dataset."
+        )
         tblsmd = do.call(dplyr::bind_rows,tblsmd) %>%
           dplyr::distinct_all() %>%
           dplyr::filter(!field %in% c("created","dataset")) %>%
@@ -650,6 +756,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       }
 
       if(!db_table_exists_safe(con, filename)){
+        stage <- "writing merged dataset tables"
+        set_dataset_loading_status(
+          status = "Saving merged dataset...",
+          detail = paste0("Writing ", filename, " and metadata tables.")
+        )
         db_write_table_safe(con, filename, merged, row.names = FALSE, context = "saving merged dataset")
         db_write_table_safe(con, paste0(filename, "_metadata"), tblsmd, row.names = FALSE, context = "saving merged dataset metadata")
         expected_name <- janitor::make_clean_names(paste0(credentials$res$username, "_", input$mergeName))
@@ -657,9 +768,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           mynotification(paste0("Merged dataset name shortened for storage as: ", filename), type = "message")
         }
       } else {
+        stage <- "awaiting overwrite confirmation"
         rvals$mergeFilename = filename
         rvals$merged = merged
         rvals$merged_metadata = tblsmd
+        hide_dataset_loading()
         showModal(modalDialog(
           title = "confirm?",
           p("Dataset name already exists. Do you want to overwrite this table?"),
@@ -670,7 +783,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         ))
       }
     }, error = function(e){
-      mynotification(paste("Error merging datasets\n",e), type = "error")
+      app_log(glue::glue("mergeDatasetsconfirm: error stage={stage} msg={conditionMessage(e)}"))
+      mynotification(
+        paste0("Unable to merge selected dataset(s) during ", stage, ": ", conditionMessage(e)),
+        type = "error"
+      )
     })
   })
 
@@ -679,9 +796,19 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(rvals$mergeFilename)
     req(rvals$merged)
     req(rvals$merged_metadata)
-    db_write_table_safe(con, rvals$mergeFilename, rvals$merged, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset")
-    db_write_table_safe(con, paste0(rvals$mergeFilename, "_metadata"), rvals$merged_metadata, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset metadata")
-    mynotification("merged datasets")
+    show_dataset_loading(
+      status = "Overwriting merged dataset...",
+      detail = paste0("Replacing ", rvals$mergeFilename, " and its metadata table.")
+    )
+    on.exit(hide_dataset_loading(), add = TRUE)
+    tryCatch({
+      db_write_table_safe(con, rvals$mergeFilename, rvals$merged, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset")
+      db_write_table_safe(con, paste0(rvals$mergeFilename, "_metadata"), rvals$merged_metadata, row.names = FALSE, overwrite = TRUE, context = "overwriting merged dataset metadata")
+      mynotification("Merged dataset overwritten.", type = "message")
+    }, error = function(e) {
+      app_log(glue::glue("overwriteDataset: error name={rvals$mergeFilename} msg={conditionMessage(e)}"))
+      mynotification(paste0("Unable to overwrite merged dataset: ", conditionMessage(e)), type = "error")
+    })
   })
 
   observeEvent(input$file1, {
@@ -725,103 +852,114 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   })
 
   load_transformation <- function(name) {
-    req(name)
-    req(length(rvals$transformations) > 0)
-    snapshot <- rvals$transformations[[name]]
-    req(!is.null(snapshot))
+    tryCatch({
+      req(name)
+      req(length(rvals$transformations) > 0)
+      snapshot <- rvals$transformations[[name]]
+      req(!is.null(snapshot))
 
-    normalize_group_factor <- function(df, group_col, preferred_levels = NULL) {
-      if (!inherits(df, "data.frame")) return(df)
-      if (is.null(group_col) || !nzchar(as.character(group_col)) || !(group_col %in% names(df))) return(df)
-      vals <- as.character(df[[group_col]])
-      vals_clean <- vals[!is.na(vals) & nzchar(vals)]
-      if (!is.null(preferred_levels) && length(preferred_levels) > 0) {
-        lvls <- unique(as.character(preferred_levels))
-      } else {
-        lvls <- sort(unique(vals_clean))
+      normalize_group_factor <- function(df, group_col, preferred_levels = NULL) {
+        if (!inherits(df, "data.frame")) return(df)
+        if (is.null(group_col) || !nzchar(as.character(group_col)) || !(group_col %in% names(df))) return(df)
+        vals <- as.character(df[[group_col]])
+        vals_clean <- vals[!is.na(vals) & nzchar(vals)]
+        if (!is.null(preferred_levels) && length(preferred_levels) > 0) {
+          lvls <- unique(as.character(preferred_levels))
+        } else {
+          lvls <- sort(unique(vals_clean))
+        }
+        if (length(lvls) == 0) return(df)
+        df[[group_col]] <- factor(vals, levels = lvls)
+        df
       }
-      if (length(lvls) == 0) return(df)
-      df[[group_col]] <- factor(vals, levels = lvls)
-      df
-    }
 
-    synced_snapshot <- refreshTransformationMetadata(
-      transformations = list(tmp = snapshot),
-      imported_data = rvals$importedData,
-      chem = snapshot$chem
-    )
-    if (length(synced_snapshot) == 1) {
-      snapshot <- synced_snapshot[[1]]
-      rvals$transformations[[name]] <- snapshot
-    }
-    applyTransformationSnapshot(rvals, snapshot)
-    # Persisted datasets load metadata as character; re-apply stable group factors after merge.
-    grp_col <- as.character(snapshot$attrGroups)
-    grp_lvls <- as.character(snapshot$attrGroupsSub)
-    if (nzchar(grp_col)) {
-      rvals$selectedData <- normalize_group_factor(rvals$selectedData, grp_col, grp_lvls)
-      rvals$pcadf <- normalize_group_factor(rvals$pcadf, grp_col, grp_lvls)
-      rvals$umapdf <- normalize_group_factor(rvals$umapdf, grp_col, grp_lvls)
-      rvals$LDAdf <- normalize_group_factor(rvals$LDAdf, grp_col, grp_lvls)
-    }
-    compute_ordinations(
-      run_pca = isTRUE(snapshot$runPCA),
-      run_umap = isTRUE(snapshot$runUMAP),
-      run_lda = isTRUE(snapshot$runLDA)
-    )
-    suppress_group_reset(TRUE)
-    on.exit(suppress_group_reset(FALSE), add = TRUE)
-    if (!is.null(snapshot$attrGroups) && nzchar(as.character(snapshot$attrGroups))) {
-      try(updateSelectInput(session, "attrGroups", selected = snapshot$attrGroups), silent = TRUE)
-      active_group_column(snapshot$attrGroups)
-    }
-    if (!is.null(snapshot$attrGroupsSub)) {
-      rvals$attrGroupsSub <- as.character(snapshot$attrGroupsSub)
-      try(updateSelectizeInput(session, "attrGroupsSub", selected = as.character(snapshot$attrGroupsSub)), silent = TRUE)
-    }
-    if (!is.null(snapshot$data.src) && nzchar(as.character(snapshot$data.src))) {
-      try(updateSelectInput(session, "data.src", selected = as.character(snapshot$data.src)), silent = TRUE)
-    }
-    if (!is.null(snapshot$xvar) && nzchar(as.character(snapshot$xvar))) {
-      try(updateSelectInput(session, "xvar", selected = as.character(snapshot$xvar)), silent = TRUE)
-    }
-    if (!is.null(snapshot$yvar) && nzchar(as.character(snapshot$yvar))) {
-      try(updateSelectInput(session, "yvar", selected = as.character(snapshot$yvar)), silent = TRUE)
-    }
-    if (!is.null(snapshot$xvar2) && length(snapshot$xvar2) > 0) {
-      try(updateSelectInput(session, "xvar2", selected = as.character(snapshot$xvar2)), silent = TRUE)
-    }
-    if (!is.null(snapshot$yvar2) && length(snapshot$yvar2) > 0) {
-      try(updateSelectInput(session, "yvar2", selected = as.character(snapshot$yvar2)), silent = TRUE)
-    }
-    if (!is.null(snapshot$Conf)) {
-      try(updateCheckboxInput(session, "Conf", value = isTRUE(snapshot$Conf)), silent = TRUE)
-    }
-    if (!is.null(snapshot$int.set) && is.finite(suppressWarnings(as.numeric(snapshot$int.set[[1]])))) {
-      try(updateSliderInput(session, "int.set", value = as.numeric(snapshot$int.set[[1]])), silent = TRUE)
-    }
-    if (!is.null(snapshot$plot_theme) && nzchar(as.character(snapshot$plot_theme))) {
-      try(updateSelectInput(session, "plot_theme", selected = as.character(snapshot$plot_theme)), silent = TRUE)
-    }
-    if (!is.null(snapshot$use_symbols)) {
-      try(updateCheckboxInput(session, "use_symbols", value = isTRUE(snapshot$use_symbols)), silent = TRUE)
-    }
-    if (!is.null(snapshot$show_point_labels)) {
-      try(updateCheckboxInput(session, "show_point_labels", value = isTRUE(snapshot$show_point_labels)), silent = TRUE)
-    }
-    if (!is.null(snapshot$pointLabelColumn) && nzchar(as.character(snapshot$pointLabelColumn))) {
-      try(updateSelectInput(session, "pointLabelColumn", selected = as.character(snapshot$pointLabelColumn)), silent = TRUE)
-    }
-    if (!is.null(input$groupSelectionMode) && !identical(input$groupSelectionMode, "all")) {
-      try(updateRadioButtons(session, "groupSelectionMode", selected = "all"), silent = TRUE)
-    }
-    refresh_transformation_selector(selected_name = name)
-    mynotification(paste0("loaded transformation: ", name))
+      synced_snapshot <- refreshTransformationMetadata(
+        transformations = list(tmp = snapshot),
+        imported_data = rvals$importedData,
+        chem = snapshot$chem
+      )
+      if (length(synced_snapshot) == 1) {
+        snapshot <- synced_snapshot[[1]]
+        rvals$transformations[[name]] <- snapshot
+      }
+      applyTransformationSnapshot(rvals, snapshot)
+      # Persisted datasets load metadata as character; re-apply stable group factors after merge.
+      grp_col <- as.character(snapshot$attrGroups)
+      grp_lvls <- as.character(snapshot$attrGroupsSub)
+      if (nzchar(grp_col)) {
+        rvals$selectedData <- normalize_group_factor(rvals$selectedData, grp_col, grp_lvls)
+        rvals$pcadf <- normalize_group_factor(rvals$pcadf, grp_col, grp_lvls)
+        rvals$umapdf <- normalize_group_factor(rvals$umapdf, grp_col, grp_lvls)
+        rvals$LDAdf <- normalize_group_factor(rvals$LDAdf, grp_col, grp_lvls)
+      }
+      compute_ordinations(
+        run_pca = isTRUE(snapshot$runPCA),
+        run_umap = isTRUE(snapshot$runUMAP),
+        run_lda = isTRUE(snapshot$runLDA)
+      )
+      suppress_group_reset(TRUE)
+      on.exit(suppress_group_reset(FALSE), add = TRUE)
+      if (!is.null(snapshot$attrGroups) && nzchar(as.character(snapshot$attrGroups))) {
+        try(updateSelectInput(session, "attrGroups", selected = snapshot$attrGroups), silent = TRUE)
+        active_group_column(snapshot$attrGroups)
+      }
+      if (!is.null(snapshot$attrGroupsSub)) {
+        rvals$attrGroupsSub <- as.character(snapshot$attrGroupsSub)
+        try(updateSelectizeInput(session, "attrGroupsSub", selected = as.character(snapshot$attrGroupsSub)), silent = TRUE)
+      }
+      if (!is.null(snapshot$data.src) && nzchar(as.character(snapshot$data.src))) {
+        try(updateSelectInput(session, "data.src", selected = as.character(snapshot$data.src)), silent = TRUE)
+      }
+      if (!is.null(snapshot$xvar) && nzchar(as.character(snapshot$xvar))) {
+        try(updateSelectInput(session, "xvar", selected = as.character(snapshot$xvar)), silent = TRUE)
+      }
+      if (!is.null(snapshot$yvar) && nzchar(as.character(snapshot$yvar))) {
+        try(updateSelectInput(session, "yvar", selected = as.character(snapshot$yvar)), silent = TRUE)
+      }
+      if (!is.null(snapshot$xvar2) && length(snapshot$xvar2) > 0) {
+        try(updateSelectInput(session, "xvar2", selected = as.character(snapshot$xvar2)), silent = TRUE)
+      }
+      if (!is.null(snapshot$yvar2) && length(snapshot$yvar2) > 0) {
+        try(updateSelectInput(session, "yvar2", selected = as.character(snapshot$yvar2)), silent = TRUE)
+      }
+      if (!is.null(snapshot$Conf)) {
+        try(updateCheckboxInput(session, "Conf", value = isTRUE(snapshot$Conf)), silent = TRUE)
+      }
+      if (!is.null(snapshot$int.set) && is.finite(suppressWarnings(as.numeric(snapshot$int.set[[1]])))) {
+        try(updateSliderInput(session, "int.set", value = as.numeric(snapshot$int.set[[1]])), silent = TRUE)
+      }
+      if (!is.null(snapshot$plot_theme) && nzchar(as.character(snapshot$plot_theme))) {
+        try(updateSelectInput(session, "plot_theme", selected = as.character(snapshot$plot_theme)), silent = TRUE)
+      }
+      if (!is.null(snapshot$use_symbols)) {
+        try(updateCheckboxInput(session, "use_symbols", value = isTRUE(snapshot$use_symbols)), silent = TRUE)
+      }
+      if (!is.null(snapshot$show_point_labels)) {
+        try(updateCheckboxInput(session, "show_point_labels", value = isTRUE(snapshot$show_point_labels)), silent = TRUE)
+      }
+      if (!is.null(snapshot$pointLabelColumn) && nzchar(as.character(snapshot$pointLabelColumn))) {
+        try(updateSelectInput(session, "pointLabelColumn", selected = as.character(snapshot$pointLabelColumn)), silent = TRUE)
+      }
+      if (!is.null(input$groupSelectionMode) && !identical(input$groupSelectionMode, "all")) {
+        try(updateRadioButtons(session, "groupSelectionMode", selected = "all"), silent = TRUE)
+      }
+      refresh_transformation_selector(selected_name = name)
+      mynotification(paste0("loaded transformation: ", name))
+    }, error = function(e) {
+      app_log(glue::glue("load_transformation: error name={name} msg={conditionMessage(e)}"))
+      mynotification(paste0("Unable to load transformation '", name, "': ", conditionMessage(e)), type = "error")
+      invisible(NULL)
+    })
   }
 
   observeEvent(input$activeTransformation, {
     if (is.null(input$activeTransformation) || !nzchar(input$activeTransformation)) return(NULL)
     if (identical(rvals$activeTransformation, input$activeTransformation)) return(NULL)
+    show_transformation_loading(
+      status = "Loading saved transformation...",
+      detail = "Restoring snapshot state, recomputing ordinations, and syncing UI controls."
+    )
+    on.exit(hide_transformation_loading(), add = TRUE)
     load_transformation(input$activeTransformation)
   })
 
@@ -1329,6 +1467,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     req(nrow(rvals$importedData) > 0)
     req(input$attr)
     req(input$chem)
+    set_transformation_loading_status(
+      status = "Validating transformation inputs...",
+      detail = "Checking group selections, element fields, and transformation naming."
+    )
 
     if (isTRUE(is.null(input$attrGroupsSub)) || length(input$attrGroupsSub) == 0) {
       mynotification("Cannot proceed without any groups selected", type = "error")
@@ -1375,6 +1517,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$impute.method = input$impute.method
 
     app_log("subsetting data")
+    set_transformation_loading_status(
+      status = "Building selected dataset...",
+      detail = "Subsetting attributes/elements and normalizing value types for analysis."
+    )
     rvals$selectedData =
       tryCatch(rvals$importedData %>%
                  dplyr::select(
@@ -1385,7 +1531,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
                  dplyr::mutate_at(dplyr::vars(rvals$attrGroups), factor) %>%
                  dplyr::mutate_at(dplyr::vars(tidyselect::any_of(rvals$chem)), quietly(as.numeric)),
                error = function(e) {
-                 mynotification(e, type = "error")
+                 mynotification(conditionMessage(e), type = "error")
                  tibble::tibble()
                })
 
@@ -1400,6 +1546,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
 
     quietly(label = 'impute',{
+      set_transformation_loading_status(
+        status = "Applying imputation and ratio rules...",
+        detail = "Imputing missing values (if configured) and computing ratio variables."
+      )
       if (rvals$impute.method  != "none" & !is.null(rvals$impute.method) & nrow(rvals$selectedData) > 0 & length(rvals$chem) > 0) {
         if (!app_require_packages("mice", feature = "Imputation")) {
           return(NULL)
@@ -1416,7 +1566,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         }
         transformed = tryCatch(mice::complete(mice::mice(transformed, method = rvals$impute.method)),
                                error = function(e){
-                                 mynotification(e)
+                                 mynotification(conditionMessage(e), type = "warning")
                                  return(rvals$selectedData[,rvals$chem])
                                })
         if(is.data.frame(transformed)){
@@ -1445,6 +1595,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$chem = rvals$chem[which(rvals$chem %in% colnames(rvals$selectedData))]
 
     quietly(label = "transform",{
+      set_transformation_loading_status(
+        status = "Applying transformations...",
+        detail = "Running value transforms and enforcing finite output values."
+      )
       if(rvals$transform.method != "none"){
         suppressWarnings({
           transformed = rvals$selectedData[, rvals$chem ]  %>%
@@ -1475,6 +1629,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       dplyr::mutate_at(dplyr::vars(input$attrGroups), as.character) %>%
       dplyr::mutate_at(dplyr::vars(input$attrGroups),factor))
 
+    set_transformation_loading_status(
+      status = "Computing ordinations...",
+      detail = "Running PCA/UMAP/LDA on the active selected dataset."
+    )
     compute_ordinations(
       run_pca = isTRUE(input$runPCA),
       run_umap = isTRUE(input$runUMAP),
@@ -1484,6 +1642,10 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     rvals$runLDAx = FALSE
     rvals$runUMAPx = FALSE
 
+    set_transformation_loading_status(
+      status = "Saving transformation snapshot...",
+      detail = "Persisting transformed workspace state and refreshing transformation selector."
+    )
     updateCurrent(rvals,
                   con,
                   credentials,
@@ -1534,9 +1696,18 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   observeEvent(input$confirmTransformationAction, {
     transformation_name <- tryCatch(input$transformationName, error = function(e) "")
     removeModal()
-    show_transformation_loading()
+    show_transformation_loading(
+      status = "Applying transformation...",
+      detail = "Building selected dataset, computing analyses, and saving snapshot."
+    )
     on.exit(hide_transformation_loading(), add = TRUE)
-    run_confirmed_transformation(transformation_name = transformation_name)
+    tryCatch(
+      run_confirmed_transformation(transformation_name = transformation_name),
+      error = function(e) {
+        app_log(glue::glue("confirmTransformationAction: error msg={conditionMessage(e)}"))
+        mynotification(paste0("Unable to apply transformation: ", conditionMessage(e)), type = "error")
+      }
+    )
   })
 
   observeEvent(rvals$selectedData,{
