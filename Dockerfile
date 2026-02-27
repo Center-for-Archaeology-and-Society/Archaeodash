@@ -22,11 +22,13 @@ RUN install2.r --error --skipinstalled \
     dendextend \
     dplyr \
     DT \
+    future \
     factoextra \
     ggplot2 \
     magrittr \
     mice \
     plotly \
+    promises \
     randomForest \
     ranger \
     rio \
