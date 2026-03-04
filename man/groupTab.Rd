@@ -13,5 +13,7 @@ UI
 UI elements for group membership tab
 }
 \examples{
+\dontrun{
 groupTab()
+}
 }

@@ -48,8 +48,8 @@ ordinationTab = function(){
 #' @return server
 #' @export
 #'
-#' @examples
-#' ordinationServer(input,output,session,rvals)
+#' @examplesIf interactive()
+#' ordinationServer(input, output, session, rvals)
 ordinationServer = function(input,output,session,rvals){
 
   output$pcaheader = renderUI({

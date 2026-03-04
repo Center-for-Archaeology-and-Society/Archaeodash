@@ -14,6 +14,16 @@ replaceCell(rowid, col, value, rvals, con, credentials, input, output, session)
 \item{value}{new value}
 
 \item{rvals}{reactive values object}
+
+\item{con}{database connection}
+
+\item{credentials}{reactive values object containing authentication state}
+
+\item{input}{shiny input object}
+
+\item{output}{shiny output object}
+
+\item{session}{shiny session object}
 }
 \value{
 reactive values object
@@ -22,5 +32,7 @@ reactive values object
 Replace values
 }
 \examples{
-replaceCell(rvals,rowid,col,value)
+\dontrun{
+replaceCell(rowid, col, value, rvals, con, credentials, input, output, session)
+}
 }

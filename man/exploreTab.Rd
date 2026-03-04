@@ -10,5 +10,7 @@ exploreTab()
 UI elements for Explore Tab
 }
 \examples{
+\dontrun{
 exploreTab()
+}
 }

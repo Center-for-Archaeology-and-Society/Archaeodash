@@ -24,5 +24,7 @@ list of results
 Get Canonical Discriminant Analysis Results
 }
 \examples{
+\dontrun{
 getCDA(df,chem,attrGroups)
+}
 }

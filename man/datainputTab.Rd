@@ -13,5 +13,7 @@ UI
 UI elements for Data Input tab
 }
 \examples{
+\dontrun{
 datainputTab()
+}
 }

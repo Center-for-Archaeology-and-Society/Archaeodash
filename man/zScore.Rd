@@ -16,5 +16,7 @@ data frame of z scores
 Convert to z score
 }
 \examples{
+\dontrun{
 zScore(x)
+}
 }

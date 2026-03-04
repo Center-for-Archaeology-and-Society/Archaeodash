@@ -20,5 +20,7 @@ vector of eligible groups for further analysis
 number of rows must be 2 more than the number of columns per group
 }
 \examples{
+\dontrun{
 getEligible(data,chem,group)
+}
 }

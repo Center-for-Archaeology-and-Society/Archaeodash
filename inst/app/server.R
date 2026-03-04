@@ -103,6 +103,7 @@ shinyServer(function(input, output, session) {
       })
       shinyjs::hide(id = "loginUI")
       shinyjs::show(id = "logoutUI")
+      shinyjs::show(id = "resetSessionUI")
       saved_theme <- get_saved_theme(safe_username())
       if (nzchar(saved_theme)) {
         session$sendCustomMessage("theme_preference", list(theme = saved_theme))
@@ -113,13 +114,44 @@ shinyServer(function(input, output, session) {
       })
       shinyjs::show(id = "loginUI")
       shinyjs::hide(id = "logoutUI")
+      shinyjs::hide(id = "resetSessionUI")
     }
   })
 
-  observeEvent(input$logoutUI,{
+  perform_logout <- function(trigger = "unknown") {
+    logout_started <- Sys.time()
+    username <- safe_username()
+    ArchaeoDash:::app_timing_log(
+      "perform_logout:start",
+      list(
+        trigger = trigger,
+        user = if (nzchar(username)) username else "anonymous"
+      )
+    )
     credentials$res = tibble::tibble(username = NA)
     credentials$status = FALSE
     session$sendCustomMessage("auth_cookie", list(action = "clear"))
+    ArchaeoDash:::app_timing_log(
+      "perform_logout:end",
+      list(
+        trigger = trigger,
+        user = if (nzchar(username)) username else "anonymous",
+        elapsed_ms = ArchaeoDash:::timing_elapsed_ms(logout_started)
+      )
+    )
+  }
+
+  observeEvent(input$logoutUI,{
+    perform_logout("logoutUI")
+  })
+
+  observeEvent(input$logout_click_js, {
+    perform_logout("logout_click_js")
+  })
+
+  observeEvent(input$resetSessionUI, {
+    perform_logout("resetSessionUI")
+    session$sendCustomMessage("session_reset", list(reload = TRUE, clear_auth = TRUE))
   })
 
   observeEvent(input$open_privacy_policy, {

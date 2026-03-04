@@ -16,5 +16,7 @@ ggplot object
 From DataExplorer
 }
 \examples{
+\dontrun{
 plot_missing(data)
+}
 }

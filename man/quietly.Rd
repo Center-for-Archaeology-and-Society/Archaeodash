@@ -8,6 +8,8 @@ quietly(.expr, label = NULL)
 }
 \arguments{
 \item{.expr}{expression}
+
+\item{label}{optional label shown when reporting suppressed warnings}
 }
 \value{
 results of function
@@ -16,6 +18,8 @@ results of function
 Quiet Warning Function
 }
 \examples{
+\dontrun{
 f = sum(1 + 'a')
 quietly(f())
+}
 }

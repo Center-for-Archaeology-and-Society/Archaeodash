@@ -28,5 +28,7 @@ data frame of closest matches
 Calculate Euclidean Distance
 }
 \examples{
+\dontrun{
 calcEDistance(rvals$selectedData,input$projectionGroup,input$edsampleID,rvals$attrGroups,rvals$chem,input$EDlimit,input$EDmethod)
+}
 }

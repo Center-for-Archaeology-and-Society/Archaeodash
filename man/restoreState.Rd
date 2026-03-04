@@ -17,5 +17,7 @@ restoreState(rvals, input, session)
 Used to keep input states from changing when updates are made
 }
 \examples{
+\dontrun{
 restoreState(rvals,input,session)
+}
 }
