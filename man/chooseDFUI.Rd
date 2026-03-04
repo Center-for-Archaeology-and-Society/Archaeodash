@@ -18,5 +18,7 @@ module
 Choose dataset UI
 }
 \examples{
+\dontrun{
 chooseDFUI("chooseDF")
+}
 }

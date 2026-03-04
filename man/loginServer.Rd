@@ -30,5 +30,7 @@ credentials object
 loginServer
 }
 \examples{
+\dontrun{
 loginServer(con,input,output,session,credentials)
+}
 }

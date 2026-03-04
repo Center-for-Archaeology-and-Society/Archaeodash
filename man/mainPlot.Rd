@@ -4,7 +4,19 @@
 \alias{mainPlot}
 \title{Main plotting function}
 \usage{
-mainPlot(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis")
+mainPlot(
+  plotdf,
+  xvar,
+  yvar,
+  attrGroups,
+  Conf,
+  int.set,
+  theme = "viridis",
+  use_symbols = TRUE,
+  symbol_col = NULL,
+  show_point_labels = FALSE,
+  label_col = NULL
+)
 }
 \arguments{
 \item{plotdf}{data frame for plotting}
@@ -20,6 +32,14 @@ mainPlot(plotdf, xvar, yvar, attrGroups, Conf, int.set, theme = "viridis")
 \item{int.set}{confidence level}
 
 \item{theme}{color theme}
+
+\item{use_symbols}{whether to draw group symbols}
+
+\item{symbol_col}{column used to map marker symbols (defaults to attrGroups)}
+
+\item{show_point_labels}{whether to show point labels}
+
+\item{label_col}{column used for point labels}
 }
 \value{
 plotly object
@@ -28,5 +48,7 @@ plotly object
 Main plotting function
 }
 \examples{
+\dontrun{
 mainPlot(plotdf = rvals$plotdf,xvar = input$xvar,yvar = input$yvar,attrGroups = rvals$attrGroups,Conf = input$Conf, int.set = input$int.set)
+}
 }

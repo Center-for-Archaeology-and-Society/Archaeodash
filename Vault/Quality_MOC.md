@@ -35,6 +35,11 @@ Quality guardrails, tests, and known risks.
 - [[Multiplot_Loading_Modal_Removal_Message_Only_2026-02-21]]
 - [[Dataset_Selector_Hard_Refresh_Initialization_and_Preference_Upsert_Fix_2026-02-21]]
 - [[Dataset_Confirm_Permanent_Hardening_DB_Lock_Lazy_Transform_2026-02-21]]
+- [[Logout_Button_Reliability_and_Remember_Token_Revocation_2026-03-04]]
+- [[Dataset_Discovery_Username_Sanitization_and_Truncation_Fix_2026-03-04]]
+- [[Beta_Runtime_Stability_Prevention_Implementation_2026-03-04]]
+- [[R_Shiny_Best_Practice_Evaluation_2026-03-04]]
+- [[R_Shiny_Best_Practice_Remediation_Implementation_2026-03-04]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

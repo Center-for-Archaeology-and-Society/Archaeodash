@@ -10,6 +10,8 @@ getBestGroup(probsAll, eligible, method)
 \item{probsAll}{result from group probability}
 
 \item{eligible}{groups}
+
+\item{method}{selection strategy used to choose the best group}
 }
 \value{
 vector of group names
@@ -18,5 +20,7 @@ vector of group names
 Find best group based on largest values
 }
 \examples{
-getBestGroup(probsAll,eligible)
+\dontrun{
+getBestGroup(probsAll, eligible, method = "max")
+}
 }

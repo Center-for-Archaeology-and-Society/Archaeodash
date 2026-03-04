@@ -22,5 +22,7 @@ server
 Ordination Server
 }
 \examples{
+\dontrun{
 ordinationServer(input,output,session,rvals)
+}
 }

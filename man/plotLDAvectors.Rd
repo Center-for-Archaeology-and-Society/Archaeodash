@@ -16,5 +16,7 @@ plot
 plot LDA vectors
 }
 \examples{
+\dontrun{
 plotLDAvectors(lda_model)
+}
 }

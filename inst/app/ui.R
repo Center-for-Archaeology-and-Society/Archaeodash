@@ -44,7 +44,14 @@ shinyUI(
                    selectize = FALSE
                  )
                ),
-               shinyjs::hidden(actionButton('logoutUI','logout')),
+               shinyjs::hidden(
+                 actionButton(
+                   'logoutUI',
+                   'logout',
+                   onclick = "if(window.Shiny && typeof window.Shiny.setInputValue === 'function'){window.Shiny.setInputValue('logout_click_js', Date.now(), {priority: 'event'});}"
+                 )
+               ),
+               shinyjs::hidden(actionButton('resetSessionUI', 'reset session')),
                uiOutput("userMessage"),
                br(),
                hr(),

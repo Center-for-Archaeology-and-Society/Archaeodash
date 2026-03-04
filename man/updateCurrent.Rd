@@ -23,5 +23,7 @@ updateCurrent(rvals, con, credentials, input, output, session)
 Save current table to database
 }
 \examples{
+\dontrun{
 updateCurrent(rvals,con,credentials,input,output,session)
+}
 }

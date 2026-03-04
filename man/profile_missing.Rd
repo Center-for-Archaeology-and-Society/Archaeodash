@@ -16,5 +16,7 @@ data frame
 From DataExplorer
 }
 \examples{
+\dontrun{
 profile_missing(data)
+}
 }

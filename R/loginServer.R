@@ -140,6 +140,16 @@ loginServer = function(con, input = input, output = output, session = session, c
     }, error = function(e) FALSE)
   }
 
+  revoke_known_remember_tokens <- function(...) {
+    raw_tokens <- unlist(list(...), use.names = FALSE)
+    if (length(raw_tokens) == 0) return(invisible(FALSE))
+    tokens <- as.character(raw_tokens)
+    tokens <- unique(tokens[!is.na(tokens) & nzchar(tokens)])
+    if (length(tokens) == 0) return(invisible(FALSE))
+    results <- vapply(tokens, function(tok) isTRUE(try(revoke_remember_token(tok), silent = TRUE)), logical(1))
+    invisible(any(results))
+  }
+
   issue_remember_token <- function(username, days_valid = 30L) {
     username <- tolower(trimws(as.character(username)))
     if (!nzchar(username) || is.null(con)) return("")
@@ -401,13 +411,70 @@ loginServer = function(con, input = input, output = output, session = session, c
       send_remember_token_to_client(as.character(credentials$res$username[[1]]))
     }
     if (isTRUE(input$cookie_consent == "declined")) {
-      try(revoke_remember_token(input$remembered_token_revoke), silent = TRUE)
+      revoke_started <- Sys.time()
+      revoked <- isTRUE(revoke_known_remember_tokens(input$remembered_token_revoke, input$remembered_token))
+      app_timing_log(
+        "remember_token_revoke",
+        list(
+          trigger = "cookie_consent_declined",
+          revoked = revoked,
+          elapsed_ms = timing_elapsed_ms(revoke_started)
+        )
+      )
       session$sendCustomMessage("auth_cookie", list(action = "clear"))
     }
   }, ignoreInit = TRUE)
 
+  observeEvent(input$remembered_token_revoke, {
+    revoke_started <- Sys.time()
+    revoked <- isTRUE(revoke_known_remember_tokens(input$remembered_token_revoke))
+    app_timing_log(
+      "remember_token_revoke",
+      list(
+        trigger = "remembered_token_revoke",
+        revoked = revoked,
+        elapsed_ms = timing_elapsed_ms(revoke_started)
+      )
+    )
+  }, ignoreInit = TRUE)
+
   observeEvent(input$logoutUI, {
-    try(revoke_remember_token(input$remembered_token_revoke), silent = TRUE)
+    revoke_started <- Sys.time()
+    revoked <- isTRUE(revoke_known_remember_tokens(input$remembered_token_revoke, input$remembered_token))
+    app_timing_log(
+      "remember_token_revoke",
+      list(
+        trigger = "logoutUI",
+        revoked = revoked,
+        elapsed_ms = timing_elapsed_ms(revoke_started)
+      )
+    )
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$logout_click_js, {
+    revoke_started <- Sys.time()
+    revoked <- isTRUE(revoke_known_remember_tokens(input$remembered_token_revoke, input$remembered_token))
+    app_timing_log(
+      "remember_token_revoke",
+      list(
+        trigger = "logout_click_js",
+        revoked = revoked,
+        elapsed_ms = timing_elapsed_ms(revoke_started)
+      )
+    )
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$resetSessionUI, {
+    revoke_started <- Sys.time()
+    revoked <- isTRUE(revoke_known_remember_tokens(input$remembered_token_revoke, input$remembered_token))
+    app_timing_log(
+      "remember_token_revoke",
+      list(
+        trigger = "resetSessionUI",
+        revoked = revoked,
+        elapsed_ms = timing_elapsed_ms(revoke_started)
+      )
+    )
   }, ignoreInit = TRUE)
 
   return(credentials)

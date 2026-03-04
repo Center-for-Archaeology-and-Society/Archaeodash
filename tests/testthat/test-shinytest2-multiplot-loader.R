@@ -8,8 +8,8 @@ test_that("multiplot no-X warning clears loading state", {
     testthat::skip("Chrome/Chromium not available for shinytest2 run.")
   }
 
-  app_dir <- normalizePath(testthat::test_path("..", "..", "inst", "app"), mustWork = TRUE)
-  csv_path <- normalizePath(testthat::test_path("..", "..", "inst", "app", "INAA_test.csv"), mustWork = TRUE)
+  app_dir <- archaeo_test_app_dir()
+  csv_path <- archaeo_test_app_file("INAA_test.csv")
 
   app <- shinytest2::AppDriver$new(
     app_dir = app_dir,

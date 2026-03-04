@@ -7,8 +7,8 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
     testthat::skip("Chrome/Chromium not available for shinytest2 run.")
   }
 
-  app_dir <- normalizePath(testthat::test_path("..", "..", "inst", "app"), mustWork = TRUE)
-  csv_path <- normalizePath(testthat::test_path("..", "..", "inst", "app", "INAA_test.csv"), mustWork = TRUE)
+  app_dir <- archaeo_test_app_dir()
+  csv_path <- archaeo_test_app_file("INAA_test.csv")
 
   extract_dt_data <- function(widget_value) {
     if (inherits(widget_value, "json") || is.character(widget_value)) {

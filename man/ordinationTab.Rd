@@ -13,5 +13,7 @@ UI
 UI elements for ordination
 }
 \examples{
+\dontrun{
 ordinationTab()
+}
 }
