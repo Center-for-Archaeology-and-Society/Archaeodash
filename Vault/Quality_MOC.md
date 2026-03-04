@@ -40,6 +40,7 @@ Quality guardrails, tests, and known risks.
 - [[Beta_Runtime_Stability_Prevention_Implementation_2026-03-04]]
 - [[R_Shiny_Best_Practice_Evaluation_2026-03-04]]
 - [[R_Shiny_Best_Practice_Remediation_Implementation_2026-03-04]]
+- [[Dataset_Steady_State_Poll_Self_Invalidation_Fix_2026-03-04]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

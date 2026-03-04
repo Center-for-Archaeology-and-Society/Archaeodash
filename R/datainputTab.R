@@ -63,6 +63,22 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   dataset_steady_poll_min_ms <- 60000L
   dataset_steady_poll_max_ms <- 300000L
   dataset_steady_poll_ms <- shiny::reactiveVal(dataset_steady_poll_min_ms)
+  get_dataset_steady_poll_ms <- function() {
+    current_ms <- suppressWarnings(as.integer(dataset_steady_poll_ms()))
+    if (is.na(current_ms) || current_ms < dataset_steady_poll_min_ms) return(dataset_steady_poll_min_ms)
+    if (current_ms > dataset_steady_poll_max_ms) return(dataset_steady_poll_max_ms)
+    current_ms
+  }
+  set_dataset_steady_poll_ms <- function(next_ms) {
+    next_ms <- suppressWarnings(as.integer(next_ms[[1]]))
+    if (is.na(next_ms) || next_ms < dataset_steady_poll_min_ms) next_ms <- dataset_steady_poll_min_ms
+    if (next_ms > dataset_steady_poll_max_ms) next_ms <- dataset_steady_poll_max_ms
+    current_ms <- suppressWarnings(as.integer(dataset_steady_poll_ms()))
+    if (is.na(current_ms) || !identical(current_ms, next_ms)) {
+      dataset_steady_poll_ms(next_ms)
+    }
+    invisible(next_ms)
+  }
   transformation_loading_status <- shiny::reactiveVal("Updating transformation...")
   transformation_loading_detail <- shiny::reactiveVal("Validating selections and preparing derived analysis objects.")
   dataset_loading_status <- shiny::reactiveVal("Loading selected dataset(s)...")
@@ -229,7 +245,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         )
       }
       dataset_table_ready(length(rvals$tbls) > 0)
-      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+      set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
       app_timing_log(
         "dataset_refresh:end",
         list(
@@ -238,7 +254,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           status = "error",
           elapsed_ms = timing_elapsed_ms(refresh_started),
           detail = conditionMessage(tbls),
-          next_ms = dataset_steady_poll_ms()
+          next_ms = get_dataset_steady_poll_ms()
         )
       )
       return(invisible(FALSE))
@@ -246,9 +262,9 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     tbls_chr <- sort(unique(as.character(tbls)))
     changed <- !identical(previous_tbls, tbls_chr)
     if (isTRUE(changed) || !identical(reason, "steady-state-sync")) {
-      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+      set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
     } else {
-      dataset_steady_poll_ms(min(dataset_steady_poll_max_ms, as.integer(dataset_steady_poll_ms() * 2L)))
+      set_dataset_steady_poll_ms(min(dataset_steady_poll_max_ms, as.integer(get_dataset_steady_poll_ms() * 2L)))
     }
     rvals$tbls <- tbls_chr
     dataset_table_ready(TRUE)
@@ -261,7 +277,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         changed = isTRUE(changed),
         count = length(tbls_chr),
         elapsed_ms = timing_elapsed_ms(refresh_started),
-        next_ms = dataset_steady_poll_ms()
+        next_ms = get_dataset_steady_poll_ms()
       )
     )
     invisible(TRUE)
@@ -532,7 +548,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
         dataset_table_ready(FALSE)
         return(invisible(NULL))
       }
-      dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+      set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
       dataset_table_ready(FALSE)
       refresh_dataset_tables(reason = "auth-state", notify_on_error = TRUE)
     },
@@ -551,12 +567,12 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (isTRUE(disable_refresh_timers)) return(invisible(NULL))
     if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
     if (!isTRUE(dataset_table_ready())) return(invisible(NULL))
-    shiny::invalidateLater(max(dataset_steady_poll_min_ms, as.integer(dataset_steady_poll_ms())), session)
+    shiny::invalidateLater(get_dataset_steady_poll_ms(), session)
     refresh_dataset_tables(reason = "steady-state-sync", notify_on_error = FALSE)
   })
 
   observeEvent(rvals$currentDatasetName, {
-    dataset_steady_poll_ms(dataset_steady_poll_min_ms)
+    set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
     refresh_dataset_tables(reason = "dataset-name-change", notify_on_error = FALSE)
   }, ignoreInit = TRUE)
 
