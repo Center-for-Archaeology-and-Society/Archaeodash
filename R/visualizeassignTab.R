@@ -165,7 +165,8 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   }
 
   async_multiplot_enabled <- requireNamespace("promises", quietly = TRUE) &&
-    requireNamespace("future", quietly = TRUE)
+    requireNamespace("future", quietly = TRUE) &&
+    !isTRUE(getOption("archaeodash.multiplot.force_sync", FALSE))
   if (isTRUE(async_multiplot_enabled) && !isTRUE(getOption("archaeodash.multiplot.future_plan_initialized"))) {
     future::plan(future::multisession, workers = 1)
     options(archaeodash.multiplot.future_plan_initialized = TRUE)
@@ -875,38 +876,55 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       return(invisible(NULL))
     }
 
-    promise <- promises::future_promise({
-      multiplot(
-        selectedData = selected_data,
-        attrGroups = attr_group,
-        xvar = axis_check$x,
-        yvar = axis_check$y,
-        ptsize = point_size,
-        interactive = use_interactive,
-        theme = use_theme
+    promise <- tryCatch({
+      p <- promises::future_promise({
+        multiplot(
+          selectedData = selected_data,
+          attrGroups = attr_group,
+          xvar = axis_check$x,
+          yvar = axis_check$y,
+          ptsize = point_size,
+          interactive = use_interactive,
+          theme = use_theme
+        )
+      })
+      promises::then(
+        p,
+        onFulfilled = function(multiplot_obj) {
+          tryCatch({
+            is_cancelled <- identical(multiplot_cancelled_request_id(), request_id)
+            is_active <- identical(multiplot_active_request_id(), request_id)
+            if (!is_cancelled && is_active) {
+              rvals$multiplot <- multiplot_obj
+              multiplot_mode(use_interactive)
+              multiplot_height(use_height)
+            }
+          }, error = function(e) {
+            mynotification(paste0("Unable to display multiplot: ", conditionMessage(e)), type = "error")
+            rvals$multiplot <- NULL
+          })
+          clear_loader_if_active()
+          invisible(NULL)
+        },
+        onRejected = function(e) {
+          tryCatch({
+            if (identical(multiplot_active_request_id(), request_id)) {
+              mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+              rvals$multiplot <- NULL
+            }
+          }, error = function(e2) invisible(NULL))
+          clear_loader_if_active()
+          invisible(NULL)
+        }
       )
+    }, error = function(e) {
+      mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+      rvals$multiplot <- NULL
+      clear_loader_if_active()
+      NULL
     })
-    promise <- promises::then(
-      promise,
-      onFulfilled = function(multiplot_obj) {
-        is_cancelled <- identical(multiplot_cancelled_request_id(), request_id)
-        is_active <- identical(multiplot_active_request_id(), request_id)
-        if (is_cancelled || !is_active) return(invisible(NULL))
-        rvals$multiplot <- multiplot_obj
-        multiplot_mode(use_interactive)
-        multiplot_height(use_height)
-        clear_loader_if_active()
-        invisible(NULL)
-      },
-      onRejected = function(e) {
-        if (!identical(multiplot_active_request_id(), request_id)) return(invisible(NULL))
-        mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
-        rvals$multiplot <- NULL
-        clear_loader_if_active()
-        invisible(NULL)
-      }
-    )
     multiplot_build_promise(promise)
+    promise
   })
 
   observeEvent(input$savePlot, {
