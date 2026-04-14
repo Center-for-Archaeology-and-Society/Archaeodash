@@ -1,6 +1,3 @@
-
-
-
 #' UI elements for visualization and group reassignment
 #'
 #' @return UI
@@ -8,7 +5,7 @@
 #'
 #' @examples
 #' visualizeassignTab()
-visualizeassignTab = function() {
+visualizeassignTab <- function() {
   tabPanel(
     title = "Visualize & Assign",
     value = "visualizetab",
@@ -20,26 +17,31 @@ visualizeassignTab = function() {
       tabPanel(
         title = "visualize and select",
         uiOutput("visualizeSelectLayout"),
-        uiOutput('brush')
+        uiOutput("brush")
       ),
       tabPanel(
         title = "multiplots",
         fluidRow(
-          column(3, uiOutput('xvar2UI')),
-          column(3,offset = 1,
-                 uiOutput('yvar2UI')),
+          column(3, uiOutput("xvar2UI")),
+          column(3,
+            offset = 1,
+            uiOutput("yvar2UI")
+          ),
         ),
         fluidRow(
-          column(2,
-                 radioButtons(
-                   inputId = "interactive",
-                   label = "make plots interactive?",
-                   choices = c(TRUE,FALSE),
-                   selected = FALSE),
-                 actionButton("updateMultiplot", "update")
+          column(
+            2,
+            radioButtons(
+              inputId = "interactive",
+              label = "make plots interactive?",
+              choices = c(TRUE, FALSE),
+              selected = FALSE
+            ),
+            actionButton("updateMultiplot", "update")
           ),
           column(
-            2,offset = 1,
+            2,
+            offset = 1,
             numericInput(
               "plotHeight",
               label = "plot height in pixels",
@@ -49,10 +51,10 @@ visualizeassignTab = function() {
               step = 50
             )
           ),
-          column(3,offset = 1,sliderInput("ptsize", "plot point size",min = .1, max = 10, value = 2, step = .1,)),
-          column(2, offset = 1,actionButton('savePlot', "Save Plot"))
+          column(3, offset = 1, sliderInput("ptsize", "plot point size", min = .1, max = 10, value = 2, step = .1, )),
+          column(2, offset = 1, actionButton("savePlot", "Save Plot"))
         ),
-        fluidRow(uiOutput('multiplotUI'))
+        fluidRow(uiOutput("multiplotUI"))
       )
     )
   )
@@ -69,8 +71,7 @@ visualizeassignTab = function() {
 #' @export
 #'
 #' @examples
-#' visualizeAssignServer(input,output,session,rvals)
-
+#' visualizeAssignServer(input, output, session, rvals)
 validate_multiplot_axes <- function(x_vars, y_vars) {
   x_vars <- as.character(x_vars)
   y_vars <- as.character(y_vars)
@@ -116,7 +117,7 @@ resolve_filters_below_plot_default <- function(plot_width, threshold = 768) {
   width[[1]] <= threshold
 }
 
-visualizeAssignServer = function(input, output, session, rvals, credentials, con) {
+visualizeAssignServer <- function(input, output, session, rvals, credentials, con) {
   selected_plot_keys <- shiny::reactiveVal(character())
   multiplot_build_request <- shiny::reactiveVal(NULL)
   multiplot_mode <- shiny::reactiveVal(FALSE)
@@ -124,9 +125,13 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   auto_filters_layout_set <- shiny::reactiveVal(FALSE)
 
   pick_selected_value <- function(candidate, choices, fallback = "") {
-    if (is.null(candidate) || length(candidate) == 0) return(fallback)
+    if (is.null(candidate) || length(candidate) == 0) {
+      return(fallback)
+    }
     value <- as.character(candidate[[1]])
-    if (is.na(value) || !nzchar(value)) return(fallback)
+    if (is.na(value) || !nzchar(value)) {
+      return(fallback)
+    }
     if (value %in% choices) value else fallback
   }
 
@@ -179,21 +184,21 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           value = isTRUE(input$filters_below_plot)
         ),
         selectInput(
-          'data.src',
-          'Choose data type',
-          choices = c('elements', 'principal components','UMAP','linear discriminants'),
-          selected = 'elements'
+          "data.src",
+          "Choose data type",
+          choices = c("elements", "principal components", "UMAP", "linear discriminants"),
+          selected = "elements"
         ),
-        uiOutput('xvarUI'),
-        uiOutput('yvarUI'),
-        selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis'),
+        uiOutput("xvarUI"),
+        uiOutput("yvarUI"),
+        selectInput("plot_theme", "Choose plot theme", choices = c("viridis", "default"), selected = "viridis"),
         hr(),
         h5("Visualization filter"),
         uiOutput("vizMetaFilterFieldUI"),
         uiOutput("vizMetaFilterValuesUI"),
         actionButton("clearVizFilter", "Clear visualization filter"),
         hr(),
-        checkboxInput('Conf', 'Data Ellipse', value = TRUE),
+        checkboxInput("Conf", "Data Ellipse", value = TRUE),
         checkboxInput(
           "use_symbols",
           label = bslib::popover(
@@ -221,10 +226,10 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
         ),
         uiOutput("pointLabelColumnUI"),
         sliderInput(
-          'int.set',
+          "int.set",
           label = bslib::popover(
             tagList("Choose ellipse level",
-                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
             ),
             title = "Choose ellipse level",
             "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
@@ -235,7 +240,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
           value = 0.90
         ),
         br(),
-        actionButton('Change', 'Change Group Assignment'),
+        actionButton("Change", "Change Group Assignment"),
         uiOutput("groupAssignChoiceUI")
       ))
     }
@@ -244,13 +249,13 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       style = controls_style,
       fluidRow(
         column(3, checkboxInput("filters_below_plot", "Place filters below plot", value = isTRUE(input$filters_below_plot))),
-        column(3, selectInput('data.src', 'Choose data type', choices = c('elements', 'principal components','UMAP','linear discriminants'), selected = 'elements')),
-        column(3, uiOutput('xvarUI')),
-        column(3, uiOutput('yvarUI'))
+        column(3, selectInput("data.src", "Choose data type", choices = c("elements", "principal components", "UMAP", "linear discriminants"), selected = "elements")),
+        column(3, uiOutput("xvarUI")),
+        column(3, uiOutput("yvarUI"))
       ),
       fluidRow(
-        column(3, selectInput('plot_theme', 'Choose plot theme', choices = c('viridis', 'default'), selected = 'viridis')),
-        column(3, checkboxInput('Conf', 'Data Ellipse', value = TRUE)),
+        column(3, selectInput("plot_theme", "Choose plot theme", choices = c("viridis", "default"), selected = "viridis")),
+        column(3, checkboxInput("Conf", "Data Ellipse", value = TRUE)),
         column(3, checkboxInput(
           "use_symbols",
           label = bslib::popover(
@@ -280,10 +285,10 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
         )),
         column(3, uiOutput("pointLabelColumnUI")),
         column(6, sliderInput(
-          'int.set',
+          "int.set",
           label = bslib::popover(
             tagList("Choose ellipse level",
-                    trigger = bsicons::bs_icon("info-circle", title = "Help")
+              trigger = bsicons::bs_icon("info-circle", title = "Help")
             ),
             title = "Choose ellipse level",
             "Choose the value for the ellipse level. Note that these are data ellipses and not confidence ellipses. For example, if you set level = 0.95, the ellipse will be drawn to represent the region containing approximately 95% of the data points."
@@ -303,7 +308,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       ),
       hr(),
       fluidRow(
-        column(3, actionButton('Change', 'Change Group Assignment')),
+        column(3, actionButton("Change", "Change Group Assignment")),
         column(9, uiOutput("groupAssignChoiceUI"))
       )
     )
@@ -313,7 +318,7 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     if (isTRUE(input$filters_below_plot)) {
       tagList(
         fluidRow(
-          column(12, plotly::plotlyOutput('plot', width = '100%', height = '600px'))
+          column(12, plotly::plotlyOutput("plot", width = "100%", height = "600px"))
         ),
         fluidRow(
           column(12, build_visualize_controls(scroll_controls = FALSE))
@@ -321,16 +326,20 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       )
     } else {
       fluidRow(
-        column(9, plotly::plotlyOutput('plot', width = '100%', height = '600px')),
+        column(9, plotly::plotlyOutput("plot", width = "100%", height = "600px")),
         column(3, build_visualize_controls(scroll_controls = TRUE))
       )
     }
   })
 
   observe({
-    if (isTRUE(auto_filters_layout_set())) return(invisible(NULL))
+    if (isTRUE(auto_filters_layout_set())) {
+      return(invisible(NULL))
+    }
     default_layout <- resolve_filters_below_plot_default(session$clientData$output_plot_width, threshold = 768)
-    if (is.null(default_layout)) return(invisible(NULL))
+    if (is.null(default_layout)) {
+      return(invisible(NULL))
+    }
     shiny::updateCheckboxInput(session, "filters_below_plot", value = isTRUE(default_layout))
     auto_filters_layout_set(TRUE)
     invisible(NULL)
@@ -344,7 +353,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   }
 
   metadata_filter_fields <- shiny::reactive({
-    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) return(character())
+    if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
+      return(character())
+    }
     chem_cols <- if (is.null(rvals$chem)) character() else intersect(rvals$chem, names(rvals$selectedData))
     fields <- setdiff(names(rvals$selectedData), c("rowid", chem_cols))
     fields[!is.na(fields) & nzchar(fields)]
@@ -353,14 +364,22 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   plot_df_for_display <- shiny::reactive({
     req(inherits(rvals$plotdf, "data.frame"))
     plot_df <- rvals$plotdf
-    if (!("rowid" %in% names(plot_df)) || nrow(plot_df) == 0) return(plot_df)
+    if (!("rowid" %in% names(plot_df)) || nrow(plot_df) == 0) {
+      return(plot_df)
+    }
     field <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
     selected_vals <- tryCatch(as.character(input$vizMetaFilterValues), error = function(e) character())
     selected_vals <- selected_vals[!is.na(selected_vals) & nzchar(selected_vals)]
 
-    if (!nzchar(field) || length(selected_vals) == 0) return(plot_df)
-    if (!inherits(rvals$selectedData, "data.frame")) return(plot_df)
-    if (!(field %in% names(rvals$selectedData)) || !("rowid" %in% names(rvals$selectedData))) return(plot_df)
+    if (!nzchar(field) || length(selected_vals) == 0) {
+      return(plot_df)
+    }
+    if (!inherits(rvals$selectedData, "data.frame")) {
+      return(plot_df)
+    }
+    if (!(field %in% names(rvals$selectedData)) || !("rowid" %in% names(rvals$selectedData))) {
+      return(plot_df)
+    }
 
     matched_rowids <- rvals$selectedData %>%
       dplyr::mutate(
@@ -378,7 +397,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
 
   output$vizMetaFilterFieldUI <- renderUI({
     fields <- metadata_filter_fields()
-    if (length(fields) == 0) return(NULL)
+    if (length(fields) == 0) {
+      return(NULL)
+    }
     current <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
     if (length(current) == 0 || is.na(current[[1]]) || !nzchar(current[[1]])) {
       current <- ""
@@ -397,7 +418,9 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
   output$vizMetaFilterValuesUI <- renderUI({
     req(inherits(rvals$selectedData, "data.frame"))
     field <- tryCatch(as.character(input$vizMetaFilterField[[1]]), error = function(e) "")
-    if (length(field) == 0 || is.na(field[[1]]) || !nzchar(field[[1]])) return(NULL)
+    if (length(field) == 0 || is.na(field[[1]]) || !nzchar(field[[1]])) {
+      return(NULL)
+    }
     field <- field[[1]]
     req(field %in% names(rvals$selectedData))
     choices <- rvals$selectedData %>%
@@ -420,11 +443,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
-  observeEvent(input$clearVizFilter, {
-    if (!is.null(input$vizMetaFilterValues)) {
-      shiny::updateSelectizeInput(session, "vizMetaFilterValues", selected = character())
-    }
-  }, ignoreInit = TRUE)
+  observeEvent(input$clearVizFilter,
+    {
+      if (!is.null(input$vizMetaFilterValues)) {
+        shiny::updateSelectizeInput(session, "vizMetaFilterValues", selected = character())
+      }
+    },
+    ignoreInit = TRUE
+  )
 
   output$groupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
@@ -441,79 +467,91 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
-  observeEvent(input$data.src, {
-    if (!identical(input$data.src, "linear discriminants")) return(NULL)
-    req(rvals$selectedData)
-    req(rvals$attrGroups)
-    if (!(rvals$attrGroups %in% names(rvals$selectedData))) return(NULL)
-    group_count <- rvals$selectedData %>%
-      dplyr::pull(!!as.name(rvals$attrGroups)) %>%
-      as.character() %>%
-      unique() %>%
-      .[!is.na(.)] %>%
-      length()
-    if (group_count < 3) {
-      mynotification("LDA requires at least three groups to visualize these data.", type = "warning")
+  observeEvent(input$data.src,
+    {
+      if (!identical(input$data.src, "linear discriminants")) {
+        return(NULL)
+      }
+      req(rvals$selectedData)
+      req(rvals$attrGroups)
+      if (!(rvals$attrGroups %in% names(rvals$selectedData))) {
+        return(NULL)
+      }
+      group_count <- rvals$selectedData %>%
+        dplyr::pull(!!as.name(rvals$attrGroups)) %>%
+        as.character() %>%
+        unique() %>%
+        .[!is.na(.)] %>%
+        length()
+      if (group_count < 3) {
+        mynotification("LDA requires at least three groups to visualize these data.", type = "warning")
+      }
+    },
+    ignoreInit = TRUE
+  )
+
+  observeEvent(
+    {
+      rvals$selectedData
+      input$data.src
+      rvals$pcadf
+      rvals$attrGroups
+    },
+    {
+      req(nrow(rvals$selectedData) > 0)
+      req(input$data.src)
+      req(rvals$attrGroups)
+      quietly(label = "get plotdf", {
+        if (input$data.src == "principal components") {
+          validate(need(nrow(rvals$pcadf) > 0, "No PCA results"))
+          rvals$plotdf <- tryCatch(rvals$pcadf, error = function(e) {
+            mynotification("No PCA results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- pc_columns_sorted(rvals$pca$x %>% colnames())
+          rvals$plotVarChoices <- pc_axis_choices_with_variance(rvals$pca, rvals$plotVars)
+        } else if (input$data.src == "linear discriminants") {
+          validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
+          rvals$plotdf <- tryCatch(rvals$LDAdf, error = function(e) {
+            mynotification("No LDA results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- rvals$LDAdf %>%
+            colnames() %>%
+            .[which(!. %in% rvals$attrs)]
+          rvals$plotVarChoices <- stats::setNames(rvals$plotVars, rvals$plotVars)
+        } else if (input$data.src == "UMAP") {
+          validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
+          rvals$plotdf <- tryCatch(rvals$umapdf, error = function(e) {
+            mynotification("No UMAP results", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- c("V1", "V2")
+          rvals$plotVarChoices <- stats::setNames(rvals$plotVars, rvals$plotVars)
+        } else {
+          req(nrow(rvals$selectedData) > 0)
+          rvals$plotdf <- tryCatch(rvals$selectedData, error = function(e) {
+            mynotification("No data", type = "warning")
+            return(tibble::tibble())
+          })
+          rvals$plotVars <- rvals$chem
+          rvals$plotVarChoices <- stats::setNames(rvals$plotVars, rvals$plotVars)
+        }
+        if (is.data.frame(rvals$plotdf) && nrow(rvals$plotdf) > 0 && !("rowid" %in% names(rvals$plotdf))) {
+          rvals$plotdf <- rvals$plotdf %>% tibble::rowid_to_column("rowid")
+        }
+      })
     }
-  }, ignoreInit = TRUE)
+  )
 
-  observeEvent({
-    rvals$selectedData
-    input$data.src
-    rvals$pcadf
-    rvals$attrGroups
-  },{
-    req(nrow(rvals$selectedData) > 0)
-    req(input$data.src)
-    req(rvals$attrGroups)
-    quietly(label = "get plotdf",{
-      if (input$data.src == 'principal components') {
-        validate(need(nrow(rvals$pcadf) > 0, "No PCA results"))
-        rvals$plotdf = tryCatch(rvals$pcadf,error = function(e) {
-          mynotification("No PCA results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = pc_columns_sorted(rvals$pca$x %>% colnames())
-        rvals$plotVarChoices = pc_axis_choices_with_variance(rvals$pca, rvals$plotVars)
-      } else if (input$data.src == 'linear discriminants') {
-        validate(need(nrow(rvals$LDAdf) > 0, "No LDA results"))
-        rvals$plotdf = tryCatch(rvals$LDAdf,error = function(e) {
-          mynotification("No LDA results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = rvals$LDAdf %>% colnames() %>% .[which(!. %in% rvals$attrs)]
-        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
-      } else if (input$data.src == 'UMAP') {
-        validate(need(nrow(rvals$umapdf) > 0, "No UMAP results"))
-        rvals$plotdf = tryCatch(rvals$umapdf,error = function(e) {
-          mynotification("No UMAP results",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = c("V1","V2")
-        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
-      } else {
-        req(nrow(rvals$selectedData) > 0)
-        rvals$plotdf = tryCatch(rvals$selectedData,error = function(e) {
-          mynotification("No data",type = "warning")
-          return(tibble::tibble())
-        })
-        rvals$plotVars = rvals$chem
-        rvals$plotVarChoices = stats::setNames(rvals$plotVars, rvals$plotVars)
-      }
-      if(is.data.frame(rvals$plotdf) && nrow(rvals$plotdf) > 0 && !("rowid" %in% names(rvals$plotdf))){
-        rvals$plotdf = rvals$plotdf %>% tibble::rowid_to_column("rowid")
-      }
-    })
-  })
-
-  output$xvarUI = renderUI({
+  output$xvarUI <- renderUI({
     req(rvals$plotVars)
     req(rvals$plotVarChoices)
     selected_x <- pick_selected_value(rvals$xvar, rvals$plotVars, fallback = rvals$plotVars[1])
-    selectInput('xvar', 'X', rvals$plotVarChoices, selected = selected_x)
+    selectInput("xvar", "X", rvals$plotVarChoices, selected = selected_x)
   })
 
-  output$yvarUI = renderUI({
+  output$yvarUI <- renderUI({
     req(rvals$plotVars)
     req(rvals$plotVarChoices)
     selected_y <- pick_selected_value(
@@ -521,14 +559,16 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       rvals$plotVars,
       fallback = rvals$plotVars[min(2, length(rvals$plotVars))]
     )
-    selectInput('yvar', 'y', rvals$plotVarChoices, selected = selected_y)
+    selectInput("yvar", "y", rvals$plotVarChoices, selected = selected_y)
   })
 
-  output$pointLabelColumnUI = renderUI({
+  output$pointLabelColumnUI <- renderUI({
     req(inherits(rvals$plotdf, "data.frame"))
     choices <- names(rvals$plotdf)
     choices <- choices[!is.na(choices) & nzchar(choices)]
-    if (length(choices) == 0) return(NULL)
+    if (length(choices) == 0) {
+      return(NULL)
+    }
     anid_matches <- choices[tolower(choices) == "anid"]
     point_label_selection <- pick_selected_value(rvals$pointLabelColumn, choices, fallback = "")
     sample_id_selection <- pick_selected_value(rvals$sampleID, choices, fallback = "")
@@ -558,12 +598,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
-  output$symbolGroupColumnUI = renderUI({
+  output$symbolGroupColumnUI <- renderUI({
     req(inherits(rvals$plotdf, "data.frame"))
     choices <- names(rvals$plotdf)
     choices <- choices[!is.na(choices) & nzchar(choices)]
     choices <- setdiff(choices, "rowid")
-    if (length(choices) == 0) return(NULL)
+    if (length(choices) == 0) {
+      return(NULL)
+    }
 
     active_input <- tryCatch(as.character(input$symbolGroupColumn[[1]]), error = function(e) "")
     prior_selection <- pick_selected_value(rvals$symbolGroupColumn, choices, fallback = "")
@@ -594,12 +636,12 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     )
   })
 
-  output$xvar2UI = renderUI({
+  output$xvar2UI <- renderUI({
     req(rvals$chem)
-    selectInput('xvar2', 'X', rvals$chem, multiple = T)
+    selectInput("xvar2", "X", rvals$chem, multiple = T)
   })
 
-  output$yvar2UI = renderUI({
+  output$yvar2UI <- renderUI({
     req(rvals$chem)
     selection <- resolve_multiplot_y_selection(
       all_vars = rvals$chem,
@@ -607,60 +649,69 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       y_vars = input$yvar2
     )
     selectInput(
-      'yvar2',
-      'Y',
+      "yvar2",
+      "Y",
       choices = selection$choices,
       multiple = T,
       selected = selection$selected
     )
   })
 
-  observeEvent(input$xvar2, {
-    req(rvals$chem)
-    selection <- resolve_multiplot_y_selection(
-      all_vars = rvals$chem,
-      x_vars = input$xvar2,
-      y_vars = input$yvar2
-    )
-    updateSelectInput(
-      session,
-      "yvar2",
-      choices = selection$choices,
-      selected = selection$selected
-    )
-  }, ignoreInit = TRUE)
+  observeEvent(input$xvar2,
+    {
+      req(rvals$chem)
+      selection <- resolve_multiplot_y_selection(
+        all_vars = rvals$chem,
+        x_vars = input$xvar2,
+        y_vars = input$yvar2
+      )
+      updateSelectInput(
+        session,
+        "yvar2",
+        choices = selection$choices,
+        selected = selection$selected
+      )
+    },
+    ignoreInit = TRUE
+  )
 
-  observeEvent(plotly::event_data("plotly_selected", source = "A"), {
-    req(plot_df_for_display())
-    plotly_select <- plotly::event_data("plotly_selected", source = "A")
-    if (is.null(plotly_select) || !("key" %in% names(plotly_select))) {
-      selected_plot_keys(character())
-      rvals$brushSelected <- NULL
-      return(invisible(NULL))
-    }
-    keys <- unique(as.character(plotly_select$key))
-    selected_plot_keys(keys)
-    rvals$brushSelected <- plot_df_for_display() %>%
-      dplyr::filter(as.character(rowid) %in% keys)
-  }, ignoreNULL = FALSE)
+  observeEvent(plotly::event_data("plotly_selected", source = "A"),
+    {
+      req(plot_df_for_display())
+      plotly_select <- plotly::event_data("plotly_selected", source = "A")
+      if (is.null(plotly_select) || !("key" %in% names(plotly_select))) {
+        selected_plot_keys(character())
+        rvals$brushSelected <- NULL
+        return(invisible(NULL))
+      }
+      keys <- unique(as.character(plotly_select$key))
+      selected_plot_keys(keys)
+      rvals$brushSelected <- plot_df_for_display() %>%
+        dplyr::filter(as.character(rowid) %in% keys)
+    },
+    ignoreNULL = FALSE
+  )
 
-  observeEvent(plot_df_for_display(), {
-    display_df <- plot_df_for_display()
-    if (!inherits(display_df, "data.frame") || !("rowid" %in% names(display_df))) {
-      selected_plot_keys(character())
-      rvals$brushSelected <- NULL
-      return(invisible(NULL))
-    }
-    display_keys <- unique(as.character(display_df$rowid))
-    keys <- intersect(selected_plot_keys(), display_keys)
-    selected_plot_keys(keys)
-    if (length(keys) == 0) {
-      rvals$brushSelected <- NULL
-      return(invisible(NULL))
-    }
-    rvals$brushSelected <- display_df %>%
-      dplyr::filter(as.character(rowid) %in% keys)
-  }, ignoreInit = FALSE)
+  observeEvent(plot_df_for_display(),
+    {
+      display_df <- plot_df_for_display()
+      if (!inherits(display_df, "data.frame") || !("rowid" %in% names(display_df))) {
+        selected_plot_keys(character())
+        rvals$brushSelected <- NULL
+        return(invisible(NULL))
+      }
+      display_keys <- unique(as.character(display_df$rowid))
+      keys <- intersect(selected_plot_keys(), display_keys)
+      selected_plot_keys(keys)
+      if (length(keys) == 0) {
+        rvals$brushSelected <- NULL
+        return(invisible(NULL))
+      }
+      rvals$brushSelected <- display_df %>%
+        dplyr::filter(as.character(rowid) %in% keys)
+    },
+    ignoreInit = FALSE
+  )
 
   observeEvent(input$Change, {
     req(rvals$plotdf)
@@ -670,14 +721,14 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       mynotification("Select one or more points in the plot before changing group assignment.", type = "warning")
       return(invisible(NULL))
     }
-    quietly(label = "change group assignment",{
+    quietly(label = "change group assignment", {
       target_group <- resolve_group_assignment_target(input$groupAssignChoice, input$groupAssignNew)
       if (!nzchar(target_group)) {
         mynotification("Choose an existing group or enter a new group designation.", type = "warning")
         return(invisible(NULL))
       }
-      rowid = as.character(selected_rows$rowid)
-      replaceCell(rowid = rowid,col = rvals$attrGroups,value = target_group, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
+      rowid <- as.character(selected_rows$rowid)
+      replaceCell(rowid = rowid, col = rvals$attrGroups, value = target_group, rvals = rvals, con = con, credentials = credentials, input = input, output = output, session = session)
       selected_keys <- selected_plot_keys()
       if (length(selected_keys) > 0 && inherits(rvals$selectedData, "data.frame") && "rowid" %in% names(rvals$selectedData)) {
         rvals$brushSelected <- rvals$selectedData %>%
@@ -685,9 +736,11 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       }
       mynotification(glue::glue("Updated {length(rowid)} row(s) to group '{target_group}'."), type = "message")
     })
-    inputList = c("xvar","yvar","xvar2","yvar2","data.src","Conf","int.set","use_symbols","symbolGroupColumn","show_point_labels","pointLabelColumn")
-    for(i in inputList){
-      rvals[[i]] = tryCatch(input[[i]],error = function(e)return(NULL))
+    inputList <- c("xvar", "yvar", "xvar2", "yvar2", "data.src", "Conf", "int.set", "use_symbols", "symbolGroupColumn", "show_point_labels", "pointLabelColumn")
+    for (i in inputList) {
+      rvals[[i]] <- tryCatch(input[[i]], error = function(e) {
+        return(NULL)
+      })
     }
   })
 
@@ -723,30 +776,33 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     p
   })
 
-  observeEvent(rvals$brushSelected,{
-  output$brush <- renderUI({
-    req(rvals$brushSelected)
-    quietly(label = "brush UI",{
-      if (is.null(rvals$brushSelected)) {
-        p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
-      } else {
-        tags$div(
-          style = "overflow-x:auto; width:100%;",
-          tableOutput("brushTable")
-        )
-      }
+  observeEvent(rvals$brushSelected, {
+    output$brush <- renderUI({
+      req(rvals$brushSelected)
+      quietly(label = "brush UI", {
+        if (is.null(rvals$brushSelected)) {
+          p("Click and drag events (i.e., select/lasso) appear here (double-click to clear)")
+        } else {
+          tags$div(
+            style = "overflow-x:auto; width:100%;",
+            tableOutput("brushTable")
+          )
+        }
+      })
     })
   })
-  })
 
-  output$brushTable <- renderTable({
-    req(rvals$brushSelected)
-    build_brush_display_table(rvals$brushSelected)
-  }, rownames = FALSE)
+  output$brushTable <- renderTable(
+    {
+      req(rvals$brushSelected)
+      build_brush_display_table(rvals$brushSelected)
+    },
+    rownames = FALSE
+  )
 
   #### multiplots ####
 
-  output$multiplotUI = renderUI({
+  output$multiplotUI <- renderUI({
     req(rvals$multiplot)
     if (isTRUE(multiplot_mode())) {
       plotly::plotlyOutput("multiplotPlotly", width = "100%", height = paste0(multiplot_height(), "px"))
@@ -755,19 +811,23 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     }
   })
 
-  output$multiplotPlotly = plotly::renderPlotly({
+  output$multiplotPlotly <- plotly::renderPlotly({
     req(rvals$multiplot)
     req(isTRUE(multiplot_mode()))
     req(inherits(rvals$multiplot, "plotly"))
     rvals$multiplot
   })
 
-  output$multiplotStatic = renderPlot({
-    req(rvals$multiplot)
-    req(!isTRUE(multiplot_mode()))
-    req(inherits(rvals$multiplot, "ggplot"))
-    rvals$multiplot
-  }, width = "auto", height = function() multiplot_height())
+  output$multiplotStatic <- renderPlot(
+    {
+      req(rvals$multiplot)
+      req(!isTRUE(multiplot_mode()))
+      req(inherits(rvals$multiplot, "ggplot"))
+      rvals$multiplot
+    },
+    width = "auto",
+    height = function() multiplot_height()
+  )
 
   observeEvent(input$updateMultiplot, {
     if (!inherits(rvals$selectedData, "data.frame") || nrow(rvals$selectedData) == 0) {
@@ -793,49 +853,58 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
     invisible(NULL)
   })
 
-  observeEvent(multiplot_build_request(), {
-    req(multiplot_build_request())
-    request <- multiplot_build_request()
-    multiplot_build_request(NULL)
-    later::later(function() {
-      tryCatch({
-        quietly(label = "multiplot",{
-          rvals$multiplot = multiplot(
-            selectedData = request$selected_data,
-            attrGroups = request$attr_group,
-            xvar  = request$x_vars,
-            yvar = request$y_vars,
-            ptsize = request$point_size,
-            interactive = request$use_interactive,
-            theme = request$use_theme
-          )
-        })
-        multiplot_mode(request$use_interactive)
-        multiplot_height(request$use_height)
-      }, error = function(e) {
-        mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
-        rvals$multiplot <- NULL
-      })
+  observeEvent(multiplot_build_request(),
+    {
+      req(multiplot_build_request())
+      request <- multiplot_build_request()
+      multiplot_build_request(NULL)
+      later::later(function() {
+        tryCatch(
+          {
+            quietly(label = "multiplot", {
+              rvals$multiplot <- multiplot(
+                selectedData = request$selected_data,
+                attrGroups = request$attr_group,
+                xvar = request$x_vars,
+                yvar = request$y_vars,
+                ptsize = request$point_size,
+                interactive = request$use_interactive,
+                theme = request$use_theme
+              )
+            })
+            multiplot_mode(request$use_interactive)
+            multiplot_height(request$use_height)
+          },
+          error = function(e) {
+            mynotification(paste0("Unable to build multiplot: ", conditionMessage(e)), type = "error")
+            rvals$multiplot <- NULL
+          }
+        )
+        invisible(NULL)
+      }, delay = 0)
       invisible(NULL)
-    }, delay = 0)
-    invisible(NULL)
-  }, ignoreInit = TRUE)
+    },
+    ignoreInit = TRUE
+  )
 
-  observeEvent(input$savePlot, {
-    showModal(
-      modalDialog(
-        title = "Save Plot",
-        textInput("plotfilename", "File name:", value = "ggplot.png"),
-        numericInput("width", "Width (inches):", value = 7),
-        numericInput("height", "Height (inches):", value = 5),
-        numericInput("res", "Resolution (dpi):", value = 300),
-        footer = tagList(
-          modalButton("Cancel"),
-          downloadButton("saveMultiPlot", "Save")
+  observeEvent(input$savePlot,
+    {
+      showModal(
+        modalDialog(
+          title = "Save Plot",
+          textInput("plotfilename", "File name:", value = "ggplot.png"),
+          numericInput("width", "Width (inches):", value = 7),
+          numericInput("height", "Height (inches):", value = 5),
+          numericInput("res", "Resolution (dpi):", value = 300),
+          footer = tagList(
+            modalButton("Cancel"),
+            downloadButton("saveMultiPlot", "Save")
+          )
         )
       )
-    )
-  }, ignoreInit = TRUE)
+    },
+    ignoreInit = TRUE
+  )
 
   output$saveMultiPlot <- downloadHandler(
     filename = function() {
@@ -851,5 +920,4 @@ visualizeAssignServer = function(input, output, session, rvals, credentials, con
       )
     }
   )
-
 }
