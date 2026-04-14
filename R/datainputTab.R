@@ -59,10 +59,20 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   dataset_loading_active <- shiny::reactiveVal(FALSE)
   dataset_table_refreshing <- shiny::reactiveVal(FALSE)
   dataset_table_ready <- shiny::reactiveVal(FALSE)
+  set_dataset_table_ready <- function(next_ready) {
+    next_ready <- isTRUE(next_ready)
+    current_ready <- isTRUE(dataset_table_ready())
+    if (!identical(current_ready, next_ready)) {
+      dataset_table_ready(next_ready)
+    }
+    invisible(next_ready)
+  }
   dataset_retry_poll_ms <- 5000L
   dataset_steady_poll_min_ms <- 60000L
   dataset_steady_poll_max_ms <- 300000L
   dataset_steady_poll_ms <- shiny::reactiveVal(dataset_steady_poll_min_ms)
+  dataset_last_steady_refresh_ms <- NA_real_
+  dataset_steady_interval_guard_logged <- FALSE
   get_dataset_steady_poll_ms <- function() {
     current_ms <- suppressWarnings(as.integer(dataset_steady_poll_ms()))
     if (is.na(current_ms) || current_ms < dataset_steady_poll_min_ms) return(dataset_steady_poll_min_ms)
@@ -200,6 +210,33 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
   refresh_dataset_tables <- function(reason = "manual", notify_on_error = FALSE) {
     refresh_started <- Sys.time()
     refresh_user <- safe_username()
+    now_ms <- as.numeric(refresh_started) * 1000
+    if (identical(reason, "steady-state-sync")) {
+      min_interval_ms <- get_dataset_steady_poll_ms()
+      if (is.finite(dataset_last_steady_refresh_ms)) {
+        elapsed_since_last_ms <- as.integer(round(now_ms - dataset_last_steady_refresh_ms))
+        if (is.finite(elapsed_since_last_ms) && elapsed_since_last_ms < min_interval_ms) {
+          if (!isTRUE(dataset_steady_interval_guard_logged)) {
+            app_timing_log(
+              "dataset_refresh:skip",
+              list(
+                reason = reason,
+                why = "interval_guard",
+                elapsed_ms = elapsed_since_last_ms,
+                min_interval_ms = min_interval_ms
+              )
+            )
+            dataset_steady_interval_guard_logged <<- TRUE
+          }
+          return(invisible(FALSE))
+        }
+      }
+      dataset_last_steady_refresh_ms <<- now_ms
+      dataset_steady_interval_guard_logged <<- FALSE
+    } else {
+      dataset_last_steady_refresh_ms <<- now_ms
+      dataset_steady_interval_guard_logged <<- FALSE
+    }
     app_timing_log(
       "dataset_refresh:start",
       list(
@@ -218,7 +255,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     }
     if (!isTruthy(credentials$status) || !nzchar(safe_username()) || is.null(con)) {
       rvals$tbls <- character()
-      dataset_table_ready(FALSE)
+      set_dataset_table_ready(FALSE)
       app_timing_log(
         "dataset_refresh:end",
         list(
@@ -244,7 +281,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
           type = "warning"
         )
       }
-      dataset_table_ready(length(rvals$tbls) > 0)
+      set_dataset_table_ready(length(rvals$tbls) > 0)
       set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
       app_timing_log(
         "dataset_refresh:end",
@@ -267,7 +304,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
       set_dataset_steady_poll_ms(min(dataset_steady_poll_max_ms, as.integer(get_dataset_steady_poll_ms() * 2L)))
     }
     rvals$tbls <- tbls_chr
-    dataset_table_ready(TRUE)
+    set_dataset_table_ready(TRUE)
     app_timing_log(
       "dataset_refresh:end",
       list(
@@ -545,11 +582,11 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     {
       if (!isTruthy(credentials$status) || !nzchar(safe_username())) {
         rvals$tbls <- character()
-        dataset_table_ready(FALSE)
+        set_dataset_table_ready(FALSE)
         return(invisible(NULL))
       }
       set_dataset_steady_poll_ms(dataset_steady_poll_min_ms)
-      dataset_table_ready(FALSE)
+      set_dataset_table_ready(FALSE)
       refresh_dataset_tables(reason = "auth-state", notify_on_error = TRUE)
     },
     ignoreInit = FALSE
@@ -560,7 +597,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
     if (isTRUE(dataset_table_ready())) return(invisible(NULL))
     shiny::invalidateLater(dataset_retry_poll_ms, session)
-    refresh_dataset_tables(reason = "auth-retry", notify_on_error = FALSE)
+    shiny::isolate(refresh_dataset_tables(reason = "auth-retry", notify_on_error = FALSE))
   })
 
   observe({
@@ -568,7 +605,7 @@ dataInputServer = function(input, output, session, rvals, con, credentials) {
     if (!isTruthy(credentials$status) || !nzchar(safe_username())) return(invisible(NULL))
     if (!isTRUE(dataset_table_ready())) return(invisible(NULL))
     shiny::invalidateLater(get_dataset_steady_poll_ms(), session)
-    refresh_dataset_tables(reason = "steady-state-sync", notify_on_error = FALSE)
+    shiny::isolate(refresh_dataset_tables(reason = "steady-state-sync", notify_on_error = FALSE))
   })
 
   observeEvent(rvals$currentDatasetName, {
