@@ -9,16 +9,4 @@ if ! command -v Rscript >/dev/null 2>&1; then
   exit 1
 fi
 
-Rscript --vanilla -e "
-  if (!requireNamespace('devtools', quietly = TRUE)) {
-    stop('Package \"devtools\" is required. Install it with install.packages(\"devtools\").')
-  }
-
-  devtools::load_all('.')
-
-  if (!exists('runArchaeodash', mode = 'function')) {
-    stop('runArchaeodash() was not found after devtools::load_all().')
-  }
-
-  runArchaeodash()
-"
+Rscript --vanilla -e "if (!requireNamespace('uvr', quietly = TRUE)) install.packages('uvr', repos = 'https://cloud.r-project.org'); uvr::install_deps('.'); devtools::load_all('.'); if (!exists('runArchaeodash', mode = 'function')) stop('runArchaeodash() was not found after devtools::load_all().'); runArchaeodash()"

@@ -84,27 +84,9 @@ fi
 git_as_rjbischo commit -m "Release $VERSION"
 git_as_rjbischo tag "$TAG"
 
-CRAN_REPO="${CRAN_REPO:-https://cloud.r-project.org}"
-Rscript -e "
-  dcf <- read.dcf('DESCRIPTION')
-  desc <- dcf[1, ]
-  fields <- c('Depends', 'Imports', 'LinkingTo', 'Suggests')
-  raw <- unlist(desc[intersect(fields, colnames(dcf))], use.names = FALSE)
-  tokens <- trimws(unlist(strsplit(raw, ',')))
-  tokens <- tokens[nzchar(tokens)]
-  pkgs <- gsub('^([A-Za-z0-9.]+).*$','\\\\1', tokens)
-  pkgs <- setdiff(unique(pkgs), c('R', rownames(installed.packages(priority='base'))))
 
-  installed <- rownames(installed.packages())
-  missing <- setdiff(pkgs, installed)
-
-  if (length(missing) > 0L) {
-    message('Installing missing dependencies: ', paste(missing, collapse=', '))
-    install.packages(missing, repos='${CRAN_REPO}', dependencies=TRUE)
-  } else {
-    message('No missing dependencies.')
-  }
-"
+# Use uvr for dependency installation
+Rscript -e "if (!requireNamespace('uvr', quietly = TRUE)) install.packages('uvr', repos = 'https://cloud.r-project.org'); uvr::install_deps('.')"
 
 R CMD INSTALL .
 
