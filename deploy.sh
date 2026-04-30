@@ -85,8 +85,8 @@ git_as_rjbischo commit -m "Release $VERSION"
 git_as_rjbischo tag "$TAG"
 
 
-# Use uvr for dependency installation
-Rscript -e "if (!requireNamespace('uvr', quietly = TRUE)) install.packages('uvr', repos = 'https://cloud.r-project.org'); uvr::install_deps('.')"
+# Install the official uvr R companion from GitHub, then install package deps from DESCRIPTION.
+Rscript -e "if (!requireNamespace('pak', quietly = TRUE)) install.packages('pak', repos = 'https://cloud.r-project.org'); if (!requireNamespace('uvr', quietly = TRUE)) pak::pak('nbafrank/uvr-r'); if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_deps('.')"
 
 R CMD INSTALL .
 

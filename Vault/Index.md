@@ -14,6 +14,7 @@ Up: [[../../Vault/Index]]
 - [[Persistence_MOC]]
 - [[Quality_MOC]]
 - [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
+- [[Uvr_GitHub_Install_Correction_2026-04-30]]
 
 ## Notes
 - This vault uses atomic notes (one concept per file) linked with `[[Wikilinks]]`.

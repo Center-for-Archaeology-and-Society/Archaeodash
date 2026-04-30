@@ -4,12 +4,14 @@ Analytical Dashboard for conducting various analyses to group and assess groupin
 
 ## Installation and Dependency Management
 
-Install dependencies and the package using the [uvr](https://github.com/yonicd/uvr) package:
+Install the official [uvr](https://github.com/nbafrank/uvr) R companion from GitHub, then install this package's `DESCRIPTION` dependencies:
 
 ```
-Rscript -e "if (!requireNamespace('uvr', quietly = TRUE)) install.packages('uvr', repos = 'https://cloud.r-project.org'); uvr::install_deps('.')"
+Rscript -e "if (!requireNamespace('pak', quietly = TRUE)) install.packages('pak', repos = 'https://cloud.r-project.org'); if (!requireNamespace('uvr', quietly = TRUE)) pak::pak('nbafrank/uvr-r'); if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_deps('.')"
 R CMD INSTALL .
 ```
+
+This repository does not currently contain a `uvr.toml`/`uvr.lock` project, so it is not yet using `uvr sync`.
 
 The primary tool is a Shiny app that is still a work in progress, but has functional tools for reading in data from csv or Excel, imputing missing data, transforming data, conducting PCA and several versions of cluster analysis, manually assigning groups, visualizing data, and exporting the results.
 
@@ -21,7 +23,7 @@ INAA_test.csv - test data for the scripts/app
 Run the package unit tests locally:
 
 ```
-Rscript -e "if (!requireNamespace('uvr', quietly = TRUE)) install.packages('uvr', repos = 'https://cloud.r-project.org'); uvr::install_deps('.')"
+Rscript -e "if (!requireNamespace('pak', quietly = TRUE)) install.packages('pak', repos = 'https://cloud.r-project.org'); if (!requireNamespace('uvr', quietly = TRUE)) pak::pak('nbafrank/uvr-r'); if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_deps('.')"
 Rscript -e "testthat::test_dir('tests/testthat', reporter='summary')"
 ```
 
