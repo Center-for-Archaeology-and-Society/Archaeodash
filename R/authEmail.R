@@ -172,22 +172,30 @@ send_auth_email <- function(to_email, subject, html_body, text_body = html_body)
     return(identical(as.integer(status), 0L))
   }
 
-  if (!nzchar(smtp_server) || !nzchar(smtp_username) || !nzchar(smtp_password)) {
-    app_log("Authentication email not sent: SMTP configuration is incomplete.")
+  if (!nzchar(smtp_server)) {
+    app_log("Authentication email not sent: SMTP server is missing.")
     return(FALSE)
   }
 
+  smtp_args <- list(
+    mail_from = from_email,
+    mail_rcpt = to_email,
+    message = message,
+    smtp_server = smtp_server,
+    use_ssl = use_ssl,
+    verbose = FALSE
+  )
+  if (nzchar(smtp_username) || nzchar(smtp_password)) {
+    if (!nzchar(smtp_username) || !nzchar(smtp_password)) {
+      app_log("Authentication email not sent: SMTP username or password is incomplete.")
+      return(FALSE)
+    }
+    smtp_args$username <- smtp_username
+    smtp_args$password <- smtp_password
+  }
+
   tryCatch({
-    curl::send_mail(
-      mail_from = from_email,
-      mail_rcpt = to_email,
-      message = message,
-      smtp_server = smtp_server,
-      use_ssl = use_ssl,
-      username = smtp_username,
-      password = smtp_password,
-      verbose = FALSE
-    )
+    do.call(curl::send_mail, smtp_args)
     TRUE
   }, error = function(e) {
     app_log(paste0("Authentication email send failed: ", conditionMessage(e)))

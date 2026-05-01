@@ -3,5 +3,6 @@
 .RData
 .Ruserdata
 .Renviron
+.env.runtime
 
 inst/app/app_cache/
