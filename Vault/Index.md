@@ -17,6 +17,7 @@ Up: [[../../Vault/Index]]
 - [[Auth_Migration_Explicit_Fail_Closed_2026-05-01]]
 - [[Deploy_Script_Docker_Compose_Beta_2026-05-01]]
 - [[Docker_Compose_Email_Env_Runtime_2026-05-01]]
+- [[Auth_User_Duplicate_Cleanup_Email_Verification_2026-05-01]]
 - [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
 - [[Uvr_GitHub_Install_Correction_2026-04-30]]
 

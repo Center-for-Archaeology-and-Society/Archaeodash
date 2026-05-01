@@ -196,6 +196,7 @@ send_auth_email <- function(to_email, subject, html_body, text_body = html_body)
 
   tryCatch({
     do.call(curl::send_mail, smtp_args)
+    app_log(paste0("Authentication email sent: subject='", subject, "' to ", to_email))
     TRUE
   }, error = function(e) {
     app_log(paste0("Authentication email send failed: ", conditionMessage(e)))

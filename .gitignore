@@ -4,5 +4,7 @@
 .Ruserdata
 .Renviron
 .env.runtime
+db_backup_auth_cleanup_*.rds
+db_backup_auth_cleanup_*.sql
 
 inst/app/app_cache/
