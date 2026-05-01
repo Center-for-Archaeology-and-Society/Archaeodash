@@ -33,6 +33,27 @@ Tests also run automatically in GitHub Actions on each push and pull request to 
 
 Do not commit real credentials to `.Renviron`. Use `.Renviron.example` as a template and set real values in deployment/runtime secrets.
 
+For email-based account verification and password reset, also set:
+
+```bash
+ARCHAEODASH_BASE_URL=https://your-app-host.example.com/
+ARCHAEODASH_SMTP_SERVER=smtps://smtp.example.com:465
+ARCHAEODASH_SMTP_USERNAME=your-smtp-username
+ARCHAEODASH_SMTP_PASSWORD=your-smtp-password
+ARCHAEODASH_SMTP_FROM=noreply@example.com
+ARCHAEODASH_SMTP_REPLY_TO=support@example.com
+ARCHAEODASH_SMTP_USE_SSL=force
+```
+
+Optional auth email controls:
+
+```bash
+ARCHAEODASH_AUTH_EMAIL_ENABLED=1
+ARCHAEODASH_AUTH_EMAIL_MODE=smtp
+```
+
+Set `ARCHAEODASH_AUTH_EMAIL_MODE=log` to log verification/reset emails locally instead of sending them.
+
 ## DB-backed end-to-end test
 
 The auth+load shinytest2 e2e test is opt-in and requires a reachable database:

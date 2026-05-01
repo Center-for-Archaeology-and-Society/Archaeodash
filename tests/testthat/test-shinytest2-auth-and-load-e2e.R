@@ -41,6 +41,20 @@ test_that("register temp user and load INAA_test.csv end-to-end", {
   app$set_inputs(registerConfirm = "click")
   app$wait_for_idle(timeout = 30000)
 
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "UPDATE users SET email_verified_at = NOW() WHERE username = %s",
+      DBI::dbQuoteString(con, username)
+    )
+  )
+
+  app$set_inputs(loginUI = "click")
+  app$wait_for_idle(timeout = 10000)
+  app$set_inputs(username = username, password = password, rememberLogin = TRUE)
+  app$set_inputs(login = "click")
+  app$wait_for_idle(timeout = 30000)
+
   user_msg <- app$run_js("return (document.getElementById('userMessage') || {}).innerText || '';")
   expect_true(grepl(tolower(username), tolower(as.character(user_msg)), fixed = TRUE))
 

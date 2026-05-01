@@ -8,7 +8,7 @@ Welcome to ArchaeoDash. By accessing or using our application, you agree to comp
 
 ### **Registration**
 
-To use certain features of ArchaeoDash, you must register for an account. To register, click the *LOGIN* button on the left sidebar, check the checkbox by *Register as a new user*, and fill out the information. You must agree to the notice to complete registration. If you forget your password or username, email [rbischoff\@asu.edu](mailto:rbischoff@asu.edu).
+To use certain features of ArchaeoDash, you must register for an account. To register, click the *LOGIN* button on the left sidebar, check the checkbox by *Register as a new user*, and fill out the information. You must agree to the notice to complete registration and verify your email address before logging in. If you forget your password, use the *Forgot your password?* option in the login dialog to request a reset email.
 
 ## **Data Security and Privacy**
 

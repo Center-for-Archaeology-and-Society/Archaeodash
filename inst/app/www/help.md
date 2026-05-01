@@ -33,7 +33,7 @@ We recommend creating an account to reduce data loss risk. If the app times out,
 
 ### Registration
 
-Click *LOGIN* in the side panel, check *Register as a new user*, and complete the form. You must accept the notice to complete registration. If you forget your password or username, email [rbischoff\@asu.edu](mailto:rbischoff@asu.edu).
+Click *LOGIN* in the side panel, check *Register as a new user*, and complete the form. You must accept the notice to complete registration, then verify your email from the message sent to you before your first login. If you forget your password, use the *Forgot your password?* link in the login dialog to request a reset email.
 
 ### Login
 

@@ -1,3 +1,7 @@
+source(testthat::test_path("..", "..", "R", "packageChecks.R"))
+source(testthat::test_path("..", "..", "R", "authEmail.R"))
+source(testthat::test_path("..", "..", "R", "loginServer.R"))
+
 test_that("remember token generation and hashing behave as expected", {
   skip_if_not_installed("sodium")
 
@@ -32,4 +36,16 @@ test_that("login rate limit blocks after repeated failures and clears after succ
   clear_login_failures(key)
   cleared <- check_login_rate_limit(key, max_attempts = 3L, window_seconds = 60L)
   expect_true(cleared$allowed)
+})
+
+test_that("email helper validators behave as expected", {
+  expect_true(is_valid_email_address("person@example.com"))
+  expect_false(is_valid_email_address("not-an-email"))
+  expect_equal(normalize_auth_email(" Person@Example.Com "), "person@example.com")
+})
+
+test_that("email_verified_value recognizes verified and unverified rows", {
+  expect_false(email_verified_value(data.frame(username = "a", stringsAsFactors = FALSE)))
+  expect_false(email_verified_value(data.frame(email_verified_at = NA_character_, stringsAsFactors = FALSE)))
+  expect_true(email_verified_value(data.frame(email_verified_at = "2026-05-01 00:00:00", stringsAsFactors = FALSE)))
 })
