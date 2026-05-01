@@ -11,8 +11,8 @@ auth_email_reply_to <- function() {
 }
 
 auth_email_mode <- function() {
-  mode <- tolower(trimws(Sys.getenv("ARCHAEODASH_AUTH_EMAIL_MODE", "smtp")))
-  if (!(mode %in% c("smtp", "log"))) "smtp" else mode
+  mode <- tolower(trimws(Sys.getenv("ARCHAEODASH_AUTH_EMAIL_MODE", "sendmail")))
+  if (!(mode %in% c("smtp", "sendmail", "log"))) "sendmail" else mode
 }
 
 auth_email_default_base_url <- function() {
@@ -127,11 +127,13 @@ send_auth_email <- function(to_email, subject, html_body, text_body = html_body)
 
   to_email <- tolower(trimws(as.character(to_email)))
   from_email <- auth_email_sender()
+  mode <- auth_email_mode()
   smtp_server <- trimws(Sys.getenv("ARCHAEODASH_SMTP_SERVER", ""))
   smtp_username <- trimws(Sys.getenv("ARCHAEODASH_SMTP_USERNAME", ""))
   smtp_password <- Sys.getenv("ARCHAEODASH_SMTP_PASSWORD", "")
   use_ssl <- tolower(trimws(Sys.getenv("ARCHAEODASH_SMTP_USE_SSL", "try")))
   if (!(use_ssl %in% c("try", "no", "force"))) use_ssl <- "try"
+  sendmail_path <- trimws(Sys.getenv("ARCHAEODASH_SENDMAIL_PATH", "/usr/sbin/sendmail"))
 
   if (!nzchar(to_email) || !nzchar(from_email)) {
     app_log("Authentication email not sent: sender or recipient email missing.")
@@ -146,10 +148,28 @@ send_auth_email <- function(to_email, subject, html_body, text_body = html_body)
   )
   if (!nzchar(message)) return(FALSE)
 
-  if (identical(auth_email_mode(), "log")) {
+  if (identical(mode, "log")) {
     app_log(paste0("AUTH EMAIL [", subject, "] to ", to_email))
     app_log(text_body)
     return(TRUE)
+  }
+
+  if (identical(mode, "sendmail")) {
+    if (!nzchar(sendmail_path) || !file.exists(sendmail_path)) {
+      app_log(paste0("Authentication email not sent: sendmail path unavailable: ", sendmail_path))
+      return(FALSE)
+    }
+    msg_file <- tempfile("archaeodash-auth-email-")
+    on.exit(unlink(msg_file), add = TRUE)
+    writeLines(message, con = msg_file, sep = "\r\n", useBytes = TRUE)
+    status <- tryCatch(
+      system2(sendmail_path, args = c("-t", "-i"), stdin = msg_file, stdout = FALSE, stderr = FALSE),
+      error = function(e) {
+        app_log(paste0("Authentication email sendmail handoff failed: ", conditionMessage(e)))
+        1L
+      }
+    )
+    return(identical(as.integer(status), 0L))
   }
 
   if (!nzchar(smtp_server) || !nzchar(smtp_username) || !nzchar(smtp_password)) {

@@ -12,8 +12,9 @@ Added email-token account verification for new registrations and email-token pas
 - Verification and reset links are handled from query parameters in the Shiny session.
 
 ## Configuration
-- Added SMTP/runtime settings to `.Renviron.example` and `README.md`.
-- Supports `ARCHAEODASH_AUTH_EMAIL_MODE=log` for local/dev runs without real SMTP delivery.
+- Added runtime settings to `.Renviron.example` and `README.md`.
+- Default delivery mode uses server `sendmail` handoff so existing system mail relay configuration can be reused without an app-level SMTP password.
+- Supports `ARCHAEODASH_AUTH_EMAIL_MODE=log` for local/dev runs without real delivery, or `smtp` for direct SMTP if needed.
 
 ## Validation
 - Updated login-security unit coverage for helper validation logic.
