@@ -31,12 +31,12 @@ shinyServer(function(input, output, session) {
   })
 
   if (is.null(con)) {
+    if (!is.null(db_connect_error) && nzchar(db_connect_error)) {
+      ArchaeoDash:::app_log(paste0("Database connection failed: ", db_connect_error))
+    }
     observeEvent(TRUE, {
       showNotification(
-        paste0(
-          "Unable to connect to database. Some features will be disabled.",
-          if (!is.null(db_connect_error) && nzchar(db_connect_error)) paste0(" Details: ", db_connect_error) else ""
-        ),
+        "Unable to connect to database. Some features will be disabled. Please contact support if this persists.",
         type = "error",
         duration = NULL
       )

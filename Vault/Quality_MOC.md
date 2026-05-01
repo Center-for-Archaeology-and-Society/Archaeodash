@@ -43,6 +43,8 @@ Quality guardrails, tests, and known risks.
 - [[Dataset_Steady_State_Poll_Self_Invalidation_Fix_2026-03-04]]
 - [[Dataset_Table_Ready_Reactive_Self_Invalidation_Fix_2026-03-04]]
 - [[CSP_MathJax_Allowlist_Update_2026-03-04]]
+- [[Repository_Fogs_Improvements_Security_Todo_2026-05-01]]
+- [[Auth_Migration_Explicit_Fail_Closed_2026-05-01]]
 
 ## Related
 - [[ArchaeoDash_Analysis_MOC]]

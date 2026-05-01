@@ -13,6 +13,8 @@ Up: [[../../Vault/Index]]
 - [[Workflows_MOC]]
 - [[Persistence_MOC]]
 - [[Quality_MOC]]
+- [[Repository_Fogs_Improvements_Security_Todo_2026-05-01]]
+- [[Auth_Migration_Explicit_Fail_Closed_2026-05-01]]
 - [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
 - [[Uvr_GitHub_Install_Correction_2026-04-30]]
 

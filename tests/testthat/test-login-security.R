@@ -1,4 +1,5 @@
 source(testthat::test_path("..", "..", "R", "packageChecks.R"))
+source(testthat::test_path("..", "..", "R", "appLogging.R"))
 source(testthat::test_path("..", "..", "R", "authEmail.R"))
 source(testthat::test_path("..", "..", "R", "loginServer.R"))
 
@@ -48,4 +49,49 @@ test_that("email_verified_value recognizes verified and unverified rows", {
   expect_false(email_verified_value(data.frame(username = "a", stringsAsFactors = FALSE)))
   expect_false(email_verified_value(data.frame(email_verified_at = NA_character_, stringsAsFactors = FALSE)))
   expect_true(email_verified_value(data.frame(email_verified_at = "2026-05-01 00:00:00", stringsAsFactors = FALSE)))
+})
+
+test_that("auth migrations create required tables and add email verification column", {
+  skip_if_not_installed("RSQLite")
+  skip_if_not_installed("sodium")
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  DBI::dbWriteTable(
+    con,
+    "users",
+    data.frame(
+      username = character(),
+      password = character(),
+      email = character(),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  state <- run_auth_migrations(con)
+  expect_true(auth_schema_ready(state))
+
+  schema_state <- validate_auth_schema(con)
+  expect_true(schema_state$ok)
+  expect_true(all(auth_required_tables %in% DBI::dbListTables(con)))
+  expect_true("email_verified_at" %in% DBI::dbListFields(con, "users"))
+})
+
+test_that("auth schema validation reports missing columns", {
+  skip_if_not_installed("RSQLite")
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  DBI::dbWriteTable(
+    con,
+    "users",
+    data.frame(username = character(), stringsAsFactors = FALSE)
+  )
+
+  schema_state <- validate_auth_schema(con)
+  expect_false(schema_state$ok)
+  expect_true(any(grepl("Missing auth table", schema_state$errors)))
+  expect_true(any(grepl("users missing column", schema_state$errors)))
 })

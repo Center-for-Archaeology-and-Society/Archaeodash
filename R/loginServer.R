@@ -96,6 +96,230 @@ email_verified_value <- function(user_row) {
   !(is.null(val) || is.na(val) || identical(as.character(val), ""))
 }
 
+auth_db_is_sqlite <- function(con) {
+  inherits(con, "SQLiteConnection")
+}
+
+auth_table_sql <- function(con, table_name) {
+  DBI::SQL(as.character(DBI::dbQuoteIdentifier(con, table_name)))
+}
+
+auth_column_exists <- function(con, table_name, column_name) {
+  cols <- tryCatch(DBI::dbListFields(con, table_name), error = function(e) character())
+  column_name %in% cols
+}
+
+auth_migration_statement <- function(con, name, sql) {
+  list(name = name, sql = sql)
+}
+
+auth_migration_statements <- function(con) {
+  users_tbl <- as.character(DBI::dbQuoteIdentifier(con, "users"))
+  remember_tbl <- as.character(DBI::dbQuoteIdentifier(con, "remember_tokens"))
+  verify_tbl <- as.character(DBI::dbQuoteIdentifier(con, "email_verification_tokens"))
+  reset_tbl <- as.character(DBI::dbQuoteIdentifier(con, "password_reset_tokens"))
+
+  if (auth_db_is_sqlite(con)) {
+    return(list(
+      auth_migration_statement(
+        con,
+        "create_remember_tokens",
+        paste0(
+          "CREATE TABLE IF NOT EXISTS ", remember_tbl, " (",
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, ",
+          "username TEXT NOT NULL, ",
+          "token_hash TEXT NOT NULL UNIQUE, ",
+          "created_at TEXT NOT NULL, ",
+          "expires_at TEXT NOT NULL, ",
+          "last_used_at TEXT NULL, ",
+          "revoked INTEGER NOT NULL DEFAULT 0",
+          ")"
+        )
+      ),
+      auth_migration_statement(
+        con,
+        "create_email_verification_tokens",
+        paste0(
+          "CREATE TABLE IF NOT EXISTS ", verify_tbl, " (",
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, ",
+          "username TEXT NOT NULL, ",
+          "email TEXT NOT NULL, ",
+          "token_hash TEXT NOT NULL UNIQUE, ",
+          "created_at TEXT NOT NULL, ",
+          "expires_at TEXT NOT NULL, ",
+          "used_at TEXT NULL, ",
+          "revoked INTEGER NOT NULL DEFAULT 0",
+          ")"
+        )
+      ),
+      auth_migration_statement(
+        con,
+        "create_password_reset_tokens",
+        paste0(
+          "CREATE TABLE IF NOT EXISTS ", reset_tbl, " (",
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, ",
+          "username TEXT NOT NULL, ",
+          "email TEXT NOT NULL, ",
+          "token_hash TEXT NOT NULL UNIQUE, ",
+          "created_at TEXT NOT NULL, ",
+          "expires_at TEXT NOT NULL, ",
+          "used_at TEXT NULL, ",
+          "revoked INTEGER NOT NULL DEFAULT 0",
+          ")"
+        )
+      )
+    ))
+  }
+
+  list(
+    auth_migration_statement(
+      con,
+      "create_remember_tokens",
+      paste0(
+        "CREATE TABLE IF NOT EXISTS ", remember_tbl, " (",
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
+        "username VARCHAR(255) NOT NULL, ",
+        "token_hash VARCHAR(128) NOT NULL, ",
+        "created_at DATETIME NOT NULL, ",
+        "expires_at DATETIME NOT NULL, ",
+        "last_used_at DATETIME NULL, ",
+        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
+        "UNIQUE KEY token_hash_unique (token_hash), ",
+        "INDEX idx_username (username), ",
+        "INDEX idx_expires (expires_at), ",
+        "INDEX idx_revoked (revoked)",
+        ")"
+      )
+    ),
+    auth_migration_statement(
+      con,
+      "create_email_verification_tokens",
+      paste0(
+        "CREATE TABLE IF NOT EXISTS ", verify_tbl, " (",
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
+        "username VARCHAR(255) NOT NULL, ",
+        "email VARCHAR(255) NOT NULL, ",
+        "token_hash VARCHAR(128) NOT NULL, ",
+        "created_at DATETIME NOT NULL, ",
+        "expires_at DATETIME NOT NULL, ",
+        "used_at DATETIME NULL, ",
+        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
+        "UNIQUE KEY token_hash_unique (token_hash), ",
+        "INDEX idx_username (username), ",
+        "INDEX idx_email (email), ",
+        "INDEX idx_expires (expires_at), ",
+        "INDEX idx_revoked (revoked)",
+        ")"
+      )
+    ),
+    auth_migration_statement(
+      con,
+      "create_password_reset_tokens",
+      paste0(
+        "CREATE TABLE IF NOT EXISTS ", reset_tbl, " (",
+        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
+        "username VARCHAR(255) NOT NULL, ",
+        "email VARCHAR(255) NOT NULL, ",
+        "token_hash VARCHAR(128) NOT NULL, ",
+        "created_at DATETIME NOT NULL, ",
+        "expires_at DATETIME NOT NULL, ",
+        "used_at DATETIME NULL, ",
+        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
+        "UNIQUE KEY token_hash_unique (token_hash), ",
+        "INDEX idx_username (username), ",
+        "INDEX idx_email (email), ",
+        "INDEX idx_expires (expires_at), ",
+        "INDEX idx_revoked (revoked)",
+        ")"
+      )
+    )
+  )
+}
+
+auth_required_tables <- c("users", "remember_tokens", "email_verification_tokens", "password_reset_tokens")
+auth_required_columns <- list(
+  users = c("username", "password", "email", "email_verified_at"),
+  remember_tokens = c("id", "username", "token_hash", "created_at", "expires_at", "last_used_at", "revoked"),
+  email_verification_tokens = c("id", "username", "email", "token_hash", "created_at", "expires_at", "used_at", "revoked"),
+  password_reset_tokens = c("id", "username", "email", "token_hash", "created_at", "expires_at", "used_at", "revoked")
+)
+
+validate_auth_schema <- function(con) {
+  if (is.null(con)) return(list(ok = FALSE, errors = "Database connection is unavailable."))
+  missing_tables <- auth_required_tables[!vapply(
+    auth_required_tables,
+    function(table_name) DBI::dbExistsTable(con, table_name),
+    logical(1)
+  )]
+  errors <- character()
+  if (length(missing_tables) > 0) {
+    errors <- c(errors, paste0("Missing auth table(s): ", paste(missing_tables, collapse = ", ")))
+  }
+
+  existing_tables <- setdiff(auth_required_tables, missing_tables)
+  for (table_name in existing_tables) {
+    fields <- tryCatch(DBI::dbListFields(con, table_name), error = function(e) character())
+    missing_cols <- setdiff(auth_required_columns[[table_name]], fields)
+    if (length(missing_cols) > 0) {
+      errors <- c(errors, paste0("Table ", table_name, " missing column(s): ", paste(missing_cols, collapse = ", ")))
+    }
+  }
+
+  list(ok = length(errors) == 0, errors = errors)
+}
+
+run_auth_migrations <- function(con) {
+  if (!app_require_packages(c("DBI", "sodium"), feature = "Authentication")) {
+    return(list(ok = FALSE, errors = "Required authentication packages are unavailable."))
+  }
+  if (is.null(con)) return(list(ok = FALSE, errors = "Database connection is unavailable."))
+
+  results <- list()
+  errors <- character()
+  for (statement in auth_migration_statements(con)) {
+    ok <- tryCatch({
+      DBI::dbExecute(con, statement$sql)
+      TRUE
+    }, error = function(e) {
+      errors <<- c(errors, paste0(statement$name, ": ", conditionMessage(e)))
+      FALSE
+    })
+    app_log(paste0("Auth migration ", statement$name, ": ", if (isTRUE(ok)) "ok" else "failed"))
+    results[[statement$name]] <- ok
+  }
+
+  if (!auth_column_exists(con, "users", "email_verified_at")) {
+    users_tbl <- as.character(DBI::dbQuoteIdentifier(con, "users"))
+    alter_sql <- paste0("ALTER TABLE ", users_tbl, " ADD COLUMN email_verified_at ", if (auth_db_is_sqlite(con)) "TEXT NULL" else "DATETIME NULL")
+    ok <- tryCatch({
+      DBI::dbExecute(con, alter_sql)
+      TRUE
+    }, error = function(e) {
+      errors <<- c(errors, paste0("add_users_email_verified_at: ", conditionMessage(e)))
+      FALSE
+    })
+    app_log(paste0("Auth migration add_users_email_verified_at: ", if (isTRUE(ok)) "ok" else "failed"))
+    results[["add_users_email_verified_at"]] <- ok
+  } else {
+    app_log("Auth migration add_users_email_verified_at: already present")
+    results[["add_users_email_verified_at"]] <- TRUE
+  }
+
+  schema_state <- validate_auth_schema(con)
+  if (!isTRUE(schema_state$ok)) {
+    errors <- c(errors, schema_state$errors)
+  }
+  list(ok = length(errors) == 0, errors = unique(errors), results = results)
+}
+
+auth_schema_ready <- function(state) {
+  is.list(state) && isTRUE(state$ok)
+}
+
+auth_unavailable_message <- function() {
+  "Authentication is temporarily unavailable. Please contact support if this persists."
+}
+
 #' loginServer
 #'
 #' @param con Database connection
@@ -125,84 +349,19 @@ loginServer = function(con, input = input, output = output, session = session, c
   }
 
   ensure_auth_tables <- function() {
-    if (!app_require_packages(c("DBI", "sodium"), feature = "Authentication")) return(invisible(NULL))
-    if (is.null(con)) return(invisible(NULL))
+    state <- run_auth_migrations(con)
+    if (!auth_schema_ready(state)) {
+      app_log(paste0("Auth migration failed: ", paste(state$errors, collapse = " | ")))
+    }
+    state
+  }
 
-    users_tbl <- as.character(DBI::dbQuoteIdentifier(con, "users"))
-    remember_tbl <- as.character(DBI::dbQuoteIdentifier(con, "remember_tokens"))
-    verify_tbl <- as.character(DBI::dbQuoteIdentifier(con, "email_verification_tokens"))
-    reset_tbl <- as.character(DBI::dbQuoteIdentifier(con, "password_reset_tokens"))
-
-    try(DBI::dbExecute(
-      con,
-      paste0(
-        "CREATE TABLE IF NOT EXISTS ", remember_tbl, " (",
-        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
-        "username VARCHAR(255) NOT NULL, ",
-        "token_hash VARCHAR(128) NOT NULL, ",
-        "created_at DATETIME NOT NULL, ",
-        "expires_at DATETIME NOT NULL, ",
-        "last_used_at DATETIME NULL, ",
-        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
-        "UNIQUE KEY token_hash_unique (token_hash), ",
-        "INDEX idx_username (username), ",
-        "INDEX idx_expires (expires_at), ",
-        "INDEX idx_revoked (revoked)",
-        ")"
-      )
-    ), silent = TRUE)
-
-    try(DBI::dbExecute(
-      con,
-      paste0(
-        "ALTER TABLE ", users_tbl,
-        " ADD COLUMN email_verified_at DATETIME NULL"
-      )
-    ), silent = TRUE)
-
-    try(DBI::dbExecute(
-      con,
-      paste0(
-        "CREATE TABLE IF NOT EXISTS ", verify_tbl, " (",
-        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
-        "username VARCHAR(255) NOT NULL, ",
-        "email VARCHAR(255) NOT NULL, ",
-        "token_hash VARCHAR(128) NOT NULL, ",
-        "created_at DATETIME NOT NULL, ",
-        "expires_at DATETIME NOT NULL, ",
-        "used_at DATETIME NULL, ",
-        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
-        "UNIQUE KEY token_hash_unique (token_hash), ",
-        "INDEX idx_username (username), ",
-        "INDEX idx_email (email), ",
-        "INDEX idx_expires (expires_at), ",
-        "INDEX idx_revoked (revoked)",
-        ")"
-      )
-    ), silent = TRUE)
-
-    try(DBI::dbExecute(
-      con,
-      paste0(
-        "CREATE TABLE IF NOT EXISTS ", reset_tbl, " (",
-        "id BIGINT AUTO_INCREMENT PRIMARY KEY, ",
-        "username VARCHAR(255) NOT NULL, ",
-        "email VARCHAR(255) NOT NULL, ",
-        "token_hash VARCHAR(128) NOT NULL, ",
-        "created_at DATETIME NOT NULL, ",
-        "expires_at DATETIME NOT NULL, ",
-        "used_at DATETIME NULL, ",
-        "revoked TINYINT(1) NOT NULL DEFAULT 0, ",
-        "UNIQUE KEY token_hash_unique (token_hash), ",
-        "INDEX idx_username (username), ",
-        "INDEX idx_email (email), ",
-        "INDEX idx_expires (expires_at), ",
-        "INDEX idx_revoked (revoked)",
-        ")"
-      )
-    ), silent = TRUE)
-
-    invisible(NULL)
+  require_auth_schema <- function(notify = TRUE) {
+    if (!auth_schema_ready(credentials$auth_schema)) {
+      if (isTRUE(notify)) mynotification(auth_unavailable_message(), type = "error")
+      return(FALSE)
+    }
+    TRUE
   }
 
   now_chr <- function() format(Sys.time(), "%Y-%m-%d %H:%M:%S")
@@ -230,7 +389,7 @@ loginServer = function(con, input = input, output = output, session = session, c
   revoke_remember_token <- function(token) {
     token_hash <- hash_remember_token(token)
     if (!nzchar(token_hash) || is.null(con)) return(invisible(FALSE))
-    ensure_auth_tables()
+    if (!require_auth_schema(notify = FALSE)) return(invisible(FALSE))
     query <- DBI::sqlInterpolate(
       con,
       "UPDATE ?tbl SET revoked = 1 WHERE token_hash = ?token_hash",
@@ -256,7 +415,7 @@ loginServer = function(con, input = input, output = output, session = session, c
   issue_remember_token <- function(username, days_valid = 30L) {
     username <- tolower(trimws(as.character(username)))
     if (!nzchar(username) || is.null(con)) return("")
-    ensure_auth_tables()
+    if (!require_auth_schema(notify = FALSE)) return("")
 
     token <- make_remember_token()
     token_hash <- hash_remember_token(token)
@@ -293,7 +452,7 @@ loginServer = function(con, input = input, output = output, session = session, c
   find_username_by_remember_token <- function(token) {
     token_hash <- hash_remember_token(token)
     if (!nzchar(token_hash) || is.null(con)) return("")
-    ensure_auth_tables()
+    if (!require_auth_schema(notify = FALSE)) return("")
     query <- DBI::sqlInterpolate(
       con,
       paste0(
@@ -338,7 +497,7 @@ loginServer = function(con, input = input, output = output, session = session, c
     username <- tolower(trimws(as.character(username)))
     email <- normalize_auth_email(email)
     if (!nzchar(username) || !nzchar(email) || is.null(con)) return("")
-    ensure_auth_tables()
+    if (!require_auth_schema(notify = FALSE)) return("")
 
     token <- make_remember_token()
     token_hash <- hash_remember_token(token)
@@ -368,7 +527,7 @@ loginServer = function(con, input = input, output = output, session = session, c
   consume_auth_token <- function(token, table_sql) {
     token_hash <- hash_remember_token(token)
     if (!nzchar(token_hash) || is.null(con)) return(tibble::tibble())
-    ensure_auth_tables()
+    if (!require_auth_schema(notify = FALSE)) return(tibble::tibble())
     query <- DBI::sqlInterpolate(
       con,
       paste0(
@@ -486,7 +645,7 @@ loginServer = function(con, input = input, output = output, session = session, c
   credentials$status = FALSE
   credentials$res = tibble::tibble(username = NA)
   credentials$pending_reset_token <- ""
-  ensure_auth_tables()
+  credentials$auth_schema <- ensure_auth_tables()
 
   output$emailUI = renderUI({
     if (input$registerCheckbox) {
@@ -516,6 +675,7 @@ loginServer = function(con, input = input, output = output, session = session, c
 
   observeEvent(input$requestPasswordReset, {
     if (!app_require_packages(c("DBI", "sodium"), feature = "Password reset")) return(NULL)
+    if (!require_auth_schema()) return(NULL)
     removeModal()
     email <- normalize_auth_email(isolate(input$resetPasswordEmail))
     if (is_valid_email_address(email)) {
@@ -529,6 +689,7 @@ loginServer = function(con, input = input, output = output, session = session, c
 
   observeEvent(input$submitResetPassword, {
     if (!app_require_packages(c("DBI", "sodium"), feature = "Password reset")) return(NULL)
+    if (!require_auth_schema()) return(NULL)
     token <- as.character(credentials$pending_reset_token %||% "")
     new_password <- isolate(input$resetNewPassword)
     confirm_password <- isolate(input$resetConfirmPassword)
@@ -566,6 +727,7 @@ loginServer = function(con, input = input, output = output, session = session, c
 
   observeEvent(parsed_query(), {
     if (!app_require_packages(c("DBI", "sodium"), feature = "Authentication links")) return(NULL)
+    if (!require_auth_schema()) return(NULL)
     params <- parsed_query()
 
     verify_token <- as.character(params$verify %||% "")
@@ -602,6 +764,7 @@ loginServer = function(con, input = input, output = output, session = session, c
     if (!app_require_packages(c("DBI", "sodium"), feature = "Login")) {
       return(NULL)
     }
+    if (!require_auth_schema()) return(NULL)
     if (is.null(con)) {
       mynotification("Database connection is unavailable. Login is disabled.", type = "error")
       return(NULL)
@@ -685,6 +848,7 @@ loginServer = function(con, input = input, output = output, session = session, c
     if (!app_require_packages(c("DBI", "sodium"), feature = "Registration")) {
       return(NULL)
     }
+    if (!require_auth_schema()) return(NULL)
     if (is.null(con)) {
       mynotification("Database connection is unavailable. Registration is disabled.", type = "error")
       return(NULL)
@@ -761,6 +925,7 @@ loginServer = function(con, input = input, output = output, session = session, c
     if (!app_require_packages("DBI", feature = "Remembered login")) {
       return(NULL)
     }
+    if (!require_auth_schema(notify = FALSE)) return(NULL)
     if (is.null(con)) {
       return(NULL)
     }
