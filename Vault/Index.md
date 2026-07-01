@@ -20,6 +20,7 @@ Up: [[../../Vault/Index]]
 - [[Auth_User_Duplicate_Cleanup_Email_Verification_2026-05-01]]
 - [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
 - [[Uvr_GitHub_Install_Correction_2026-04-30]]
+- [[Production_App_Promotion_2026-07-01]]
 
 ## Notes
 - This vault uses atomic notes (one concept per file) linked with `[[Wikilinks]]`.
