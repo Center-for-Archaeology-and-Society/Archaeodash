@@ -35,3 +35,34 @@ View latest check results:
 ```bash
 tail -n 20 /var/log/archaeodash/live_healthcheck.log
 ```
+
+## Beta Runtime Watchdog (Every 2 Minutes)
+
+Auto-restarts `archaeodashbeta` only when both conditions persist:
+- high container CPU usage (default `>=85%`)
+- failed HTTP/content health check for beta URL
+
+Install from repository root (requires sudo):
+
+```bash
+sudo ./security/install_beta_watchdog_timer.sh
+```
+
+Optional custom script/URL/container:
+
+```bash
+sudo ./security/install_beta_watchdog_timer.sh ./security/beta_runtime_watchdog.sh http://127.0.0.1:23838/inst/app/ archaeodashbeta
+```
+
+Check timer/service status:
+
+```bash
+systemctl status archaeodash-beta-watchdog.timer --no-pager
+systemctl status archaeodash-beta-watchdog.service --no-pager
+```
+
+View latest watchdog results:
+
+```bash
+tail -n 20 /var/log/archaeodash/beta_watchdog.log
+```

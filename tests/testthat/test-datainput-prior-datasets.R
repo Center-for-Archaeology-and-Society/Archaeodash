@@ -238,6 +238,11 @@ test_that("confirm prior dataset load completes with persisted legacy transforma
       expect_equal(nrow(isolate(rvals$importedData)), 2)
       expect_equal(nrow(isolate(rvals$selectedData)), 2)
       expect_true(tx_name %in% names(isolate(rvals$transformations)))
+      expect_null(isolate(rvals$transformations[[tx_name]]))
+
+      session$setInputs(activeTransformation = tx_name)
+      session$flushReact()
+      expect_true(is.list(isolate(rvals$transformations[[tx_name]])))
     }
   )
 })
@@ -477,6 +482,72 @@ test_that("confirm prior load times out instead of hanging on stalled workspace 
       expect_equal(nrow(isolate(rvals$importedData)), 0)
       expect_equal(nrow(isolate(rvals$selectedData)), 0)
       expect_null(isolate(rvals$currentDatasetName))
+    }
+  )
+})
+
+test_that("deferred username initialization still allows confirm prior load", {
+  skip_if_not_installed("RSQLite")
+  skip_if_not_installed("shiny")
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+
+  dataset_name <- "demo_user_dataset_a"
+  DBI::dbWriteTable(
+    con,
+    dataset_name,
+    data.frame(rowid = c("1"), grp = c("A"), al = c("1.1"), stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+  DBI::dbWriteTable(
+    con,
+    paste0(dataset_name, "_metadata"),
+    data.frame(field = "variable", value = "al", stringsAsFactors = FALSE),
+    row.names = FALSE
+  )
+
+  rvals <- shiny::reactiveValues(
+    importedData = tibble::tibble(),
+    selectedData = tibble::tibble(),
+    transformations = list(),
+    activeTransformation = NULL,
+    currentDatasetName = NULL,
+    currentDatasetKey = NULL,
+    currentDatasetRowMap = NULL,
+    tbls = character()
+  )
+  credentials <- shiny::reactiveValues(
+    status = TRUE,
+    res = tibble::tibble(username = NA_character_)
+  )
+  server_fun <- function(input, output, session) {
+    ArchaeoDash::dataInputServer(
+      input = input,
+      output = output,
+      session = session,
+      rvals = rvals,
+      con = con,
+      credentials = credentials
+    )
+  }
+
+  shiny::testServer(
+    server_fun,
+    {
+      session$flushReact()
+      expect_identical(isolate(rvals$tbls), character())
+
+      credentials$res <- tibble::tibble(username = "demo_user")
+      session$flushReact()
+      expect_true(dataset_name %in% isolate(rvals$tbls))
+
+      session$setInputs(selectedDatasets = dataset_name)
+      expect_no_error(session$setInputs(confirmPrior = 1))
+      session$flushReact()
+
+      expect_equal(nrow(isolate(rvals$importedData)), 1)
+      expect_identical(as.character(isolate(rvals$currentDatasetName)), dataset_name)
     }
   )
 })

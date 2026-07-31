@@ -29,5 +29,11 @@ connect = function(db = Sys.getenv("db"), host = Sys.getenv('host'), user = Sys.
     app_log(conditionMessage(e))
     return(NULL)
   })
+  if (!is.null(con)) {
+    # Bound lock waits at the session level so blocked DML/metadata operations fail fast
+    # instead of freezing Shiny observers for minutes/hours.
+    try(DBI::dbExecute(con, "SET SESSION lock_wait_timeout = 5"), silent = TRUE)
+    try(DBI::dbExecute(con, "SET SESSION innodb_lock_wait_timeout = 10"), silent = TRUE)
+  }
   return(con)
 }

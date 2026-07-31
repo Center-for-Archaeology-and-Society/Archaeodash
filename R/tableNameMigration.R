@@ -116,7 +116,7 @@ migrate_table_names_to_32 <- function(con) {
   is_pref <- grepl("_preferences$", tbls)
   is_idx <- grepl("_transformations$", tbls)
   is_tx_data <- grepl("_tx_", tbls) | grepl("_(selected|selected_all|pca|umap|lda|meta)$", tbls)
-  is_system <- tbls %in% c("users", "remember_tokens")
+  is_system <- tbls %in% c("users", "remember_tokens", "email_verification_tokens", "password_reset_tokens")
   dataset_bases <- tbls[!(is_metadata | is_pref | is_idx | is_tx_data | is_system)]
   dataset_bases <- dataset_bases[grepl("_", dataset_bases)]
 

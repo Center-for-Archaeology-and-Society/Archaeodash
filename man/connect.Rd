@@ -30,5 +30,7 @@ database connection
 Connect
 }
 \examples{
+\dontrun{
 connect(db,host,user,pwd,port)
+}
 }

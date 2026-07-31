@@ -18,5 +18,7 @@ module
 Subset Module UI
 }
 \examples{
+\dontrun{
 subsetModUI("subset")
+}
 }

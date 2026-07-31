@@ -174,7 +174,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       return(NULL)
     }
     req(input$datasetName)
-    tblList = DBI::dbListTables(con)
+    tblList = tryCatch(DBI::dbListTables(con), error = function(e) character())
     datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
       janitor::make_clean_names()
     if(isTruthy(datasetname %in% tblList) && input$datasetName %>% length() > 0){
@@ -306,7 +306,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           field = c("datasetName","created", rep("variable",length(rvals$chem))),
           value = c(input$datasetName,as.character(as.Date(Sys.time())),rvals$chem)
         )
-        tblList = DBI::dbListTables(con)
+        tblList = tryCatch(DBI::dbListTables(con), error = function(e) character())
         if(isTruthy(datasetname %in% tblList) || input$datasetName %>% length() == 0){
           mynotification("This dataset already exists. Please choose a different name.", type = "error")
           return(NULL)
@@ -320,29 +320,11 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           return(NULL)
         }
         username <- as.character(credentials$res$username[[1]])
-        pref_tbl <- build_user_preferences_table_name(username, max_len = app_table_name_max_len)
-        prefs <- if (db_table_exists_safe(con, pref_tbl)) {
-          tryCatch(
-            dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
-            error = function(e) tibble::tibble(field = character(), value = character())
-          )
-        } else {
-          tibble::tibble(field = character(), value = character())
-        }
-        if (!all(c("field", "value") %in% names(prefs))) {
-          prefs <- tibble::tibble(field = character(), value = character())
-        }
-        prefs <- prefs %>%
-          dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value)) %>%
-          dplyr::filter(.data$field != "lastOpenedDataset") %>%
-          dplyr::bind_rows(tibble::tibble(field = "lastOpenedDataset", value = datasetname))
-        ok_pref <- db_write_table_safe(
+        ok_pref <- write_user_preference_safe(
           con = con,
-          table_name = pref_tbl,
-          value = prefs,
-          row.names = FALSE,
-          overwrite = TRUE,
-          context = "saving user dataset preference"
+          username = username,
+          field = "lastOpenedDataset",
+          value = datasetname
         )
         if (!isTRUE(ok_pref)) {
           mynotification("Dataset loaded, but failed to update last-opened preference.", type = "warning")

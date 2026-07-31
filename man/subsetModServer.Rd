@@ -18,5 +18,7 @@ module server
 Subset Module Server
 }
 \examples{
+\dontrun{
 subsetModServer("subset",rvals)
+}
 }

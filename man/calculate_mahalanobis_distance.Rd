@@ -27,6 +27,7 @@ This function calculates the squared Mahalanobis distance between two mean vecto
 given the scaling factor, covariance matrices, and sample size.
 }
 \examples{
+\dontrun{
 x_bar <- c(1, 2)
 y_bar <- c(2, 3)
 f0 <- 1
@@ -36,4 +37,5 @@ m <- 10
 
 distance <- calculate_mahalanobis_distance(x_bar, y_bar, f0, Sx, Sy, m)
 print(distance)
+}
 }

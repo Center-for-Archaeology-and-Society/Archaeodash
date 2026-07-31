@@ -44,6 +44,27 @@ if ! command -v Rscript >/dev/null 2>&1; then
   echo "Error: Rscript is not installed or not on PATH." >&2
   exit 1
 fi
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: docker is not installed or not on PATH." >&2
+  exit 1
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Error: docker compose is not available." >&2
+  exit 1
+fi
+
+COMPOSE_FILE="${ARCHAEODASH_COMPOSE_FILE:-$ROOT_DIR/../docker-compose.yml}"
+COMPOSE_SERVICE="${ARCHAEODASH_COMPOSE_SERVICE:-archaeodashbeta}"
+CONTAINER_NAME="${ARCHAEODASH_CONTAINER:-archaeodashbeta}"
+
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+  echo "Error: Docker Compose file not found: $COMPOSE_FILE" >&2
+  exit 1
+fi
+if ! docker compose -f "$COMPOSE_FILE" config --services | grep -qx "$COMPOSE_SERVICE"; then
+  echo "Error: Docker Compose service '$COMPOSE_SERVICE' not found in $COMPOSE_FILE." >&2
+  exit 1
+fi
 
 VERSION="$(date +%Y.%m.%d.%H%M)"
 TAG="v$VERSION"
@@ -84,31 +105,29 @@ fi
 git_as_rjbischo commit -m "Release $VERSION"
 git_as_rjbischo tag "$TAG"
 
-CRAN_REPO="${CRAN_REPO:-https://cloud.r-project.org}"
-Rscript -e "
-  dcf <- read.dcf('DESCRIPTION')
-  desc <- dcf[1, ]
-  fields <- c('Depends', 'Imports', 'LinkingTo', 'Suggests')
-  raw <- unlist(desc[intersect(fields, colnames(dcf))], use.names = FALSE)
-  tokens <- trimws(unlist(strsplit(raw, ',')))
-  tokens <- tokens[nzchar(tokens)]
-  pkgs <- gsub('^([A-Za-z0-9.]+).*$','\\\\1', tokens)
-  pkgs <- setdiff(unique(pkgs), c('R', rownames(installed.packages(priority='base'))))
 
-  installed <- rownames(installed.packages())
-  missing <- setdiff(pkgs, installed)
-
-  if (length(missing) > 0L) {
-    message('Installing missing dependencies: ', paste(missing, collapse=', '))
-    install.packages(missing, repos='${CRAN_REPO}', dependencies=TRUE)
-  } else {
-    message('No missing dependencies.')
-  }
-"
+# Install the official uvr R companion from GitHub, then install package deps from DESCRIPTION.
+Rscript -e "if (!requireNamespace('pak', quietly = TRUE)) install.packages('pak', repos = 'https://cloud.r-project.org'); if (!requireNamespace('uvr', quietly = TRUE)) pak::pak('nbafrank/uvr-r'); if (!requireNamespace('remotes', quietly = TRUE)) install.packages('remotes', repos = 'https://cloud.r-project.org'); remotes::install_deps('.')"
 
 R CMD INSTALL .
+
+echo "Rebuilding and recreating Docker Compose service '$COMPOSE_SERVICE'."
+docker compose -f "$COMPOSE_FILE" up -d --build --force-recreate "$COMPOSE_SERVICE"
+
+echo "Installing package inside Docker container '$CONTAINER_NAME'."
+docker compose -f "$COMPOSE_FILE" exec -T -w /srv/shiny-server "$COMPOSE_SERVICE" \
+  Rscript -e 'devtools::install_local(".", force = TRUE, dependencies = FALSE, upgrade = "never")'
+
+echo "Restarting Docker Compose service '$COMPOSE_SERVICE'."
+docker compose -f "$COMPOSE_FILE" restart "$COMPOSE_SERVICE"
+
+echo "Verifying Docker container '$CONTAINER_NAME' is running."
+if ! docker ps --filter "name=^${CONTAINER_NAME}$" --filter "status=running" --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+  echo "Error: container '$CONTAINER_NAME' is not running after deploy." >&2
+  exit 1
+fi
 
 git_as_rjbischo push "$REMOTE" "$BRANCH"
 git_as_rjbischo push "$REMOTE" "$TAG"
 
-echo "Deployed version $VERSION on branch $BRANCH with tag $TAG."
+echo "Deployed version $VERSION on branch $BRANCH with tag $TAG to Docker service '$COMPOSE_SERVICE'."

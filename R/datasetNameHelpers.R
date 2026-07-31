@@ -34,3 +34,19 @@ build_user_preferences_table_name <- function(username, max_len = app_table_name
   user_budget <- max(1, max_len - nchar(suffix) - 1 - nchar(hash))
   paste0(substr(user, 1, user_budget), "_", hash, suffix)
 }
+
+dataset_username_table_prefixes <- function(username, max_len = app_table_name_max_len, hash_len = 8L) {
+  if (is.null(username) || length(username) == 0 || is.na(username[[1]])) return(character())
+
+  raw_user <- tolower(trimws(as.character(username[[1]])))
+  if (!nzchar(raw_user)) return(character())
+
+  clean_user <- janitor::make_clean_names(raw_user)
+  if (!nzchar(clean_user)) return(raw_user)
+
+  user_budget <- max(1L, as.integer(max_len) - 1L - 1L - as.integer(hash_len))
+  truncated_user <- if (nchar(clean_user) > user_budget) substr(clean_user, 1, user_budget) else ""
+
+  prefixes <- c(raw_user, clean_user, truncated_user)
+  unique(prefixes[!is.na(prefixes) & nzchar(prefixes)])
+}

@@ -1,6 +1,4 @@
-Up: [[../../../../OneDrive - Arizona State University/Documents/Vault/Index]]
-Canonical Vault: [[../../../../OneDrive - Arizona State University/Documents/Vault/Index]]
-Vault Network: [[../../../../OneDrive - Arizona State University/Documents/Vault/Vault_Network]]
+Up: [[../../Vault/Index]]
 
 # Vault Index
 
@@ -15,6 +13,15 @@ Vault Network: [[../../../../OneDrive - Arizona State University/Documents/Vault
 - [[Workflows_MOC]]
 - [[Persistence_MOC]]
 - [[Quality_MOC]]
+- [[Repository_Fogs_Improvements_Security_Todo_2026-05-01]]
+- [[Auth_Migration_Explicit_Fail_Closed_2026-05-01]]
+- [[Deploy_Script_Docker_Compose_Beta_2026-05-01]]
+- [[Docker_Compose_Email_Env_Runtime_2026-05-01]]
+- [[Auth_User_Duplicate_Cleanup_Email_Verification_2026-05-01]]
+- [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
+- [[Uvr_GitHub_Install_Correction_2026-04-30]]
+- [[Production_App_Promotion_2026-07-01]]
 
 ## Notes
 - This vault uses atomic notes (one concept per file) linked with `[[Wikilinks]]`.
+- [[Multiplot_Async_Promise_Robustness_Fix_2026-04-13]]

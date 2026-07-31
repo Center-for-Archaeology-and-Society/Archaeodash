@@ -36,6 +36,14 @@
     document.cookie = name + "=; Max-Age=-1; path=/; SameSite=Lax" + secureFlag;
   }
 
+  function clearAuthCookieAndRevoke() {
+    var existingToken = getCookie("archaeodash_auth_token");
+    if (existingToken) {
+      sendRememberTokenRevoke(existingToken);
+    }
+    eraseCookie("archaeodash_auth_token");
+  }
+
   function sendRememberTokenRevoke(token) {
     if (!token) return;
     sendToShiny("remembered_token_revoke", token, 30);
@@ -65,16 +73,23 @@
             sendToShiny("remembered_token", msg.token, 30);
           }
         } else if (msg.action === "clear") {
-          var existingToken = getCookie("archaeodash_auth_token");
-          if (existingToken) {
-            sendRememberTokenRevoke(existingToken);
-          }
-          eraseCookie("archaeodash_auth_token");
+          clearAuthCookieAndRevoke();
         }
       });
       window.Shiny.addCustomMessageHandler("theme_preference", function (msg) {
         if (!msg || !msg.theme || typeof applyServerTheme !== "function") return;
         applyServerTheme(msg.theme);
+      });
+      window.Shiny.addCustomMessageHandler("session_reset", function (msg) {
+        if (!msg) msg = {};
+        if (msg.clear_auth !== false) {
+          clearAuthCookieAndRevoke();
+        }
+        if (msg.reload) {
+          window.setTimeout(function () {
+            window.location.reload();
+          }, 50);
+        }
       });
       return;
     }
@@ -219,11 +234,7 @@
       if (declineBtn) {
         declineBtn.addEventListener("click", function () {
           setCookie("archaeodash_cookie_consent", "declined", 180);
-          var existingToken = getCookie("archaeodash_auth_token");
-          if (existingToken) {
-            sendRememberTokenRevoke(existingToken);
-          }
-          eraseCookie("archaeodash_auth_token");
+          clearAuthCookieAndRevoke();
           if (banner) banner.style.display = "none";
           sendToShiny("cookie_consent", "declined", 30);
         });
