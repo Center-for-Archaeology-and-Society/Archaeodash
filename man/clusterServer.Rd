@@ -14,6 +14,10 @@ clusterServer(input, output, session, rvals, credentials, con)
 \item{session}{shiny session object}
 
 \item{rvals}{reactive values object}
+
+\item{credentials}{reactive values object containing authentication state}
+
+\item{con}{database connection}
 }
 \value{
 server
@@ -22,5 +26,7 @@ server
 Cluster Server
 }
 \examples{
-clusterServer(input,output,session,rvals)
+\dontrun{
+clusterServer(input, output, session, rvals, credentials, con)
+}
 }

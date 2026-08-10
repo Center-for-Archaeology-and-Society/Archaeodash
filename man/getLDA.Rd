@@ -24,5 +24,7 @@ list of results
 Compute LDA
 }
 \examples{
+\dontrun{
 getLDA(df,chem,attrGroups)
+}
 }

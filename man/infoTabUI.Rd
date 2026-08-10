@@ -13,5 +13,7 @@ UI
 infoTabUI
 }
 \examples{
+\dontrun{
 infoTabUI()
+}
 }

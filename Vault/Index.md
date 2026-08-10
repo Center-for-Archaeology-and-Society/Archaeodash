@@ -1,3 +1,5 @@
+Up: [[../../Vault/Index]]
+
 # Vault Index
 
 ## Map of Content
@@ -11,6 +13,15 @@
 - [[Workflows_MOC]]
 - [[Persistence_MOC]]
 - [[Quality_MOC]]
+- [[Repository_Fogs_Improvements_Security_Todo_2026-05-01]]
+- [[Auth_Migration_Explicit_Fail_Closed_2026-05-01]]
+- [[Deploy_Script_Docker_Compose_Beta_2026-05-01]]
+- [[Docker_Compose_Email_Env_Runtime_2026-05-01]]
+- [[Auth_User_Duplicate_Cleanup_Email_Verification_2026-05-01]]
+- [[Git_Commit_Transplant_Broken_To_Master_2026-04-30]]
+- [[Uvr_GitHub_Install_Correction_2026-04-30]]
+- [[Registration_Consent_Modal_Input_Persistence_Fix_2026-08-10]]
 
 ## Notes
 - This vault uses atomic notes (one concept per file) linked with `[[Wikilinks]]`.
+- [[Multiplot_Async_Promise_Robustness_Fix_2026-04-13]]

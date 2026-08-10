@@ -121,6 +121,36 @@ test_that("mainPlot uses conservative marker symbols for cross-version compatibi
   )))
 })
 
+test_that("mainPlot supports symbol mapping from a metadata field", {
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(6)),
+    grp = rep("A", 6),
+    context = c("alpha", "beta", "gamma", "alpha", "beta", "gamma"),
+    x = c(1, 2, 3, 4, 5, 6),
+    y = c(6, 5, 4, 3, 2, 1),
+    stringsAsFactors = FALSE
+  )
+
+  p <- mainPlot(
+    plotdf = plotdf,
+    xvar = "x",
+    yvar = "y",
+    attrGroups = "grp",
+    Conf = FALSE,
+    int.set = 0.9,
+    theme = "viridis",
+    use_symbols = TRUE,
+    symbol_col = "context"
+  )
+
+  built <- plotly::plotly_build(p)
+  marker_symbols <- unlist(lapply(built$x$data, function(tr) tr$marker$symbol), use.names = FALSE)
+  marker_symbols <- unique(as.character(marker_symbols))
+  marker_symbols <- marker_symbols[!is.na(marker_symbols) & nzchar(marker_symbols)]
+
+  expect_true(all(c("circle", "square", "diamond") %in% marker_symbols))
+})
+
 test_that("mainPlot tolerates missing theme and ellipse level inputs", {
   plotdf <- data.frame(
     rowid = as.character(seq_len(10)),
@@ -165,6 +195,44 @@ test_that("mainPlot skips ellipse gracefully when data are not ellipse-eligible"
     )
     expect_s3_class(p, "plotly")
   })
+})
+
+test_that("mainPlot uses the same group colors for markers and ellipses", {
+  set.seed(6)
+  plotdf <- data.frame(
+    rowid = as.character(seq_len(12)),
+    grp = rep(c("A", "B"), each = 6),
+    x = c(rnorm(6, mean = 0), rnorm(6, mean = 3)),
+    y = c(rnorm(6, mean = 0), rnorm(6, mean = 3)),
+    stringsAsFactors = FALSE
+  )
+
+  p <- mainPlot(
+    plotdf = plotdf,
+    xvar = "x",
+    yvar = "y",
+    attrGroups = "grp",
+    Conf = TRUE,
+    int.set = 0.9,
+    theme = "viridis"
+  )
+
+  built <- plotly::plotly_build(p)
+  marker_traces <- Filter(function(tr) identical(tr$mode, "markers"), built$x$data)
+  line_traces <- Filter(function(tr) identical(tr$mode, "lines"), built$x$data)
+
+  marker_colors <- stats::setNames(
+    vapply(marker_traces, function(tr) as.character(tr$marker$color[[1]]), character(1)),
+    vapply(marker_traces, function(tr) as.character(tr$name[[1]]), character(1))
+  )
+  line_colors <- stats::setNames(
+    vapply(line_traces, function(tr) as.character(tr$line$color[[1]]), character(1)),
+    vapply(line_traces, function(tr) as.character(tr$legendgroup[[1]]), character(1))
+  )
+
+  common_groups <- intersect(names(marker_colors), names(line_colors))
+  expect_true(length(common_groups) > 0)
+  expect_true(all(marker_colors[common_groups] == line_colors[common_groups]))
 })
 
 test_that("multiplot returns expected class for interactive and static modes", {
@@ -263,4 +331,22 @@ test_that("validate_multiplot_axes enforces non-empty and distinct selections", 
   expect_true(valid$ok)
   expect_equal(valid$x, "V1")
   expect_equal(valid$y, c("V2", "V3"))
+})
+
+test_that("resolve_multiplot_y_selection removes X variables from Y options", {
+  sel <- resolve_multiplot_y_selection(
+    all_vars = c("V1", "V2", "V3"),
+    x_vars = c("V1"),
+    y_vars = c("V1", "V2")
+  )
+  expect_equal(sel$choices, c("V2", "V3"))
+  expect_equal(sel$selected, "V2")
+
+  fallback <- resolve_multiplot_y_selection(
+    all_vars = c("V1", "V2"),
+    x_vars = c("V1"),
+    y_vars = c("V1")
+  )
+  expect_equal(fallback$choices, "V2")
+  expect_equal(fallback$selected, "V2")
 })

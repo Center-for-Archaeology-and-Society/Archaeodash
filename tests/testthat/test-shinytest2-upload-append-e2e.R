@@ -8,7 +8,7 @@ test_that("upload append handles shared column type mismatch without bind_rows f
     testthat::skip("Chrome/Chromium not available for shinytest2 run.")
   }
 
-  app_dir <- normalizePath(testthat::test_path("..", "..", "inst", "app"), mustWork = TRUE)
+  app_dir <- archaeo_test_app_dir()
 
   csv1 <- tempfile(fileext = ".csv")
   csv2 <- tempfile(fileext = ".csv")

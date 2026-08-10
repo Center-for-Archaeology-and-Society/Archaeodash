@@ -18,8 +18,8 @@ test_that("register temp user and load INAA_test.csv end-to-end", {
   }
   on.exit(try(DBI::dbDisconnect(con), silent = TRUE), add = TRUE)
 
-  app_dir <- normalizePath(testthat::test_path("..", "..", "inst", "app"), mustWork = TRUE)
-  csv_path <- normalizePath(testthat::test_path("..", "..", "inst", "app", "INAA_test.csv"), mustWork = TRUE)
+  app_dir <- archaeo_test_app_dir()
+  csv_path <- archaeo_test_app_file("INAA_test.csv")
   temp_id <- paste0(as.integer(Sys.time()), sample(1000:9999, 1))
   username <- paste0("zz_e2e_", temp_id)
   password <- paste0("Pw!", temp_id, "x")
@@ -39,6 +39,20 @@ test_that("register temp user and load INAA_test.csv end-to-end", {
   app$set_inputs(register = "click")
   app$wait_for_idle(timeout = 10000)
   app$set_inputs(registerConfirm = "click")
+  app$wait_for_idle(timeout = 30000)
+
+  DBI::dbExecute(
+    con,
+    sprintf(
+      "UPDATE users SET email_verified_at = NOW() WHERE username = %s",
+      DBI::dbQuoteString(con, username)
+    )
+  )
+
+  app$set_inputs(loginUI = "click")
+  app$wait_for_idle(timeout = 10000)
+  app$set_inputs(username = username, password = password, rememberLogin = TRUE)
+  app$set_inputs(login = "click")
   app$wait_for_idle(timeout = 30000)
 
   user_msg <- app$run_js("return (document.getElementById('userMessage') || {}).innerText || '';")

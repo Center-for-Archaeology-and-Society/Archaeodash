@@ -4,10 +4,12 @@
 \alias{comp.profile}
 \title{comp.profile}
 \usage{
-comp.profile(x)
+comp.profile(x, groups = NULL)
 }
 \arguments{
 \item{x}{vector of concentrations}
+
+\item{groups}{optional grouping vector; if provided, lines are colored by group}
 }
 \value{
 plot
@@ -16,5 +18,7 @@ plot
 plots concentrations
 }
 \examples{
+\dontrun{
 comp.profile(x)
+}
 }

@@ -174,7 +174,7 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       return(NULL)
     }
     req(input$datasetName)
-    tblList = DBI::dbListTables(con)
+    tblList = tryCatch(DBI::dbListTables(con), error = function(e) character())
     datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
       janitor::make_clean_names()
     if(isTruthy(datasetname %in% tblList) && input$datasetName %>% length() > 0){
@@ -225,8 +225,8 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         inline = FALSE
       ),
       checkboxInput("loadBlankNonElement", "Replace empty/NA non-element fields with [blank]", value = TRUE),
-      checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = FALSE),
-      checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = FALSE),
+      checkboxInput("loadZeroAsNA", "Treat zero values as NA", value = TRUE),
+      checkboxInput("loadNegativeAsNA", "Treat negative values as NA", value = TRUE),
       checkboxInput("loadNAAsZero", "Replace NA values with 0", value = FALSE)
     )
   })
@@ -240,6 +240,10 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       id_column = resolve_id_column(input$loadIDColumn, names(rvals$data))
       selected_cols = unique(c("rowid", input$loadcolumns, input$loadchem, id_column))
       selected_cols = intersect(selected_cols, names(rvals$data))
+      if (length(selected_cols) == 0) {
+        mynotification("No columns are selected for import. Choose at least one column.", type = "error")
+        return(invisible(NULL))
+      }
       data_loaded = rvals$data %>%
         dplyr::select(tidyselect::all_of(selected_cols)) %>%
         dplyr::mutate(dplyr::across(tidyselect::all_of(input$loadchem), ~ suppressWarnings(as.numeric(as.character(.)))))
@@ -293,20 +297,22 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
         if (!app_require_packages("DBI", feature = "Saving uploaded datasets to database")) {
           return(NULL)
         }
-        datasetname = paste0(credentials$res$username,"_",input$datasetName) %>%
-          janitor::make_clean_names()
-        if(nchar(datasetname) > 53){
-          mynotification("Error: datasetname is too long. Please try again.", type = "error")
-          return(NULL)
-        }
+        datasetname <- build_dataset_table_name(
+          username = credentials$res$username,
+          dataset_label = input$datasetName,
+          max_len = app_table_name_max_len
+        )
         data_metadata = tibble::tibble(
           field = c("datasetName","created", rep("variable",length(rvals$chem))),
           value = c(input$datasetName,as.character(as.Date(Sys.time())),rvals$chem)
         )
-        tblList = DBI::dbListTables(con)
+        tblList = tryCatch(DBI::dbListTables(con), error = function(e) character())
         if(isTruthy(datasetname %in% tblList) || input$datasetName %>% length() == 0){
           mynotification("This dataset already exists. Please choose a different name.", type = "error")
           return(NULL)
+        }
+        if (!identical(datasetname, janitor::make_clean_names(paste0(credentials$res$username, "_", input$datasetName)))) {
+          mynotification(paste0("Dataset name shortened for storage as: ", datasetname), type = "message")
         }
         ok_data <- db_write_table_safe(con, datasetname, data_loaded, row.names = FALSE, context = "saving uploaded dataset")
         ok_meta <- db_write_table_safe(con, paste0(datasetname, "_metadata"), data_metadata, row.names = FALSE, context = "saving uploaded dataset metadata")
@@ -314,32 +320,14 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
           return(NULL)
         }
         username <- as.character(credentials$res$username[[1]])
-        pref_tbl <- paste0(username, "_preferences")
-        prefs <- if (db_table_exists_safe(con, pref_tbl)) {
-          tryCatch(
-            dplyr::tbl(con, pref_tbl) %>% dplyr::collect() %>% dplyr::mutate_all(as.character),
-            error = function(e) tibble::tibble(field = character(), value = character())
-          )
-        } else {
-          tibble::tibble(field = character(), value = character())
-        }
-        if (!all(c("field", "value") %in% names(prefs))) {
-          prefs <- tibble::tibble(field = character(), value = character())
-        }
-        prefs <- prefs %>%
-          dplyr::transmute(field = as.character(.data$field), value = as.character(.data$value)) %>%
-          dplyr::filter(.data$field != "lastOpenedDataset") %>%
-          dplyr::bind_rows(tibble::tibble(field = "lastOpenedDataset", value = datasetname))
-        ok_pref <- db_write_table_safe(
+        ok_pref <- write_user_preference_safe(
           con = con,
-          table_name = pref_tbl,
-          value = prefs,
-          row.names = FALSE,
-          overwrite = TRUE,
-          context = "saving user dataset preference"
+          username = username,
+          field = "lastOpenedDataset",
+          value = datasetname
         )
         if (!isTRUE(ok_pref)) {
-          return(NULL)
+          mynotification("Dataset loaded, but failed to update last-opened preference.", type = "warning")
         }
         rvals$currentDatasetName <- datasetname
         rvals$currentDatasetKey <- build_dataset_key(datasetname)
@@ -351,7 +339,8 @@ dataLoaderServer = function(rvals, input,output,session, credentials, con){
       }
       removeModal()
     }, error = function(e){
-      mynotification(paste("An error occurred. Please try again. Error:\n",e), type = "error")
+      app_log(paste0("loadData: error ", conditionMessage(e)))
+      mynotification(paste0("Unable to import dataset: ", conditionMessage(e)), type = "error")
     })
   })
 }

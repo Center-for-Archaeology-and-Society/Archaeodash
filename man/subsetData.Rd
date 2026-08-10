@@ -13,5 +13,7 @@ UI
 Subset Data UI
 }
 \examples{
+\dontrun{
 subsetData()
+}
 }

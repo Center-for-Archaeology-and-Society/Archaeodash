@@ -7,8 +7,8 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
     testthat::skip("Chrome/Chromium not available for shinytest2 run.")
   }
 
-  app_dir <- normalizePath(testthat::test_path("..", "..", "inst", "app"), mustWork = TRUE)
-  csv_path <- normalizePath(testthat::test_path("..", "..", "inst", "app", "INAA_test.csv"), mustWork = TRUE)
+  app_dir <- archaeo_test_app_dir()
+  csv_path <- archaeo_test_app_file("INAA_test.csv")
 
   extract_dt_data <- function(widget_value) {
     if (inherits(widget_value, "json") || is.character(widget_value)) {
@@ -89,6 +89,11 @@ test_that("membership and euclidean checkbox assignment flows work end-to-end", 
   app$wait_for_idle(timeout = 10000)
   app$set_inputs(confirmTransformationAction = "click")
   app$wait_for_idle(timeout = 60000)
+
+  # Regression: top-level Visualize & Assign tab must be addressable by value.
+  app$set_inputs(nav = "visualizetab")
+  app$wait_for_value(input = "nav", timeout = 15000)
+  expect_equal(app$get_value(input = "nav"), "visualizetab")
 
   # Membership: assign checked row to BestGroup, then to a new group.
   app$set_inputs(nav = "groupMembershiptab")

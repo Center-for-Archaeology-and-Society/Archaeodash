@@ -1,4 +1,16 @@
 transformation_sep <- "\u001f"
+transform_table_name_max_len <- 32L
+transform_table_suffixes <- c("_selected", "_selected_all", "_pca", "_umap", "_lda", "_meta")
+transform_prefix_max_len <- function() {
+  as.integer(transform_table_name_max_len - max(nchar(transform_table_suffixes)))
+}
+
+transform_table_name_hash <- function(x, n = 8) {
+  tf <- tempfile("archaeodash_transform_table_name_")
+  on.exit(unlink(tf), add = TRUE)
+  writeBin(charToRaw(enc2utf8(as.character(x))), tf)
+  substr(as.character(tools::md5sum(tf)[[1]]), 1, n)
+}
 
 collapse_transform_values <- function(x) {
   x <- as.character(x)
@@ -56,11 +68,26 @@ build_dataset_key <- function(dataset_names) {
 }
 
 transform_index_table <- function(username) {
-  safe_table_name(paste0(username, "_transformations"), max_len = 63)
+  user <- janitor::make_clean_names(as.character(username))
+  suffix <- "_transformations"
+  candidate <- paste0(user, suffix)
+  if (nchar(candidate) <= transform_table_name_max_len) return(candidate)
+
+  hash <- transform_table_name_hash(candidate, n = 6)
+  user_budget <- max(1, transform_table_name_max_len - nchar(suffix) - 1 - nchar(hash))
+  paste0(substr(user, 1, user_budget), "_", hash, suffix)
 }
 
 transform_prefix <- function(username, dataset_key, transformation_name) {
-  safe_table_name(paste(username, "tx", dataset_key, transformation_name, sep = "_"), max_len = 55)
+  cleaned <- safe_table_name(
+    paste(username, "tx", dataset_key, transformation_name, sep = "_"),
+    max_len = 63
+  )
+  max_len <- transform_prefix_max_len()
+  if (nchar(cleaned) <= max_len) return(cleaned)
+  suffix <- transform_table_name_hash(cleaned, n = 6)
+  base_budget <- max_len - 1 - nchar(suffix)
+  paste0(substr(cleaned, 1, max(1, base_budget)), "_", suffix)
 }
 
 ensure_transform_index_table <- function(con, username) {
@@ -238,77 +265,122 @@ persist_transformation_db <- function(con, username, dataset_key, snapshot) {
   invisible(TRUE)
 }
 
-load_transformations_db <- function(con, username, dataset_key) {
-  if (is.null(con) || !nzchar(username) || !nzchar(dataset_key)) return(list())
+list_transformations_db <- function(con, username, dataset_key) {
+  if (is.null(con) || !nzchar(username) || !nzchar(dataset_key)) return(character())
   if (!app_require_packages("DBI", feature = "Persistent transformations")) {
-    return(list())
+    return(character())
   }
   idx_tbl <- transform_index_table(username)
   idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
-  if (!DBI::dbExistsTable(con, idx_tbl)) return(list())
+  if (!DBI::dbExistsTable(con, idx_tbl)) return(character())
 
   quoted_key <- DBI::dbQuoteString(con, dataset_key)
-  rows <- DBI::dbGetQuery(
-    con,
-    paste0("SELECT * FROM ", idx_tbl_sql, " WHERE dataset_key = ", quoted_key)
+  rows <- tryCatch(
+    DBI::dbGetQuery(
+      con,
+      paste0("SELECT transformation_name FROM ", idx_tbl_sql, " WHERE dataset_key = ", quoted_key)
+    ),
+    error = function(e) tibble::tibble()
   )
-  if (!is.data.frame(rows) || nrow(rows) == 0) return(list())
+  if (!is.data.frame(rows) || nrow(rows) == 0 || !("transformation_name" %in% names(rows))) {
+    return(character())
+  }
+  tx <- unique(as.character(rows$transformation_name))
+  tx[!is.na(tx) & nzchar(tx)]
+}
 
+load_single_transformation_db <- function(con, username, dataset_key, transformation_name) {
+  if (is.null(con) || !nzchar(username) || !nzchar(dataset_key) || !nzchar(transformation_name)) return(NULL)
+  if (!app_require_packages("DBI", feature = "Persistent transformations")) {
+    return(NULL)
+  }
+  idx_tbl <- transform_index_table(username)
+  idx_tbl_sql <- as.character(DBI::dbQuoteIdentifier(con, idx_tbl))
+  if (!DBI::dbExistsTable(con, idx_tbl)) return(NULL)
+
+  quoted_key <- DBI::dbQuoteString(con, dataset_key)
+  quoted_name <- DBI::dbQuoteString(con, transformation_name)
+  rows <- tryCatch(
+    DBI::dbGetQuery(
+      con,
+      paste0(
+        "SELECT * FROM ", idx_tbl_sql,
+        " WHERE dataset_key = ", quoted_key,
+        " AND transformation_name = ", quoted_name,
+        " LIMIT 1"
+      )
+    ),
+    error = function(e) tibble::tibble()
+  )
+  if (!is.data.frame(rows) || nrow(rows) == 0) return(NULL)
+
+  tx_name <- as.character(rows$transformation_name[[1]])
+  prefix <- as.character(rows$table_prefix[[1]])
+  selected_tbl <- paste0(prefix, "_selected")
+  selected_all_tbl <- paste0(prefix, "_selected_all")
+  meta_tbl <- paste0(prefix, "_meta")
+  if (!DBI::dbExistsTable(con, selected_tbl)) return(NULL)
+
+  selected_data <- dplyr::tbl(con, selected_tbl) %>% dplyr::collect()
+  selected_data_all <- if (DBI::dbExistsTable(con, selected_all_tbl)) dplyr::tbl(con, selected_all_tbl) %>% dplyr::collect() else selected_data
+  pcadf <- if (DBI::dbExistsTable(con, paste0(prefix, "_pca"))) dplyr::tbl(con, paste0(prefix, "_pca")) %>% dplyr::collect() else tibble::tibble()
+  umapdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_umap"))) dplyr::tbl(con, paste0(prefix, "_umap")) %>% dplyr::collect() else tibble::tibble()
+  LDAdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_lda"))) dplyr::tbl(con, paste0(prefix, "_lda")) %>% dplyr::collect() else tibble::tibble()
+
+  meta <- if (DBI::dbExistsTable(con, meta_tbl)) dplyr::tbl(con, meta_tbl) %>% dplyr::collect() else tibble::tibble(field = character(), value = character())
+  get_meta <- function(field_name, default = "") {
+    vals <- meta$value[meta$field == field_name]
+    if (length(vals) == 0 || is.na(vals[[1]])) default else as.character(vals[[1]])
+  }
+
+  list(
+    name = tx_name,
+    created = get_meta("created", as.character(rows$created[[1]])),
+    chem = split_transform_values(get_meta("chem", "")),
+    attr = split_transform_values(get_meta("attr", "")),
+    attrs = split_transform_values(get_meta("attrs", "")),
+    attrGroups = get_meta("attrGroups", ""),
+    attrGroupsSub = split_transform_values(get_meta("attrGroupsSub", "")),
+    transform.method = get_meta("transform.method", ""),
+    impute.method = get_meta("impute.method", ""),
+    runPCA = identical(get_meta("runPCA", "FALSE"), "TRUE"),
+    runUMAP = identical(get_meta("runUMAP", "FALSE"), "TRUE"),
+    runLDA = identical(get_meta("runLDA", "FALSE"), "TRUE"),
+    data.src = get_meta("data.src", "elements"),
+    xvar = get_meta("xvar", ""),
+    yvar = get_meta("yvar", ""),
+    xvar2 = split_transform_values(get_meta("xvar2", "")),
+    yvar2 = split_transform_values(get_meta("yvar2", "")),
+    Conf = identical(get_meta("Conf", "FALSE"), "TRUE"),
+    int.set = suppressWarnings(as.numeric(get_meta("int.set", "0.95"))),
+    plot_theme = get_meta("plot_theme", "viridis"),
+    use_symbols = identical(get_meta("use_symbols", "TRUE"), "TRUE"),
+    show_point_labels = identical(get_meta("show_point_labels", "FALSE"), "TRUE"),
+    pointLabelColumn = get_meta("pointLabelColumn", ""),
+    ratioMode = get_meta("ratioMode", "append"),
+    ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
+    selectedDataAll = selected_data_all,
+    selectedData = selected_data,
+    pcadf = pcadf,
+    umapdf = umapdf,
+    LDAdf = LDAdf,
+    pca = NULL,
+    LDAmod = NULL
+  )
+}
+
+load_transformations_db <- function(con, username, dataset_key) {
+  tx_names <- list_transformations_db(con, username, dataset_key)
+  if (length(tx_names) == 0) return(list())
   snapshots <- list()
-  for (i in seq_len(nrow(rows))) {
-    tx_name <- as.character(rows$transformation_name[[i]])
-    prefix <- as.character(rows$table_prefix[[i]])
-    selected_tbl <- paste0(prefix, "_selected")
-    selected_all_tbl <- paste0(prefix, "_selected_all")
-    meta_tbl <- paste0(prefix, "_meta")
-    if (!DBI::dbExistsTable(con, selected_tbl)) next
-
-    selected_data <- dplyr::tbl(con, selected_tbl) %>% dplyr::collect()
-    selected_data_all <- if (DBI::dbExistsTable(con, selected_all_tbl)) dplyr::tbl(con, selected_all_tbl) %>% dplyr::collect() else selected_data
-    pcadf <- if (DBI::dbExistsTable(con, paste0(prefix, "_pca"))) dplyr::tbl(con, paste0(prefix, "_pca")) %>% dplyr::collect() else tibble::tibble()
-    umapdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_umap"))) dplyr::tbl(con, paste0(prefix, "_umap")) %>% dplyr::collect() else tibble::tibble()
-    LDAdf <- if (DBI::dbExistsTable(con, paste0(prefix, "_lda"))) dplyr::tbl(con, paste0(prefix, "_lda")) %>% dplyr::collect() else tibble::tibble()
-
-    meta <- if (DBI::dbExistsTable(con, meta_tbl)) dplyr::tbl(con, meta_tbl) %>% dplyr::collect() else tibble::tibble(field = character(), value = character())
-    get_meta <- function(field_name, default = "") {
-      vals <- meta$value[meta$field == field_name]
-      if (length(vals) == 0 || is.na(vals[[1]])) default else as.character(vals[[1]])
-    }
-
-    snapshots[[tx_name]] <- list(
-      name = tx_name,
-      created = get_meta("created", as.character(rows$created[[i]])),
-      chem = split_transform_values(get_meta("chem", "")),
-      attr = split_transform_values(get_meta("attr", "")),
-      attrs = split_transform_values(get_meta("attrs", "")),
-      attrGroups = get_meta("attrGroups", ""),
-      attrGroupsSub = split_transform_values(get_meta("attrGroupsSub", "")),
-      transform.method = get_meta("transform.method", ""),
-      impute.method = get_meta("impute.method", ""),
-      runPCA = identical(get_meta("runPCA", "FALSE"), "TRUE"),
-      runUMAP = identical(get_meta("runUMAP", "FALSE"), "TRUE"),
-      runLDA = identical(get_meta("runLDA", "FALSE"), "TRUE"),
-      data.src = get_meta("data.src", "elements"),
-      xvar = get_meta("xvar", ""),
-      yvar = get_meta("yvar", ""),
-      xvar2 = split_transform_values(get_meta("xvar2", "")),
-      yvar2 = split_transform_values(get_meta("yvar2", "")),
-      Conf = identical(get_meta("Conf", "FALSE"), "TRUE"),
-      int.set = suppressWarnings(as.numeric(get_meta("int.set", "0.95"))),
-      plot_theme = get_meta("plot_theme", "viridis"),
-      use_symbols = identical(get_meta("use_symbols", "TRUE"), "TRUE"),
-      show_point_labels = identical(get_meta("show_point_labels", "FALSE"), "TRUE"),
-      pointLabelColumn = get_meta("pointLabelColumn", ""),
-      ratioMode = get_meta("ratioMode", "append"),
-      ratioSpecs = decode_ratio_specs(get_meta("ratioSpecs", "")),
-      selectedDataAll = selected_data_all,
-      selectedData = selected_data,
-      pcadf = pcadf,
-      umapdf = umapdf,
-      LDAdf = LDAdf,
-      pca = NULL,
-      LDAmod = NULL
+  for (tx_name in tx_names) {
+    snapshot <- tryCatch(
+      load_single_transformation_db(con, username, dataset_key, tx_name),
+      error = function(e) NULL
     )
+    if (!is.null(snapshot)) {
+      snapshots[[tx_name]] <- snapshot
+    }
   }
   snapshots
 }

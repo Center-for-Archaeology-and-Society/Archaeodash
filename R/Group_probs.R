@@ -11,46 +11,63 @@
 #' group.mem.probs(elements,assigned)
 group.mem.probs <- function(data,chem,group,eligible,method = "Hotellings", ID) {
   probsAlldf = NULL
+  eligible <- as.character(eligible)
+  eligible <- eligible[!is.na(eligible) & nzchar(eligible)]
+  eligible <- unique(eligible)
+  if (length(eligible) == 0) {
+    mynotification("No eligible groups are available for membership probabilities.", type = "error")
+    return(NULL)
+  }
+  chem <- intersect(as.character(chem), names(data))
+  if (length(chem) == 0) {
+    mynotification("No valid analysis columns are available for membership probabilities.", type = "error")
+    return(NULL)
+  }
   if (identical(method, "Hotellings") && !app_require_packages("ICSNP", feature = "Hotellings T2 group probabilities")) {
     mynotification("Falling back to Mahalanobis because Hotellings T2 is unavailable.", type = "warning")
     return(group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID))
   }
-  tryCatch({
-  if("PC1" %in% names(data)){
-    chem = data %>% dplyr::select(tidyselect::any_of(tidyselect::contains("PC"))) %>% names()
-  }
-
-  probsAll = matrix(nrow = nrow(data), ncol = length(eligible))
-  colnames(probsAll) = eligible
-  rownames(probsAll) = data[[ID]]
-  p.val <- NULL
-  for (r in 1:nrow(data)) {
-    for(grp in eligible){
-      grpindx = which(data[[group]]==grp)
-      grpindx = setdiff(grpindx,r)
-      if(method == "Hotellings"){
-        p.val <- tryCatch(
-          ICSNP::HotellingsT2(data[r,chem],data[grpindx,chem])$p.value %>% round(.,5)*100,
-          error = function(e) stop(e)
-        )
-      } else {
-        p.val <- getMahalanobis(data[r,chem],data[grpindx,chem])
-      }
-      probsAll[r,which(eligible == grp)] <- p.val
+  probsAlldf <- tryCatch({
+    if("PC1" %in% names(data)){
+      chem = data %>% dplyr::select(tidyselect::any_of(tidyselect::contains("PC"))) %>% names()
     }
 
-  }
-  bg = getBestGroup(probsAll,eligible,method = method)
-  probsAlldf = probsAll %>%
-    tibble::as_tibble() %>%
-    dplyr::mutate(ID = data[[ID]], Group = group, GroupVal = data[[group]],BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1)
+    probsAll = matrix(NA_real_, nrow = nrow(data), ncol = length(eligible))
+    colnames(probsAll) = eligible
+    rownames(probsAll) = as.character(data[[ID]])
+    p.val <- NULL
+    for (r in 1:nrow(data)) {
+      for(grp in eligible){
+        grpindx = which(data[[group]]==grp)
+        grpindx = setdiff(grpindx,r)
+        if(method == "Hotellings"){
+          p.val <- tryCatch(
+            ICSNP::HotellingsT2(data[r,chem],data[grpindx,chem])$p.value %>% round(.,5)*100,
+            error = function(e) stop(e)
+          )
+        } else {
+          p.val <- getMahalanobis(data[r,chem],data[grpindx,chem])
+        }
+        probsAll[r,which(eligible == grp)] <- if (is.finite(as.numeric(p.val))) as.numeric(p.val) else NA_real_
+      }
+
+    }
+    if (identical(method, "Mahalanobis")) {
+      probsAll[!is.finite(probsAll)] <- Inf
+    }
+    bg = getBestGroup(probsAll,eligible,method = method)
+    if (length(bg$nms) != nrow(data)) bg$nms <- rep(NA_character_, nrow(data))
+    if (length(bg$vals) != nrow(data)) bg$vals <- rep(NA_real_, nrow(data))
+    probsAll %>%
+      tibble::as_tibble() %>%
+      dplyr::mutate(ID = as.character(data[[ID]]), Group = group, GroupVal = as.character(data[[group]]),BestGroup = bg$nms, BestValue = bg$vals,InGroup = GroupVal == BestGroup,.before = 1)
   }, error = function(e){
     if (identical(method, "Hotellings")) {
       mynotification(glue::glue("Hotellings failed ({e$message}); falling back to Mahalanobis."), type = "warning")
-      probsAlldf <- group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID)
-      return(probsAlldf)
+      return(group.mem.probs(data = data, chem = chem, group = group, eligible = eligible, method = "Mahalanobis", ID = ID))
     }
     mynotification(glue::glue("unable to return group membership probabilities: {e}"), type = "error")
+    NULL
   })
   return(probsAlldf)
 }
@@ -92,13 +109,28 @@ getEligible = function(data,chem,group){
 #' @examples
 #' getBestGroup(probsAll,eligible)
 getBestGroup = function(probsAll,eligible, method){
-  if(method == "Hotellings")
-  bestVal = apply(probsAll,1,which.max) else
-    bestVal = apply(probsAll,1,which.min)
-  if(method == "Hotellings")
-    val = apply(probsAll,1,max) else
-      val = apply(probsAll,1,min)
-  nms = sapply(bestVal,function(x)eligible[x]) %>% unname()
+  probsAll <- as.matrix(probsAll)
+  if (!is.numeric(probsAll)) {
+    suppressWarnings(storage.mode(probsAll) <- "double")
+  }
+  if (length(eligible) == 0 || nrow(probsAll) == 0 || ncol(probsAll) == 0) {
+    return(list(nms = character(), vals = numeric()))
+  }
+  n <- nrow(probsAll)
+  nms <- rep(NA_character_, n)
+  val <- rep(NA_real_, n)
+  for (i in seq_len(n)) {
+    row_vals <- probsAll[i, ]
+    valid_idx <- which(!is.na(row_vals))
+    if (length(valid_idx) == 0) next
+    pick_idx <- if (method == "Hotellings") {
+      valid_idx[which.max(row_vals[valid_idx])]
+    } else {
+      valid_idx[which.min(row_vals[valid_idx])]
+    }
+    nms[[i]] <- as.character(eligible[[pick_idx]])
+    val[[i]] <- as.numeric(row_vals[[pick_idx]])
+  }
   return(list(nms = nms, vals = val))
 }
 
@@ -116,19 +148,57 @@ getMahalanobis = function(row, data){
   if (!is.data.frame(data) || nrow(data) < 2 || ncol(data) == 0) {
     return(Inf)
   }
-  cov_matrix <- suppressWarnings(cov(data))
-  mean_data <- suppressWarnings(colMeans(data))
+  row_vec <- suppressWarnings(as.numeric(as.matrix(row)))
+  data_matrix <- suppressWarnings(as.matrix(data))
+  suppressWarnings(storage.mode(data_matrix) <- "double")
+  if (length(row_vec) == 0 || ncol(data_matrix) == 0) {
+    return(Inf)
+  }
+  keep_cols <- is.finite(row_vec)
+  if (!any(keep_cols)) {
+    return(Inf)
+  }
+  row_vec <- row_vec[keep_cols]
+  data_matrix <- data_matrix[, keep_cols, drop = FALSE]
+  if (ncol(data_matrix) == 0) {
+    return(Inf)
+  }
+  complete_rows <- stats::complete.cases(data_matrix)
+  data_matrix <- data_matrix[complete_rows, , drop = FALSE]
+  if (nrow(data_matrix) < 2) {
+    return(Inf)
+  }
+  variable_cols <- vapply(seq_len(ncol(data_matrix)), function(i) {
+    vals <- data_matrix[, i]
+    n_finite <- sum(is.finite(vals))
+    if (n_finite < 2) return(FALSE)
+    stats::var(vals, na.rm = TRUE) > 0
+  }, logical(1))
+  if (!any(variable_cols)) {
+    return(Inf)
+  }
+  row_vec <- row_vec[variable_cols]
+  data_matrix <- data_matrix[, variable_cols, drop = FALSE]
+  if (ncol(data_matrix) == 0 || nrow(data_matrix) < 2) {
+    return(Inf)
+  }
+  cov_matrix <- suppressWarnings(stats::cov(data_matrix))
+  cov_matrix <- as.matrix(cov_matrix)
+  if (any(!is.finite(cov_matrix))) {
+    return(Inf)
+  }
+  mean_data <- suppressWarnings(colMeans(data_matrix))
   result <- tryCatch(
-    stats::mahalanobis(row, mean_data, cov_matrix, tol = 1e-8),
+    stats::mahalanobis(matrix(row_vec, nrow = 1), mean_data, cov_matrix, tol = 1e-8)[[1]],
     error = function(e) {
       reg <- diag(1e-8, ncol(cov_matrix))
       tryCatch(
-        stats::mahalanobis(row, mean_data, cov_matrix + reg, tol = 1e-8),
+        stats::mahalanobis(matrix(row_vec, nrow = 1), mean_data, cov_matrix + reg, tol = 1e-8)[[1]],
         error = function(e2) Inf
       )
     }
   )
-  as.numeric(result)
+  if (is.finite(as.numeric(result))) as.numeric(result) else Inf
 }
 # read in sample data INAA_test, create attribute and element data.frames, impute missing data and transform
 # mydat <- read.csv('inst/INAA_test.csv',header=T,row.names=1)

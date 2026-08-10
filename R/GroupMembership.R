@@ -9,7 +9,7 @@
 
 groupTab = function(){
   tabPanel(title = "Probabilities and Distances",
-           id = "groupMembershiptab",
+           value = "groupMembershiptab",
            fluidPage(
              fluidRow(
                column(
@@ -83,8 +83,18 @@ groupTab = function(){
 #' @examples
 #' groupServer(input,output,session,rvals)
 groupServer = function(input,output,session,rvals, credentials, con){
-  membership_proxy <- DT::dataTableProxy("membershipTbl")
   selected_membership_rowids <- shiny::reactiveVal(character())
+  resolve_group_column <- function(df = NULL) {
+    candidate <- tryCatch(as.character(rvals$attrGroups[[1]]), error = function(e) "")
+    if (!nzchar(candidate)) {
+      candidate <- tryCatch(as.character(input$attrGroups[[1]]), error = function(e) "")
+    }
+    if (!is.data.frame(df) || nrow(df) == 0) return(candidate)
+    if (nzchar(candidate) && candidate %in% names(df)) return(candidate)
+    non_numeric <- names(df)[!vapply(df, is.numeric, logical(1))]
+    if (length(non_numeric) > 0) return(non_numeric[[1]])
+    names(df)[[1]]
+  }
 
   build_membership_display_table <- function(df) {
     checked_rowids <- shiny::isolate(selected_membership_rowids())
@@ -151,9 +161,12 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$grpSizeTbl = DT::renderDataTable({
     req(nrow(rvals$selectedData) > 0)
+    group_col <- resolve_group_column(rvals$selectedData)
+    req(nzchar(group_col))
+    req(group_col %in% names(rvals$selectedData))
     tbl = NULL
     quietly(label = "render group size",{
-      tbl = table(rvals$selectedData[[rvals$attrGroups]]) %>%
+      tbl = table(rvals$selectedData[[group_col]]) %>%
         as.data.frame() %>%
         setNames(c("Group","Count"))
     })
@@ -175,8 +188,11 @@ groupServer = function(input,output,session,rvals, credentials, con){
       source <- "elements"
     }
     source_features <- get_source_features(source_df, source)
+    group_col <- resolve_group_column(source_df)
+    req(nzchar(group_col))
+    req(group_col %in% names(source_df))
     if(isTruthy(!is.null(rvals$attrs))){
-      eligible = tryCatch(getEligible(source_df, chem = source_features, group = rvals$attrGroups),error = function(e) return(NULL))
+      eligible = tryCatch(getEligible(source_df, chem = source_features, group = group_col),error = function(e) return(NULL))
     } else {
       eligible = NULL
     }
@@ -273,22 +289,31 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   output$gGroupAssignChoiceUI <- renderUI({
     req(rvals$selectedData)
-    req(rvals$attrGroups)
-    groups <- available_group_assignments(rvals$selectedData, rvals$attrGroups)
-    selected_choice <- tryCatch(as.character(input$gGroupAssignChoice[[1]]), error = function(e) "")
+    group_col <- resolve_group_column(rvals$selectedData)
+    req(nzchar(group_col))
+    req(group_col %in% names(rvals$selectedData))
+    groups <- available_group_assignments(rvals$selectedData, group_col)
+    selected_choice <- tryCatch(as.character(shiny::isolate(input$gGroupAssignChoice[[1]])), error = function(e) "")
+    new_value <- tryCatch(as.character(shiny::isolate(input$gGroupAssignNew[[1]])), error = function(e) "")
     build_group_assignment_ui(
       choice_input_id = "gGroupAssignChoice",
       new_input_id = "gGroupAssignNew",
       groups = groups,
-      selected_choice = selected_choice
+      selected_choice = selected_choice,
+      new_value = new_value
     )
   })
 
   observeEvent(input$membershipRun,{
-    req(rvals$attrGroups)
     mynotification("calculating membership")
     source_data <- get_membership_data(input$membershipDataset)
     if (is.null(source_data)) return(invisible(NULL))
+    group_col <- resolve_group_column(source_data$df)
+    if (!nzchar(group_col) || !(group_col %in% names(source_data$df))) {
+      mynotification("No valid group column is available for membership calculation.", type = "error")
+      return(invisible(NULL))
+    }
+    rvals$attrGroups <- group_col
     df <- suppressWarnings(source_data$df %>% dplyr::mutate_at(dplyr::vars(source_data$features), as.numeric))
     feature_cols <- source_data$features
     if (identical(input$membershipDataset, "principal components")) {
@@ -298,7 +323,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
     eligible_groups <- eligible_groups[!is.na(eligible_groups) & nzchar(eligible_groups)]
     if (length(eligible_groups) == 0) {
       eligible_groups <- tryCatch(
-        getEligible(df, chem = feature_cols, group = rvals$attrGroups),
+        getEligible(df, chem = feature_cols, group = group_col),
         error = function(e) character()
       )
       eligible_groups <- as.character(eligible_groups)
@@ -340,7 +365,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
     rvals$membershipProbs = group.mem.probs(
       data = df,
       chem = feature_cols,
-      group = rvals$attrGroups,
+      group = group_col,
       eligible = eligible_groups,
       method = input$membershipMethod,
       ID = sample_id_col
@@ -456,6 +481,11 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
   apply_membership_assignment <- function(values) {
     req(rvals$membershipProbs)
+    group_col <- resolve_group_column(rvals$importedData)
+    if (!nzchar(group_col) || !(group_col %in% names(rvals$importedData))) {
+      mynotification("Unable to determine a valid group column for assignment updates.", type = "error")
+      return(invisible(NULL))
+    }
     selected_rows <- get_checked_membership_rows()
     if (is.null(selected_rows) || length(selected_rows) == 0) {
       mynotification("Check one or more rows in Membership Probabilities first.", type = "warning")
@@ -477,7 +507,7 @@ groupServer = function(input,output,session,rvals, credentials, con){
 
     replaceCell(
       rowid = rowid,
-      col = rvals$attrGroups,
+      col = group_col,
       value = values,
       rvals = rvals,
       con = con,
@@ -487,13 +517,8 @@ groupServer = function(input,output,session,rvals, credentials, con){
       session = session
     )
 
-    if (is.data.frame(rvals$membershipProbs) && nrow(rvals$membershipProbs) > 0) {
-      DT::replaceData(
-        membership_proxy,
-        build_membership_display_table(rvals$membershipProbs),
-        resetPaging = FALSE,
-        rownames = FALSE
-      )
+    if (is.data.frame(rvals$membershipProbs)) {
+      rvals$membershipProbs <- rvals$membershipProbs
     }
     mynotification("Updated selected row assignments.", type = "message")
     invisible(NULL)
