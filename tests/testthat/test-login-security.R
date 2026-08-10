@@ -67,6 +67,27 @@ test_that("auth absolute URL includes query parameter names", {
   )
 })
 
+test_that("auth email MIME messages do not contain bare linefeeds", {
+  old_from <- Sys.getenv("ARCHAEODASH_SMTP_FROM", unset = NA_character_)
+  on.exit({
+    if (is.na(old_from)) {
+      Sys.unsetenv("ARCHAEODASH_SMTP_FROM")
+    } else {
+      Sys.setenv(ARCHAEODASH_SMTP_FROM = old_from)
+    }
+  }, add = TRUE)
+  Sys.setenv(ARCHAEODASH_SMTP_FROM = "noreply@example.com")
+
+  msg <- compose_auth_email_message(
+    to_email = "person@example.com",
+    subject = "Verify",
+    html_body = "<p>Hello</p>\n<p>World</p>",
+    text_body = "Hello\n\nWorld"
+  )
+
+  expect_false(grepl("(?<!\\r)\\n", msg, perl = TRUE))
+})
+
 test_that("email_verified_value recognizes verified and unverified rows", {
   expect_false(email_verified_value(data.frame(username = "a", stringsAsFactors = FALSE)))
   expect_false(email_verified_value(data.frame(email_verified_at = NA_character_, stringsAsFactors = FALSE)))

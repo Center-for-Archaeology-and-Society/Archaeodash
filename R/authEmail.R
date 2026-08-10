@@ -84,10 +84,16 @@ auth_email_subject <- function(kind = c("verify", "reset")) {
   }
 }
 
+normalize_email_line_endings <- function(x) {
+  gsub("\\r?\\n", "\r\n", as.character(x), perl = TRUE)
+}
+
 compose_auth_email_message <- function(to_email, subject, html_body, text_body = html_body) {
   from_email <- auth_email_sender()
   if (!nzchar(from_email)) return("")
   reply_to <- auth_email_reply_to()
+  text_body <- normalize_email_line_endings(text_body)
+  html_body <- normalize_email_line_endings(html_body)
   boundary <- paste0("archaeodash_", as.integer(Sys.time()), "_", sample.int(1e6, 1))
   headers <- c(
     paste0("From: ArchaeoDash <", from_email, ">"),

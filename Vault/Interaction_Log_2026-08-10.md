@@ -9,3 +9,4 @@
 - Deployed version `2026.08.10.2039` to live `archaeodash` and verified HTTP 200, DB/auth schema, SMTP settings, and focused auth tests inside the live container.
 - Traced verification email path; SMTP relay accepted a live probe, but auth URLs omitted query parameter names, so fixed verification/reset URLs to generate `?verify=...` and `?reset=...`.
 - Deployed version `2026.08.10.2044` to live `archaeodash`; verified HTTP 200, focused auth tests, and correct verification/reset URL generation inside the live container.
+- Traced registration email delivery failure to ASU SMTP rejecting bare LF line endings in the multipart MIME body; normalized auth email bodies to CRLF and verified the relay accepts the exact verification email shape.
