@@ -112,7 +112,7 @@ test_that("registration survives consent modal replacing original inputs", {
       if (is.na(old_env[[name]])) {
         Sys.unsetenv(name)
       } else {
-        Sys.setenv(structure(old_env[[name]], names = name))
+        do.call(Sys.setenv, stats::setNames(as.list(old_env[[name]]), name))
       }
     }
   }, add = TRUE)
@@ -161,4 +161,78 @@ test_that("registration survives consent modal replacing original inputs", {
   expect_equal(users$email[[1]], "newuser@example.com")
   expect_false(email_verified_value(users))
   expect_true(sodium::password_verify(users$password[[1]], "password123"))
+})
+
+test_that("registration retry resends verification for matching unverified account", {
+  skip_if_not_installed("RSQLite")
+  skip_if_not_installed("sodium")
+  skip_if_not_installed("curl")
+
+  old_env <- Sys.getenv(c(
+    "ARCHAEODASH_AUTH_EMAIL_MODE",
+    "ARCHAEODASH_SMTP_FROM",
+    "ARCHAEODASH_BASE_URL"
+  ), unset = NA_character_)
+  on.exit({
+    for (name in names(old_env)) {
+      if (is.na(old_env[[name]])) {
+        Sys.unsetenv(name)
+      } else {
+        do.call(Sys.setenv, stats::setNames(as.list(old_env[[name]]), name))
+      }
+    }
+  }, add = TRUE)
+  Sys.setenv(
+    ARCHAEODASH_AUTH_EMAIL_MODE = "log",
+    ARCHAEODASH_SMTP_FROM = "noreply@example.com",
+    ARCHAEODASH_BASE_URL = "https://archaeodash.example.test/"
+  )
+
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  on.exit(DBI::dbDisconnect(con), add = TRUE)
+  DBI::dbExecute(
+    con,
+    "CREATE TABLE users (
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      email TEXT NOT NULL,
+      email_verified_at TEXT NULL
+    )"
+  )
+  DBI::dbExecute(
+    con,
+    DBI::sqlInterpolate(
+      con,
+      "INSERT INTO users (username, password, email, email_verified_at) VALUES (?username, ?password, ?email, NULL)",
+      username = "newuser",
+      password = sodium::password_store("password123"),
+      email = "newuser@example.com"
+    )
+  )
+
+  credentials <- shiny::reactiveValues()
+  shiny::testServer(
+    function(input, output, session) {
+      loginServer(con, input, output, session, credentials)
+    },
+    {
+      session$setInputs(
+        username = "NewUser",
+        password = "password123",
+        email = "NewUser@Example.com"
+      )
+      session$setInputs(register = 1)
+      session$flushReact()
+      session$setInputs(username = NULL, password = NULL, email = NULL)
+      session$setInputs(registerConfirm = 1)
+      session$flushReact()
+    }
+  )
+
+  users <- DBI::dbReadTable(con, "users")
+  tokens <- DBI::dbReadTable(con, "email_verification_tokens")
+  expect_equal(nrow(users), 1L)
+  expect_equal(nrow(tokens), 1L)
+  expect_equal(tokens$username[[1]], "newuser")
+  expect_equal(tokens$email[[1]], "newuser@example.com")
 })

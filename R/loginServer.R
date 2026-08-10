@@ -926,8 +926,24 @@ loginServer = function(con, input = input, output = output, session = session, c
         mynotification("Registration created your account, but verification email delivery failed. Contact support to verify your email.", type = "warning")
       }
     }, error = function(e) {
+      existing_user <- tryCatch(select_user_by_username(username), error = function(err) tibble::tibble())
+      if (is.data.frame(existing_user) &&
+          nrow(existing_user) == 1 &&
+          !email_verified_value(existing_user) &&
+          identical(normalize_auth_email(existing_user$email[[1]]), email)) {
+        sent <- isTRUE(send_verification_email(username, email))
+        clear_login_failures(rate_key)
+        credentials$res = tibble::tibble(username = NA)
+        credentials$status = FALSE
+        if (sent) {
+          mynotification("Registration already exists. A fresh verification link has been sent.")
+        } else {
+          mynotification("Registration already exists, but verification email delivery failed. Contact support to verify your email.", type = "warning")
+        }
+        return(NULL)
+      }
       record_login_failure(rate_key)
-      mynotification("Registration Failed: User already exists or invalid data")
+      mynotification("Registration Failed: User already exists or invalid data", type = "error")
       credentials$res = tibble::tibble(username = NA)
       credentials$status = FALSE
     })
