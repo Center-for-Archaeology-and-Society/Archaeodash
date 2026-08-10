@@ -64,8 +64,10 @@ build_auth_absolute_url <- function(session = NULL, path = "/", query = list()) 
   rel_path <- if (nzchar(path)) sub("^/+", "", as.character(path)) else ""
   url <- paste0(base_url, rel_path)
   if (length(query) > 0) {
-    encoded_query <- paste(
-      stats::setNames(vapply(query, utils::URLencode, character(1), reserved = TRUE), names(query)),
+    encoded_query <- paste0(
+      utils::URLencode(names(query), reserved = TRUE),
+      "=",
+      vapply(query, utils::URLencode, character(1), reserved = TRUE),
       collapse = "&"
     )
     url <- paste0(url, if (grepl("\\?", url, fixed = TRUE)) "&" else "?", encoded_query)

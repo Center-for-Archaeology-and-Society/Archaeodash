@@ -46,6 +46,27 @@ test_that("email helper validators behave as expected", {
   expect_equal(normalize_auth_email(" Person@Example.Com "), "person@example.com")
 })
 
+test_that("auth absolute URL includes query parameter names", {
+  old_base <- Sys.getenv("ARCHAEODASH_BASE_URL", unset = NA_character_)
+  on.exit({
+    if (is.na(old_base)) {
+      Sys.unsetenv("ARCHAEODASH_BASE_URL")
+    } else {
+      Sys.setenv(ARCHAEODASH_BASE_URL = old_base)
+    }
+  }, add = TRUE)
+  Sys.setenv(ARCHAEODASH_BASE_URL = "https://archaeodash.example.test/app/")
+
+  expect_equal(
+    build_auth_absolute_url(NULL, query = list(verify = "abc123")),
+    "https://archaeodash.example.test/app/?verify=abc123"
+  )
+  expect_equal(
+    build_auth_absolute_url(NULL, query = list(reset = "a b")),
+    "https://archaeodash.example.test/app/?reset=a%20b"
+  )
+})
+
 test_that("email_verified_value recognizes verified and unverified rows", {
   expect_false(email_verified_value(data.frame(username = "a", stringsAsFactors = FALSE)))
   expect_false(email_verified_value(data.frame(email_verified_at = NA_character_, stringsAsFactors = FALSE)))
