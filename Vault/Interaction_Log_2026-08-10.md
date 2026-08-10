@@ -8,3 +8,4 @@
 - Checked live Shiny logs and registration dependencies; no Shiny auth errors were logged, DB/SMTP probes passed, and registration retry now resends verification for matching unverified accounts.
 - Deployed version `2026.08.10.2039` to live `archaeodash` and verified HTTP 200, DB/auth schema, SMTP settings, and focused auth tests inside the live container.
 - Traced verification email path; SMTP relay accepted a live probe, but auth URLs omitted query parameter names, so fixed verification/reset URLs to generate `?verify=...` and `?reset=...`.
+- Deployed version `2026.08.10.2044` to live `archaeodash`; verified HTTP 200, focused auth tests, and correct verification/reset URL generation inside the live container.
